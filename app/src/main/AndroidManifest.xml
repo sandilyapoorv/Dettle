@@ -15,6 +15,9 @@
     <!-- Wake lock (for overnight mode) -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!-- Audio / Voice Typing -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <application
         android:name=".DettleApplication"
         android:allowBackup="true"

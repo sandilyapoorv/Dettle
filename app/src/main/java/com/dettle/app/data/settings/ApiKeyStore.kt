@@ -143,6 +143,18 @@ class ApiKeyStore @Inject constructor(
         get() = prefs.getBoolean("overnight_notify", true)
         set(value) = prefs.edit().putBoolean("overnight_notify", value).apply()
 
+    // ─── Voice Typing (OpenWhispr) ──────────────────────────────────────────
+
+    /** Selected voice typing engine: "ON_DEVICE_DSP" or "OPENWHISPR_SERVER" */
+    var voiceTypingEngine: String
+        get() = prefs.getString("voice_typing_engine", "ON_DEVICE_DSP") ?: "ON_DEVICE_DSP"
+        set(value) = prefs.edit().putString("voice_typing_engine", value).apply()
+
+    /** Local OpenWhispr / Whisper server endpoint URL */
+    var openWhisprServerUrl: String
+        get() = prefs.getString("openwhispr_server_url", "http://10.0.2.2:8080/v1/audio/transcriptions") ?: "http://10.0.2.2:8080/v1/audio/transcriptions"
+        set(value) = prefs.edit().putString("openwhispr_server_url", value).apply()
+
     companion object {
         const val DEFAULT_SELECTOR_URL =
             "https://gist.githubusercontent.com/YOUR_GITHUB_USERNAME/GIST_ID/raw/dom_selectors.json"

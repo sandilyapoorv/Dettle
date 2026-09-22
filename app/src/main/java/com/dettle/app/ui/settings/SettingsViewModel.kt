@@ -50,7 +50,10 @@ class SettingsViewModel @Inject constructor(
             providerStatuses = keyPoolManager.getProviderStatuses(),
             // Google Drive
             driveConnected = driveConnector.isConnected(),
-            driveUserEmail = keyStore.driveUserEmail ?: ""
+            driveUserEmail = keyStore.driveUserEmail ?: "",
+            // Voice Typing
+            voiceTypingEngine = keyStore.voiceTypingEngine,
+            openWhisprUrl = keyStore.openWhisprServerUrl
         )
     }
 
@@ -110,6 +113,16 @@ class SettingsViewModel @Inject constructor(
         keyStore.cloudflareAccountId = id
         state = state.copy(cloudflareAccountId = id)
     }
+
+    fun setVoiceTypingEngine(engine: String) {
+        keyStore.voiceTypingEngine = engine
+        state = state.copy(voiceTypingEngine = engine)
+    }
+
+    fun setOpenWhisprUrl(url: String) {
+        keyStore.openWhisprServerUrl = url
+        state = state.copy(openWhisprUrl = url)
+    }
 }
 
 data class SettingsState(
@@ -132,5 +145,8 @@ data class SettingsState(
     val providerStatuses: List<ProviderStatus> = emptyList(),
     // Google Drive
     val driveConnected: Boolean = false,
-    val driveUserEmail: String = ""
+    val driveUserEmail: String = "",
+    // Voice Typing (OpenWhispr)
+    val voiceTypingEngine: String = "ON_DEVICE_DSP",
+    val openWhisprUrl: String = "http://10.0.2.2:8080/v1/audio/transcriptions"
 )

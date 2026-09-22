@@ -1,10 +1,18 @@
 package com.dettle.app.ui.chat
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
@@ -36,6 +44,8 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.AccountTree
 import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.Cancel
@@ -75,6 +85,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -85,14 +96,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.dettle.app.audio.VoiceTypingManager
 import com.dettle.app.domain.model.ChatMessage
 import com.dettle.app.domain.model.MessageRole
 import com.dettle.app.domain.model.MessageType
@@ -108,11 +123,62 @@ import com.dettle.app.ui.theme.DettleRed
 fun ChatScreen(
     viewModel: ChatViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val allModes by viewModel.allModes.collectAsState()
     val listState = rememberLazyListState()
     var inputText by remember { mutableStateOf("") }
     var customizingMode by remember { mutableStateOf<com.dettle.app.orchestrator.mode.AgentMode?>(null) }
+
+    // Voice Typing state
+    val voiceTypingManager = remember { VoiceTypingManager(context.applicationContext) }
+    val isVoiceListening by voiceTypingManager.isListening.collectAsState()
+    val voiceRmsDb by voiceTypingManager.rmsDb.collectAsState()
+    var baseTextBeforeVoice by remember { mutableStateOf("") }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            voiceTypingManager.stopListening()
+        }
+    }
+
+    fun startListeningInternal() {
+        baseTextBeforeVoice = inputText
+        voiceTypingManager.startListening(
+            onPartial = { partial ->
+                inputText = if (baseTextBeforeVoice.isBlank()) partial else "$baseTextBeforeVoice $partial"
+            },
+            onFinal = { finalResult ->
+                inputText = if (baseTextBeforeVoice.isBlank()) finalResult else "$baseTextBeforeVoice $finalResult"
+            },
+            onError = { error ->
+                Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    val audioPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            startListeningInternal()
+        } else {
+            Toast.makeText(context, "Microphone permission is required for voice typing", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun handleMicClick() {
+        if (isVoiceListening) {
+            voiceTypingManager.stopListening()
+        } else {
+            val permissionCheck = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
+            if (permissionCheck == PackageManager.PERMISSION_GRANTED) {
+                startListeningInternal()
+            } else {
+                audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        }
+    }
 
     LaunchedEffect(uiState.messages.size) {
         if (uiState.messages.isNotEmpty()) {
@@ -177,13 +243,16 @@ fun ChatScreen(
                 value = inputText,
                 enabled = uiState.inputEnabled,
                 isRunning = uiState.isAgentRunning,
+                isListening = isVoiceListening,
+                rmsDb = voiceRmsDb,
                 onValueChange = { inputText = it },
                 onSend = {
                     if (inputText.isNotBlank()) {
                         viewModel.sendMessage(inputText.trim())
                         inputText = ""
                     }
-                }
+                },
+                onMicClick = { handleMicClick() }
             )
         }
     ) { paddingValues ->
@@ -826,9 +895,18 @@ fun ChatInputBar(
     value: String,
     enabled: Boolean,
     isRunning: Boolean,
+    isListening: Boolean,
+    rmsDb: Float,
     onValueChange: (String) -> Unit,
-    onSend: () -> Unit
+    onSend: () -> Unit,
+    onMicClick: () -> Unit
 ) {
+    val micPulseAlpha by animateFloatAsState(
+        targetValue = if (isListening) 0.4f + (rmsDb * 0.6f) else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "micPulse"
+    )
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -837,58 +915,113 @@ fun ChatInputBar(
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 2.dp
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OutlinedTextField(
-                value = value,
-                onValueChange = onValueChange,
-                enabled = enabled,
-                modifier = Modifier.weight(1f),
-                placeholder = {
-                    Text(
-                        if (!enabled && isRunning) "Agent is working..." else "Ask Dettle anything...",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium
+        Column {
+            if (isListening) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary)
                     )
-                },
-                shape = MaterialTheme.shapes.large,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                ),
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Sentences,
-                    imeAction = ImeAction.Send
-                ),
-                keyboardActions = KeyboardActions(onSend = { onSend() }),
-                maxLines = 5,
-                textStyle = MaterialTheme.typography.bodyMedium
-            )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "Listening...",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
 
-            Spacer(Modifier.width(10.dp))
-
-            FilledIconButton(
-                onClick = onSend,
-                enabled = enabled && value.isNotBlank(),
-                modifier = Modifier.size(46.dp),
-                shape = MaterialTheme.shapes.small,
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.Send,
-                    contentDescription = "Send",
-                    modifier = Modifier.size(18.dp)
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    enabled = enabled,
+                    modifier = Modifier.weight(1f),
+                    placeholder = {
+                        Text(
+                            if (isListening) "Listening to speech..."
+                            else if (!enabled && isRunning) "Agent is working..."
+                            else "Ask Dettle anything...",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    },
+                    shape = MaterialTheme.shapes.large,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = if (isListening) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    ),
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Sentences,
+                        imeAction = ImeAction.Send
+                    ),
+                    keyboardActions = KeyboardActions(onSend = { onSend() }),
+                    maxLines = 5,
+                    textStyle = MaterialTheme.typography.bodyMedium
                 )
+
+                Spacer(Modifier.width(8.dp))
+
+                // Voice Typing Button
+                IconButton(
+                    onClick = onMicClick,
+                    enabled = enabled,
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(MaterialTheme.shapes.small)
+                        .background(
+                            if (isListening) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                            else Color.Transparent
+                        )
+                        .border(
+                            1.dp,
+                            if (isListening) MaterialTheme.colorScheme.primary.copy(alpha = micPulseAlpha)
+                            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                            MaterialTheme.shapes.small
+                        )
+                ) {
+                    Icon(
+                        if (isListening) Icons.Filled.Mic else Icons.Outlined.Mic,
+                        contentDescription = if (isListening) "Stop voice typing" else "Start voice typing",
+                        tint = if (isListening) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                Spacer(Modifier.width(8.dp))
+
+                FilledIconButton(
+                    onClick = onSend,
+                    enabled = enabled && value.isNotBlank(),
+                    modifier = Modifier.size(46.dp),
+                    shape = MaterialTheme.shapes.small,
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Send,
+                        contentDescription = "Send",
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
     }
