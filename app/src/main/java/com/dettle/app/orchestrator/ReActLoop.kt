@@ -24,8 +24,10 @@ import com.dettle.app.orchestrator.policy.PolicyEngine
 import com.dettle.app.orchestrator.policy.SalienceEvaluator
 import com.dettle.app.orchestrator.policy.SalienceType
 import com.dettle.app.orchestrator.reflex.ProceduralReflexEngine
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -239,8 +241,8 @@ class ReActLoop @Inject constructor(
                 history = history
             ))
         }
-    }   // end flow{}
-    }   // end fun run()
+    }.flowOn(Dispatchers.IO)
+    }
 
     /** Parse a structured JSON tool call from OpenAI-compatible providers */
     private fun parseToolCall(rawJson: String): ToolCall? {

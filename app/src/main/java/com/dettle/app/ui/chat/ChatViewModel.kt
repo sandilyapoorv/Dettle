@@ -1,7 +1,9 @@
 package com.dettle.app.ui.chat
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CoroutineExceptionHandler
 import com.dettle.app.domain.model.ApiMessage
 import com.dettle.app.domain.model.ApprovalRequest
 import com.dettle.app.domain.model.ApprovalStatus
@@ -81,25 +83,48 @@ class ChatViewModel @Inject constructor(
         addMessage(userMessage)
         _uiState.update { it.copy(isAgentRunning = true, inputEnabled = false) }
 
-        viewModelScope.launch {
-            // 1. Classify intent (or use locked mode)
-            val effectiveMode = resolveMode(text)
-            _uiState.update { it.copy(activeModeId = effectiveMode.id) }
+        val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
+            Log.e("ChatViewModel", "Unhandled exception in sendMessage coroutine", throwable)
+            _uiState.update { it.copy(isAgentRunning = false, inputEnabled = true, thinkingStep = 0) }
+            addMessage(
+                ChatMessage(
+                    role = MessageRole.ASSISTANT,
+                    type = MessageType.ERROR,
+                    content = "System Error: ${throwable.localizedMessage ?: "Unexpected error occurred. Please verify your API keys and network."}"
+                )
+            )
+        }
 
-            // 2. For GOAL mode: create or resume a persistent goal
-            val goal = if (effectiveMode.id == ModeId.GOAL) {
-                resolveGoal(text, effectiveMode)
-            } else null
+        viewModelScope.launch(exceptionHandler) {
+            try {
+                // 1. Classify intent (or use locked mode)
+                val effectiveMode = resolveMode(text)
+                _uiState.update { it.copy(activeModeId = effectiveMode.id) }
 
-            // 3. Run the loop
-            reActLoop.run(
-                userMessage = text,
-                conversationHistory = conversationHistory.toList(),
-                mode = effectiveMode,
-                goal = goal
-            ).collect { event -> handleLoopEvent(event) }
+                // 2. For GOAL mode: create or resume a persistent goal
+                val goal = if (effectiveMode.id == ModeId.GOAL) {
+                    resolveGoal(text, effectiveMode)
+                } else null
 
-            _uiState.update { it.copy(isAgentRunning = false, inputEnabled = true) }
+                // 3. Run the loop
+                reActLoop.run(
+                    userMessage = text,
+                    conversationHistory = conversationHistory.toList(),
+                    mode = effectiveMode,
+                    goal = goal
+                ).collect { event -> handleLoopEvent(event) }
+            } catch (t: Throwable) {
+                Log.e("ChatViewModel", "Caught throwable in chat execution loop", t)
+                addMessage(
+                    ChatMessage(
+                        role = MessageRole.ASSISTANT,
+                        type = MessageType.ERROR,
+                        content = "Execution failed: ${t.localizedMessage ?: "Check API settings and connectivity."}"
+                    )
+                )
+            } finally {
+                _uiState.update { it.copy(isAgentRunning = false, inputEnabled = true, thinkingStep = 0) }
+            }
         }
     }
 

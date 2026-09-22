@@ -5,8 +5,11 @@ import com.dettle.app.domain.model.ApiMessage
 import com.dettle.app.domain.model.Tool
 import com.dettle.app.domain.model.ToolParameters
 import com.dettle.app.domain.model.ToolProperty
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import okhttp3.Response
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -51,51 +54,51 @@ class OpenAICompatProvider(
         systemPrompt: String?,
         maxTokens: Int
     ): Flow<StreamChunk> = flow {
-
-        val allMessages = buildList {
-            if (systemPrompt != null) {
-                add(ApiMessage(role = "system", content = systemPrompt))
-            }
-            addAll(messages)
-        }
-
-        val requestBody = buildRequestBody(allMessages, tools, maxTokens)
-        val request = Request.Builder()
-            .url("${model.provider.baseUrl}/chat/completions")
-            .post(requestBody.toRequestBody("application/json".toMediaType()))
-            .header("Authorization", "Bearer $apiKey")
-            .header("Content-Type", "application/json")
-            .apply { extraHeaders.forEach { (k, v) -> header(k, v) } }
-            .build()
-
-        val response = client.newCall(request).execute()
-
-        when {
-            response.code == 429 -> {
-                val retryAfter = response.header("Retry-After")?.toLongOrNull()?.times(1000) ?: 60_000L
-                isRateLimited = true
-                rateLimitResetMs = System.currentTimeMillis() + retryAfter
-                response.close()
-                emit(StreamChunk.Error("Rate limit hit on ${model.provider.displayName}", isRateLimit = true))
-                return@flow
-            }
-            !response.isSuccessful -> {
-                val errorBody = response.body?.string() ?: "Unknown error"
-                response.close()
-                emit(StreamChunk.Error("${model.provider.displayName} error ${response.code}: $errorBody"))
-                return@flow
-            }
-        }
-
-        val source = response.body?.source() ?: run {
-            emit(StreamChunk.Error("Empty response body from ${model.provider.displayName}"))
-            return@flow
-        }
-
-        var totalPromptTokens = 0
-        var totalCompletionTokens = 0
-
+        var response: Response? = null
         try {
+            val allMessages = buildList {
+                if (systemPrompt != null) {
+                    add(ApiMessage(role = "system", content = systemPrompt))
+                }
+                addAll(messages)
+            }
+
+            val requestBody = buildRequestBody(allMessages, tools, maxTokens)
+            val cleanApiKey = apiKey.trim().replace("\r", "").replace("\n", "")
+            val request = Request.Builder()
+                .url("${model.provider.baseUrl}/chat/completions")
+                .post(requestBody.toRequestBody("application/json".toMediaType()))
+                .header("Authorization", "Bearer $cleanApiKey")
+                .header("Content-Type", "application/json")
+                .apply { extraHeaders.forEach { (k, v) -> header(k, v) } }
+                .build()
+
+            val callResponse = client.newCall(request).execute()
+            response = callResponse
+
+            when {
+                callResponse.code == 429 -> {
+                    val retryAfter = callResponse.header("Retry-After")?.toLongOrNull()?.times(1000) ?: 60_000L
+                    isRateLimited = true
+                    rateLimitResetMs = System.currentTimeMillis() + retryAfter
+                    emit(StreamChunk.Error("Rate limit hit on ${model.provider.displayName}", isRateLimit = true))
+                    return@flow
+                }
+                !callResponse.isSuccessful -> {
+                    val errorBody = callResponse.body?.string() ?: "Unknown error"
+                    emit(StreamChunk.Error("${model.provider.displayName} error ${callResponse.code}: $errorBody"))
+                    return@flow
+                }
+            }
+
+            val source = callResponse.body?.source() ?: run {
+                emit(StreamChunk.Error("Empty response body from ${model.provider.displayName}"))
+                return@flow
+            }
+
+            var totalPromptTokens = 0
+            var totalCompletionTokens = 0
+
             while (!source.exhausted()) {
                 val line = source.readUtf8Line() ?: break
                 if (!line.startsWith("data: ")) continue
@@ -144,10 +147,12 @@ class OpenAICompatProvider(
                     // Skip malformed chunks (streaming can have partial JSON)
                 }
             }
+        } catch (e: Exception) {
+            emit(StreamChunk.Error("${model.provider.displayName} network error: ${e.localizedMessage ?: e.message ?: "Unknown error"}"))
         } finally {
-            response.close()
+            response?.close()
         }
-    }
+    }.flowOn(Dispatchers.IO)
 
     private fun buildRequestBody(
         messages: List<ApiMessage>,

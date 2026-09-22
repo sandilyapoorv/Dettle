@@ -36,10 +36,16 @@ class ModeRouter @Inject constructor(
         history: List<ApiMessage> = emptyList()
     ): ClassificationResult {
         return try {
-            val response = callClassifier(userMessage, history)
-            parseResponse(response)
-        } catch (e: Exception) {
-            Log.w(TAG, "Classification failed: ${e.message}. Defaulting to CHAT.")
+            val response = kotlinx.coroutines.withTimeoutOrNull(4000L) {
+                callClassifier(userMessage, history)
+            } ?: ""
+            if (response.isBlank()) {
+                ClassificationResult(modeId = ModeId.CHAT, isAmbiguous = true, confidence = "LOW")
+            } else {
+                parseResponse(response)
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "Classification failed: ${t.message}. Defaulting to CHAT.")
             ClassificationResult(modeId = ModeId.CHAT, isAmbiguous = true, confidence = "LOW")
         }
     }

@@ -6,6 +6,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [v1.0.7] - 2026-09-22: Full System Robustness, Crash Prevention & Thread-Isolated API Routing
+
+### Direct APK Download
+- **Release APK (54.7 MB)**: [app-debug.apk](https://github.com/sandilyapoorv/Dettle/releases/download/v1.0.7/app-debug.apk)
+- **GitHub Release Page**: [https://github.com/sandilyapoorv/Dettle/releases/tag/v1.0.7](https://github.com/sandilyapoorv/Dettle/releases/tag/v1.0.7)
+- **CI/CD Workflow**: [https://github.com/sandilyapoorv/Dettle/actions](https://github.com/sandilyapoorv/Dettle/actions)
+
+### Why This Release Was Done
+Resolves a critical issue where entering API keys and executing agent operations caused the app to abruptly close. This release eliminates every crash vector across networking, coroutines, thread dispatchers, Keystore access, and UI collection, ensuring rock-solid stability under all network and key conditions.
+
+### Root Cause Analysis (Why the App Was Closing)
+1. **NetworkOnMainThreadException**: In `OpenAICompatProvider`, `GeminiProvider`, and `OllamaProvider`, synchronous OkHttp `client.newCall(request).execute()` was executed on the Main thread when invoked through `ChatViewModel.sendMessage()` -> `viewModelScope.launch` -> `resolveMode()` -> `modeRouter.classify()` -> `keyPoolManager.chat()`. Android StrictMode detected blocking socket I/O on the UI thread and immediately terminated the application process.
+2. **Uncaught Network & I/O Exceptions**: Network timeouts, invalid keys (HTTP 401/403/500), broken sockets, and DNS failures threw uncaught `IOException`, `SocketTimeoutException`, or `UnknownHostException` out of the provider flow, aborting the coroutine without handling.
+3. **OkHttp Header Format Validation**: Copying API keys with invisible trailing newlines or whitespace caused OkHttp's header builder to throw an unhandled `IllegalArgumentException` (`Unexpected char in header value`).
+4. **Missing CoroutineExceptionHandler & Error Shielding**: In `ChatViewModel.sendMessage()`, `viewModelScope.launch` had no exception handler and no `try-catch` around loop execution. Any unhandled exception escalated to Android's default thread exception handler, closing the app.
+5. **Keystore Initialization Fragility**: `EncryptedSharedPreferences.create` in `ApiKeyStore` lacked fallback handling, risking fatal crashes if Keystore corruption occurred during updates.
+
+### Key Architectural Changes & Commits
+1. **Thread Isolation & Flow Dispatching**:
+   - Appended `.flowOn(Dispatchers.IO)` to every provider flow in `OpenAICompatProvider`, `GeminiProvider`, `OllamaProvider`, and `KeyPoolManager`.
+   - Appended `.flowOn(Dispatchers.IO)` to `ReActLoop.run` and wrapped `ToolExecutor.execute` in `withContext(Dispatchers.IO)` to guarantee that all file, network, and tool operations run strictly off the UI thread.
+2. **Comprehensive Network Try-Catch & Error Emitting**:
+   - Wrapped OkHttp calls and SSE line streaming in robust `try-catch` blocks in all providers, emitting `StreamChunk.Error` with human-readable error messages and closing responses safely in `finally` blocks.
+3. **API Key Sanitization**:
+   - Sanitized API keys across `AIProviderFactory`, `OpenAICompatProvider`, and `GeminiProvider` using `.trim().replace("\r", "").replace("\n", "")` and blank-checking before building HTTP headers or URLs.
+4. **ChatViewModel Error Shielding**:
+   - Added `CoroutineExceptionHandler` to `ChatViewModel.sendMessage()`.
+   - Enclosed `resolveMode()`, `resolveGoal()`, and `reActLoop.run().collect` within a `try-catch-finally` block that gracefully displays error cards in chat, resets `isAgentRunning = false`, and restores `inputEnabled = true`.
+5. **Waterfall Failover on Provider Errors**:
+   - Updated `KeyPoolManager.chat` to catch exceptions per provider and attempt failover to subsequent available providers before returning an error.
+6. **Intent Classification Safety Timeout**:
+   - Wrapped `ModeRouter.classify` with `withTimeoutOrNull(4000L)` and `catch (t: Throwable)` falling back cleanly to `ModeId.CHAT`.
+7. **Keystore Initialization Fallback**:
+   - Added `try-catch` around `EncryptedSharedPreferences.create` in `ApiKeyStore` falling back to private `SharedPreferences` to prevent initialization crashes.
+8. **Top-Level Uncaught Exception Handler**:
+   - Implemented `Thread.setDefaultUncaughtExceptionHandler` in `DettleApplication.onCreate()` to log full stack traces and persist crash dumps to `crash_log.txt`.
+
+---
+
 ## [v1.0.6] - 2026-09-22: Multi-Account Subscriptions, Provider Deletion, 120 FPS Physics & Granular Backup
 
 ### Direct APK Download

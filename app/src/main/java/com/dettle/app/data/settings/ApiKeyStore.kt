@@ -26,17 +26,22 @@ class ApiKeyStore @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     private val prefs: SharedPreferences by lazy {
-        val masterKey = MasterKey.Builder(context)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build()
+        try {
+            val masterKey = MasterKey.Builder(context)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build()
 
-        EncryptedSharedPreferences.create(
-            context,
-            "dettle_secure_keys",
-            masterKey,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-        )
+            EncryptedSharedPreferences.create(
+                context,
+                "dettle_secure_keys",
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+        } catch (e: Exception) {
+            android.util.Log.e("ApiKeyStore", "Failed to initialize EncryptedSharedPreferences, falling back to private SharedPreferences", e)
+            context.getSharedPreferences("dettle_secure_keys_fallback", Context.MODE_PRIVATE)
+        }
     }
 
     // ─── Multi-Account API Provider Storage ───────────────────────────────
@@ -165,6 +170,11 @@ class ApiKeyStore @Inject constructor(
         val active = accounts.firstOrNull { it.isActive && it.rateLimitedUntilMs < now }
             ?: accounts.firstOrNull { it.isActive }
         return active?.apiKey ?: prefs.getString(keyFor(provider), null)?.takeIf { it.isNotBlank() }
+    }
+
+    fun setLegacyKey(provider: AIProviderType, apiKey: String) {
+        val trimmed = apiKey.trim()
+        prefs.edit().putString(keyFor(provider), trimmed).apply()
     }
 
     fun setKey(provider: AIProviderType, apiKey: String) {

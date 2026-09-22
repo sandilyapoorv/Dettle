@@ -5,9 +5,11 @@ import com.dettle.app.domain.model.AIModel
 import com.dettle.app.domain.model.ApiMessage
 import com.dettle.app.domain.model.FreeModels
 import com.dettle.app.domain.model.Tool
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onEach
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -89,6 +91,8 @@ class KeyPoolManager @Inject constructor(
             state.totalRequestsToday++
 
             var hitRateLimit = false
+            var hitError = false
+            var streamBegan = false
             var totalTokensUsed = 0
             val startTime = System.currentTimeMillis()
             var fullResponse = ""
@@ -97,52 +101,65 @@ class KeyPoolManager @Inject constructor(
             val messagesStr = messages.joinToString("\n") { "[${it.role.uppercase()}]: ${it.content?.take(500)}" }
             agentLogger.logPrompt(state.model.modelId, systemPrompt, messagesStr)
 
-            provider.chat(messages, tools, systemPrompt, maxTokens)
-                .onEach { chunk ->
-                    when (chunk) {
-                        is StreamChunk.Token -> fullResponse += chunk.text
-                        is StreamChunk.Done -> {
-                            agentLogger.logResponse(
-                                modelId = state.model.modelId,
-                                rawResponse = fullResponse,
-                                durationMs = System.currentTimeMillis() - startTime,
-                                tokens = chunk.usage?.totalTokens ?: 0
-                            )
+            try {
+                provider.chat(messages, tools, systemPrompt, maxTokens)
+                    .onEach { chunk ->
+                        when (chunk) {
+                            is StreamChunk.Token -> {
+                                streamBegan = true
+                                fullResponse += chunk.text
+                            }
+                            is StreamChunk.Done -> {
+                                agentLogger.logResponse(
+                                    modelId = state.model.modelId,
+                                    rawResponse = fullResponse,
+                                    durationMs = System.currentTimeMillis() - startTime,
+                                    tokens = chunk.usage?.totalTokens ?: 0
+                                )
+                                totalTokensUsed = chunk.usage?.totalTokens ?: 0
+                                state.totalTokensToday += totalTokensUsed
+                                Log.d(TAG, "${state.model.displayName}: used $totalTokensUsed tokens today (total: ${state.totalTokensToday})")
+                            }
+                            is StreamChunk.Error -> {
+                                if (chunk.isRateLimit) {
+                                    hitRateLimit = true
+                                    state.isOnCooldown = true
+                                    state.cooldownUntilMs = System.currentTimeMillis() + 60_000L
+                                    Log.w(TAG, "Rate limited on ${state.model.displayName}, cooling down 60s")
+                                } else {
+                                    hitError = true
+                                    lastError = chunk.message
+                                    Log.w(TAG, "Error on ${state.model.displayName}: ${chunk.message}")
+                                }
+                            }
+                            else -> {}
                         }
-                        is StreamChunk.Error -> {
-                            if (chunk.isRateLimit) {
-                                hitRateLimit = true
-                                state.isOnCooldown = true
-                                state.cooldownUntilMs = System.currentTimeMillis() + 60_000L
-                                Log.w(TAG, "Rate limited on ${state.model.displayName}, cooling down 60s")
+                    }
+                    .collect { chunk ->
+                        if (chunk is StreamChunk.Error) {
+                            lastError = chunk.message
+                            if (!streamBegan) {
+                                return@collect  // Will try next provider in pool
                             }
                         }
-                        is StreamChunk.Done -> {
-                            totalTokensUsed = chunk.usage?.totalTokens ?: 0
-                            state.totalTokensToday += totalTokensUsed
-                            Log.d(TAG, "${state.model.displayName}: used $totalTokensUsed tokens today (total: ${state.totalTokensToday})")
-                        }
-                        else -> {}
+                        emit(chunk)
                     }
-                }
-                .collect { chunk ->
-                    if (chunk is StreamChunk.Error && chunk.isRateLimit) {
-                        lastError = chunk.message
-                        return@collect  // Will try next provider
-                    }
-                    emit(chunk)
-                }
 
-            if (!hitRateLimit) return@flow  // Success — done
-            // hitRateLimit = true → fall through to next provider
+                if (!hitRateLimit && !hitError) return@flow  // Success — done
+                if (streamBegan) return@flow // Tokens were already emitted to UI
+            } catch (e: Exception) {
+                Log.e(TAG, "Provider ${state.model.displayName} failed with exception: ${e.message}", e)
+                lastError = e.message ?: "Provider error"
+                if (streamBegan) return@flow
+            }
         }
 
         // All providers exhausted
         emit(StreamChunk.Error(
-            lastError ?: "All providers are rate-limited or exhausted. Please wait a few minutes.",
-            isRateLimit = true
+            lastError ?: "All providers are rate-limited or unavailable. Please verify your API keys in Settings.",
+            isRateLimit = false
         ))
-    }
+    }.flowOn(Dispatchers.IO)
 
     /** Get current status of all providers (for the Settings/Agents screen) */
     fun getProviderStatuses(): List<ProviderStatus> {

@@ -3,8 +3,11 @@ package com.dettle.app.data.api
 import com.dettle.app.domain.model.AIModel
 import com.dettle.app.domain.model.ApiMessage
 import com.dettle.app.domain.model.Tool
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import okhttp3.Response
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -44,75 +47,75 @@ class GeminiProvider(
         systemPrompt: String?,
         maxTokens: Int
     ): Flow<StreamChunk> = flow {
-
-        // Build Gemini-format request
-        val contents = messages.filter { it.role != "system" }.map { msg ->
-            buildJsonObject {
-                put("role", JsonPrimitive(if (msg.role == "assistant") "model" else "user"))
-                put("parts", buildJsonArray {
-                    add(buildJsonObject { put("text", JsonPrimitive(msg.content)) })
-                })
-            }
-        }
-
-        val requestBody = buildJsonObject {
-            put("contents", buildJsonArray { contents.forEach { add(it) } })
-            put("safetySettings", buildJsonArray {
-                val blockNone = JsonPrimitive("BLOCK_NONE")
-                add(buildJsonObject { put("category", JsonPrimitive("HARM_CATEGORY_HARASSMENT")); put("threshold", blockNone) })
-                add(buildJsonObject { put("category", JsonPrimitive("HARM_CATEGORY_HATE_SPEECH")); put("threshold", blockNone) })
-                add(buildJsonObject { put("category", JsonPrimitive("HARM_CATEGORY_SEXUALLY_EXPLICIT")); put("threshold", blockNone) })
-                add(buildJsonObject { put("category", JsonPrimitive("HARM_CATEGORY_DANGEROUS_CONTENT")); put("threshold", blockNone) })
-            })
-            put("generationConfig", buildJsonObject {
-                put("maxOutputTokens", JsonPrimitive(maxTokens))
-                put("temperature", JsonPrimitive(0.7))
-            })
-            if (systemPrompt != null) {
-                put("systemInstruction", buildJsonObject {
-                    put("parts", buildJsonArray {
-                        add(buildJsonObject { put("text", JsonPrimitive(systemPrompt)) })
-                    })
-                })
-            }
-        }.toString()
-
-        val url = "${model.provider.baseUrl}/models/${model.modelId}:streamGenerateContent" +
-                "?key=$apiKey&alt=sse"
-
-        val request = Request.Builder()
-            .url(url)
-            .post(requestBody.toRequestBody("application/json".toMediaType()))
-            .header("Content-Type", "application/json")
-            .build()
-
-        val response = client.newCall(request).execute()
-
-        when {
-            response.code == 429 -> {
-                isRateLimited = true
-                rateLimitResetMs = System.currentTimeMillis() + 60_000L
-                response.close()
-                emit(StreamChunk.Error("Rate limit hit on Gemini", isRateLimit = true))
-                return@flow
-            }
-            !response.isSuccessful -> {
-                val error = response.body?.string() ?: "Unknown error"
-                response.close()
-                emit(StreamChunk.Error("Gemini error ${response.code}: $error"))
-                return@flow
-            }
-        }
-
-        val source = response.body?.source() ?: run {
-            emit(StreamChunk.Error("Empty Gemini response"))
-            return@flow
-        }
-
-        var promptTokens = 0
-        var completionTokens = 0
-
+        var response: Response? = null
         try {
+            // Build Gemini-format request
+            val contents = messages.filter { it.role != "system" }.map { msg ->
+                buildJsonObject {
+                    put("role", JsonPrimitive(if (msg.role == "assistant") "model" else "user"))
+                    put("parts", buildJsonArray {
+                        add(buildJsonObject { put("text", JsonPrimitive(msg.content)) })
+                    })
+                }
+            }
+
+            val requestBody = buildJsonObject {
+                put("contents", buildJsonArray { contents.forEach { add(it) } })
+                put("safetySettings", buildJsonArray {
+                    val blockNone = JsonPrimitive("BLOCK_NONE")
+                    add(buildJsonObject { put("category", JsonPrimitive("HARM_CATEGORY_HARASSMENT")); put("threshold", blockNone) })
+                    add(buildJsonObject { put("category", JsonPrimitive("HARM_CATEGORY_HATE_SPEECH")); put("threshold", blockNone) })
+                    add(buildJsonObject { put("category", JsonPrimitive("HARM_CATEGORY_SEXUALLY_EXPLICIT")); put("threshold", blockNone) })
+                    add(buildJsonObject { put("category", JsonPrimitive("HARM_CATEGORY_DANGEROUS_CONTENT")); put("threshold", blockNone) })
+                })
+                put("generationConfig", buildJsonObject {
+                    put("maxOutputTokens", JsonPrimitive(maxTokens))
+                    put("temperature", JsonPrimitive(0.7))
+                })
+                if (systemPrompt != null) {
+                    put("systemInstruction", buildJsonObject {
+                        put("parts", buildJsonArray {
+                            add(buildJsonObject { put("text", JsonPrimitive(systemPrompt)) })
+                        })
+                    })
+                }
+            }.toString()
+
+            val cleanApiKey = apiKey.trim().replace("\r", "").replace("\n", "")
+            val url = "${model.provider.baseUrl}/models/${model.modelId}:streamGenerateContent" +
+                    "?key=$cleanApiKey&alt=sse"
+
+            val request = Request.Builder()
+                .url(url)
+                .post(requestBody.toRequestBody("application/json".toMediaType()))
+                .header("Content-Type", "application/json")
+                .build()
+
+            val callResponse = client.newCall(request).execute()
+            response = callResponse
+
+            when {
+                callResponse.code == 429 -> {
+                    isRateLimited = true
+                    rateLimitResetMs = System.currentTimeMillis() + 60_000L
+                    emit(StreamChunk.Error("Rate limit hit on Gemini", isRateLimit = true))
+                    return@flow
+                }
+                !callResponse.isSuccessful -> {
+                    val error = callResponse.body?.string() ?: "Unknown error"
+                    emit(StreamChunk.Error("Gemini error ${callResponse.code}: $error"))
+                    return@flow
+                }
+            }
+
+            val source = callResponse.body?.source() ?: run {
+                emit(StreamChunk.Error("Empty Gemini response"))
+                return@flow
+            }
+
+            var promptTokens = 0
+            var completionTokens = 0
+
             while (!source.exhausted()) {
                 val line = source.readUtf8Line() ?: break
                 if (!line.startsWith("data: ")) continue
@@ -126,14 +129,6 @@ class GeminiProvider(
                     // Extract text from Gemini's nested response format:
                     // candidates[0].content.parts[0].text
                     val parsed = json.parseToJsonElement(data)
-                    val candidates = parsed.toString() // simplified — real implementation parses properly
-
-                    // Parse the actual text content
-                    val jsonObj = parsed
-                    val candidatesArr = jsonObj.toString() // placeholder for full parsing
-
-                    // In a real implementation, navigate: candidates[0].content.parts[0].text
-                    // For now, emit a token if we can extract it
                     val text = extractGeminiText(data)
                     if (text.isNotEmpty()) {
                         emit(StreamChunk.Token(text))
@@ -148,15 +143,17 @@ class GeminiProvider(
 
                 } catch (_: Exception) { /* skip malformed chunk */ }
             }
-        } finally {
-            response.close()
-        }
 
-        emit(StreamChunk.Done(
-            finishReason = "stop",
-            usage = TokenUsage(promptTokens, completionTokens, promptTokens + completionTokens)
-        ))
-    }
+            emit(StreamChunk.Done(
+                finishReason = "stop",
+                usage = TokenUsage(promptTokens, completionTokens, promptTokens + completionTokens)
+            ))
+        } catch (e: Exception) {
+            emit(StreamChunk.Error("Gemini network error: ${e.localizedMessage ?: e.message ?: "Unknown error"}"))
+        } finally {
+            response?.close()
+        }
+    }.flowOn(Dispatchers.IO)
 
     /** Extract text from Gemini's nested SSE JSON format */
     private fun extractGeminiText(rawJson: String): String {

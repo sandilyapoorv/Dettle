@@ -24,7 +24,11 @@ class AIProviderFactory @Inject constructor(
             return OllamaProvider(model, client, json)
         }
 
-        val apiKey = keyStore.getKey(model.provider) ?: return null
+        val apiKey = keyStore.getKey(model.provider)
+            ?.trim()
+            ?.replace("\r", "")
+            ?.replace("\n", "")
+            ?.takeIf { it.isNotBlank() } ?: return null
 
         return when (model.provider) {
             AIProviderType.GROQ -> OpenAICompatProvider(

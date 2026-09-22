@@ -108,8 +108,8 @@ class SettingsViewModel @Inject constructor(
             apiKey = trimmedKey
         )
         keyStore.addProviderAccount(newAccount)
-        // Also update legacy single-key store for compatibility
-        keyStore.setKey(provider, trimmedKey)
+        // Also update legacy single-key store for compatibility without overwriting earlier accounts
+        keyStore.setLegacyKey(provider, trimmedKey)
         loadState()
     }
 
