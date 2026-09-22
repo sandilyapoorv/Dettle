@@ -20,7 +20,8 @@ This major release addresses critical UX, performance, and multi-tenancy require
 3. **Multi-Account & API Pooling**: Added support for unlimited accounts and API keys per provider, automatic failover, and global aggregate mathematics for tokens and requests.
 4. **GitHub Scope Customizer**: Enabled multiple GitHub accounts and an interactive permissions scope picker with a 1-click customized token generation URL.
 5. **Project Memory Modes**: Supported ChatGPT Project-style scoping with selectable "Project-Wise Memory" and "Complete Memory" modes.
-6. **Continuous Voice Overhaul**: Removed 5-second silence cutoffs with seamless sentence chaining, continuous listening, and dynamic morphing action buttons (`Mic` -> `Send` -> `Stop` + Waveform Visualizer).
+6. **Continuous Voice Overhaul**: Removed 5-second silence cutoffs with seamless sentence chaining, continuous listening, and dynamic morphing action buttons (`Mic` -> `Send` -> `Hold` + Waveform Visualizer).
+7. **Uncapped RAM & Memory Optimization**: Removed artificial 250 MB memory ceiling and stopped forceful WebView teardown on backgrounding; enabled `android:largeHeap="true"` to grant the app modern high-performance memory headroom without blocking access or dropping active sessions.
 
 ### Key Architectural Changes & Commits
 - **90+ FPS Performance**:

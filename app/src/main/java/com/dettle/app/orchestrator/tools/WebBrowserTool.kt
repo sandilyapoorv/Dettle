@@ -20,7 +20,7 @@ class WebBrowserTool @Inject constructor() {
 
     /**
      * Executes a live web search using DuckDuckGo's HTML-only version 
-     * (Requires no API keys and is extremely lightweight for the 250MB RAM limit).
+     * (Requires no API keys and is extremely fast and lightweight).
      */
     suspend fun searchWeb(query: String): String = withContext(Dispatchers.IO) {
         Log.d(TAG, "AI initiated web search for: $query")

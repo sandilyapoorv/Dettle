@@ -46,7 +46,7 @@ class LearningEngine @Inject constructor(
         val projectId: String? = null
     )
 
-    // Protects the 250MB RAM limit: Bounded channel drops oldest snapshots if the queue backs up
+    // Memory & queue backpressure protection: Bounded channel drops oldest snapshots if the queue backs up
     private val queue = Channel<ConversationSnapshot>(capacity = 20, onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST)
 
     /** Post a snapshot for background processing. Non-blocking. */

@@ -58,7 +58,7 @@ class SanitizedRagOrchestrator @Inject constructor(
 
         // 3. Local De-Sanitization (Restoring the sensitive data on-device)
         return restoreEntities(cloudResponse).also {
-            // Clear the vault after the transaction to prevent memory leaks in the 250MB daemon
+            // Clear the vault after the transaction to prevent memory leaks and protect privacy
             tokenVault.clear()
             entityCounter = 1
         }

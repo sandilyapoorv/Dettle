@@ -34,6 +34,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Dettle"
         android:hardwareAccelerated="true"
+        android:largeHeap="true"
         android:usesCleartextTraffic="false">
 
         <activity

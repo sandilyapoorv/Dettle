@@ -52,7 +52,7 @@ class AgentLogger @Inject constructor(
         return File(logDir, "dettle_ai_log_$dateString.jsonl")
     }
 
-    // Protects the 250MB RAM limit: Bounded channel drops oldest logs if disk I/O gets stuck
+    // Memory & backpressure protection: Bounded channel drops oldest logs if disk I/O gets stuck
     private val writeChannel = Channel<AgentLogEntry>(capacity = 1000, onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST)
 
     init {
