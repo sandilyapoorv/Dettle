@@ -532,13 +532,18 @@ fun TextMessageBubble(message: ChatMessage) {
                     else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                 )
             ) {
-                Box(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.Bottom
+                ) {
                     Text(
                         text = message.content,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (isUser) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                        color = if (isUser) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
                     if (message.isStreaming) {
+                        Spacer(Modifier.width(3.dp))
                         StreamingCursor()
                     }
                 }
@@ -955,16 +960,13 @@ fun ChatInputBar(
     onStopVoiceClick: () -> Unit,
     onCancelVoiceClick: () -> Unit
 ) {
-    val isImeVisible = WindowInsets.isImeVisible
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .then(
-                if (isImeVisible) Modifier.imePadding()
-                else Modifier.navigationBarsPadding()
-            ),
+            .imePadding(),
         color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 2.dp
+        tonalElevation = 3.dp,
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
     ) {
         Row(
             modifier = Modifier
