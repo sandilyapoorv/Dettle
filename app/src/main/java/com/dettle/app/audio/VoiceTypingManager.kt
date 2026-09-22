@@ -54,6 +54,9 @@ class VoiceTypingManager @Inject constructor(
 
     private var retryCount = 0
 
+    private val accumulatedBuffer = StringBuilder()
+    private var isUserActive = false
+
     val isRecognitionAvailable: Boolean
         get() = SpeechRecognizer.isRecognitionAvailable(context)
 
@@ -78,9 +81,12 @@ class VoiceTypingManager @Inject constructor(
             onErrorCallback = onError
             onFallbackToSystemPromptCallback = onFallbackToSystemPrompt
             retryCount = 0
+            accumulatedBuffer.clear()
+            isUserActive = true
 
             if (!isRecognitionAvailable) {
                 Log.w(TAG, "Speech recognition service not found via SpeechRecognizer; falling back to system intent")
+                isUserActive = false
                 onFallbackToSystemPrompt?.invoke()
                     ?: onError?.invoke("Speech recognition is not available on this device.")
                 return@post
@@ -91,7 +97,8 @@ class VoiceTypingManager @Inject constructor(
     }
 
     private fun startListeningInternal(fallbackMode: Boolean) {
-        stopListeningInternal()
+        if (!isUserActive) return
+        cleanRecognizerResources()
 
         try {
             speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
@@ -125,22 +132,27 @@ class VoiceTypingManager @Inject constructor(
 
     fun stopListening() {
         mainHandler.post {
-            stopListeningInternal()
+            isUserActive = false
+            val finalText = accumulatedBuffer.toString().trim()
+            cleanRecognizerResources()
+            _isListening.value = false
+            _rmsDb.value = 0f
+            _state.value = VoiceTypingState.Idle
+            if (finalText.isNotEmpty()) {
+                onFinalResultCallback?.invoke(finalText)
+            }
         }
     }
 
-    private fun stopListeningInternal() {
+    private fun cleanRecognizerResources() {
         try {
             speechRecognizer?.stopListening()
             speechRecognizer?.cancel()
             speechRecognizer?.destroy()
         } catch (e: Exception) {
-            Log.w(TAG, "Error stopping recognizer: ${e.message}")
+            Log.w(TAG, "Error cleaning recognizer: ${e.message}")
         } finally {
             speechRecognizer = null
-            _isListening.value = false
-            _rmsDb.value = 0f
-            _state.value = VoiceTypingState.Idle
         }
     }
 
@@ -169,15 +181,28 @@ class VoiceTypingManager @Inject constructor(
         }
 
         override fun onError(error: Int) {
-            Log.w(TAG, "SpeechRecognizer onError: code $error (fallbackMode=$fallbackMode, retryCount=$retryCount)")
+            Log.w(TAG, "SpeechRecognizer onError: code $error (fallbackMode=$fallbackMode, retryCount=$retryCount, userActive=$isUserActive)")
 
-            // Handle Error 12 (ERROR_LANGUAGE_NOT_SUPPORTED) or Error 13 (ERROR_LANGUAGE_UNAVAILABLE)
+            // Error 12 (ERROR_LANGUAGE_NOT_SUPPORTED) or Error 13 (ERROR_LANGUAGE_UNAVAILABLE)
             if ((error == ERROR_LANGUAGE_UNAVAILABLE || error == ERROR_LANGUAGE_NOT_SUPPORTED || error == SpeechRecognizer.ERROR_CLIENT) && retryCount == 0 && !fallbackMode) {
                 retryCount++
                 Log.i(TAG, "Language pack not available offline (code $error). Automatically retrying with system default language...")
                 mainHandler.post {
-                    startListeningInternal(fallbackMode = true)
+                    if (isUserActive) {
+                        startListeningInternal(fallbackMode = true)
+                    }
                 }
+                return
+            }
+
+            // Continuous mode auto-recovery on silence/no-match timeouts
+            if ((error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) && isUserActive) {
+                Log.d(TAG, "Speech timeout/no match during continuous recording. Seamlessly resuming listener...")
+                mainHandler.postDelayed({
+                    if (isUserActive) {
+                        startListeningInternal(fallbackMode)
+                    }
+                }, 150)
                 return
             }
 
@@ -201,16 +226,11 @@ class VoiceTypingManager @Inject constructor(
             _rmsDb.value = 0f
             _state.value = VoiceTypingState.Error(errorMessage)
 
-            // Non-fatal scenarios (timeout / silence) simply return to Idle
-            if (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
-                _state.value = VoiceTypingState.Idle
-                return
-            }
-
             // If background SpeechRecognizer fails with language or client error even after retry, trigger the system dialog
             if (error == ERROR_LANGUAGE_UNAVAILABLE || error == ERROR_LANGUAGE_NOT_SUPPORTED || error == SpeechRecognizer.ERROR_CLIENT || error == SpeechRecognizer.ERROR_SERVER) {
                 if (onFallbackToSystemPromptCallback != null) {
                     Log.i(TAG, "Delegating to system speech input dialog due to error $error")
+                    isUserActive = false
                     onFallbackToSystemPromptCallback?.invoke()
                     return
                 }
@@ -222,22 +242,40 @@ class VoiceTypingManager @Inject constructor(
         override fun onResults(results: Bundle?) {
             val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
             val recognizedText = matches?.firstOrNull()?.trim() ?: ""
-            Log.d(TAG, "Final speech result: $recognizedText")
-
-            _isListening.value = false
-            _rmsDb.value = 0f
-            _state.value = VoiceTypingState.Idle
+            Log.d(TAG, "Speech chunk result: $recognizedText")
 
             if (recognizedText.isNotEmpty()) {
-                onFinalResultCallback?.invoke(recognizedText)
+                if (accumulatedBuffer.isNotEmpty()) {
+                    accumulatedBuffer.append(" ")
+                }
+                accumulatedBuffer.append(recognizedText)
+                val fullText = accumulatedBuffer.toString()
+                onPartialResultCallback?.invoke(fullText)
+            }
+
+            // If user is still actively recording, restart recognizer for next continuous sentence!
+            if (isUserActive) {
+                mainHandler.postDelayed({
+                    if (isUserActive) {
+                        startListeningInternal(fallbackMode)
+                    }
+                }, 100)
+            } else {
+                _isListening.value = false
+                _rmsDb.value = 0f
+                _state.value = VoiceTypingState.Idle
+                val fullText = accumulatedBuffer.toString().trim()
+                if (fullText.isNotEmpty()) {
+                    onFinalResultCallback?.invoke(fullText)
+                }
             }
         }
 
         override fun onPartialResults(partialResults: Bundle?) {
             val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
             val partialText = matches?.firstOrNull()?.trim() ?: return
-            Log.d(TAG, "Partial speech result: $partialText")
-            onPartialResultCallback?.invoke(partialText)
+            val combined = if (accumulatedBuffer.isEmpty()) partialText else "$accumulatedBuffer $partialText"
+            onPartialResultCallback?.invoke(combined)
         }
 
         override fun onEvent(eventType: Int, params: Bundle?) {}

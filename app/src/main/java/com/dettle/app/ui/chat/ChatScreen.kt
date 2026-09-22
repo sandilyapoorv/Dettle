@@ -7,6 +7,7 @@ import android.speech.RecognizerIntent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
@@ -17,8 +18,13 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -47,6 +53,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.AccountTree
 import androidx.compose.material.icons.outlined.BugReport
@@ -98,7 +106,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
@@ -119,6 +131,9 @@ import com.dettle.app.ui.mode.ModePillBar
 import com.dettle.app.ui.theme.DettleGreen
 import com.dettle.app.ui.theme.DettleOrange
 import com.dettle.app.ui.theme.DettleRed
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.isActive
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -135,7 +150,6 @@ fun ChatScreen(
     // Voice Typing state
     val voiceTypingManager = remember { VoiceTypingManager(context.applicationContext) }
     val isVoiceListening by voiceTypingManager.isListening.collectAsState()
-    val voiceRmsDb by voiceTypingManager.rmsDb.collectAsState()
     var baseTextBeforeVoice by remember { mutableStateOf("") }
 
     DisposableEffect(Unit) {
@@ -266,7 +280,7 @@ fun ChatScreen(
                 enabled = uiState.inputEnabled,
                 isRunning = uiState.isAgentRunning,
                 isListening = isVoiceListening,
-                rmsDb = voiceRmsDb,
+                voiceRmsFlow = voiceTypingManager.rmsDb,
                 onValueChange = { inputText = it },
                 onSend = {
                     if (inputText.isNotBlank()) {
@@ -274,7 +288,12 @@ fun ChatScreen(
                         inputText = ""
                     }
                 },
-                onMicClick = { handleMicClick() }
+                onMicClick = { handleMicClick() },
+                onStopVoiceClick = { voiceTypingManager.stopListening() },
+                onCancelVoiceClick = {
+                    voiceTypingManager.stopListening()
+                    inputText = baseTextBeforeVoice
+                }
             )
         }
     ) { paddingValues ->
@@ -307,17 +326,16 @@ fun ChatScreen(
                     }
                 }
 
-                items(uiState.messages, key = { it.id }) { message ->
-                    AnimatedVisibility(
-                        visible = true,
-                        enter = fadeIn() + slideInVertically { it / 2 }
-                    ) {
-                        MessageItem(
-                            message = message,
-                            onApprove = viewModel::approveAction,
-                            onReject = viewModel::rejectAction
-                        )
-                    }
+                items(
+                    items = uiState.messages,
+                    key = { it.id },
+                    contentType = { it.type.name }
+                ) { message ->
+                    MessageItem(
+                        message = message,
+                        onApprove = viewModel::approveAction,
+                        onReject = viewModel::rejectAction
+                    )
                 }
 
                 // GOAL mode checklist
@@ -910,7 +928,13 @@ fun ThinkingIndicator(step: Int, maxSteps: Int) {
     }
 }
 
-// ─── Input Bar ─────────────────────────────────────────────────────────────
+// ─── Input Bar & Dynamic Action Button ─────────────────────────────────────
+
+enum class ActionButtonState {
+    MIC,
+    STOP,
+    SEND
+}
 
 @Composable
 fun ChatInputBar(
@@ -918,17 +942,13 @@ fun ChatInputBar(
     enabled: Boolean,
     isRunning: Boolean,
     isListening: Boolean,
-    rmsDb: Float,
+    voiceRmsFlow: StateFlow<Float>,
     onValueChange: (String) -> Unit,
     onSend: () -> Unit,
-    onMicClick: () -> Unit
+    onMicClick: () -> Unit,
+    onStopVoiceClick: () -> Unit,
+    onCancelVoiceClick: () -> Unit
 ) {
-    val micPulseAlpha by animateFloatAsState(
-        targetValue = if (isListening) 0.4f + (rmsDb * 0.6f) else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-        label = "micPulse"
-    )
-
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -937,113 +957,245 @@ fun ChatInputBar(
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 2.dp
     ) {
-        Column {
-            if (isListening) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AnimatedContent(
+                targetState = isListening,
+                modifier = Modifier.weight(1f),
+                transitionSpec = {
+                    (fadeIn(tween(180)) + scaleIn(initialScale = 0.97f))
+                        .togetherWith(fadeOut(tween(140)) + scaleOut(targetScale = 0.97f))
+                },
+                label = "inputModeAnimation"
+            ) { listening ->
+                if (listening) {
+                    VoiceWaveformBar(
+                        rmsFlow = voiceRmsFlow,
+                        onCancel = onCancelVoiceClick
                     )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        "Listening...",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold
+                } else {
+                    OutlinedTextField(
+                        value = value,
+                        onValueChange = onValueChange,
+                        enabled = enabled,
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = {
+                            Text(
+                                if (!enabled && isRunning) "Agent is working..."
+                                else "Ask Dettle anything...",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        },
+                        shape = RoundedCornerShape(24.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        ),
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Sentences,
+                            imeAction = ImeAction.Send
+                        ),
+                        keyboardActions = KeyboardActions(onSend = {
+                            if (value.isNotBlank()) onSend()
+                        }),
+                        maxLines = 5,
+                        textStyle = MaterialTheme.typography.bodyMedium
                     )
                 }
             }
 
-            Row(
+            Spacer(Modifier.width(10.dp))
+
+            // Dynamic Morphing Action Button: Mic / Stop / Send
+            val buttonState = when {
+                isListening -> ActionButtonState.STOP
+                value.isNotBlank() -> ActionButtonState.SEND
+                else -> ActionButtonState.MIC
+            }
+
+            AnimatedContent(
+                targetState = buttonState,
+                transitionSpec = {
+                    (scaleIn(tween(200)) + fadeIn(tween(150)))
+                        .togetherWith(scaleOut(tween(150)) + fadeOut(tween(120)))
+                },
+                label = "actionButtonMorph"
+            ) { state ->
+                when (state) {
+                    ActionButtonState.STOP -> {
+                        FilledIconButton(
+                            onClick = onStopVoiceClick,
+                            modifier = Modifier.size(46.dp),
+                            shape = CircleShape,
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = DettleRed,
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Icon(
+                                Icons.Filled.Stop,
+                                contentDescription = "Stop recording and transcribe",
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    ActionButtonState.SEND -> {
+                        FilledIconButton(
+                            onClick = onSend,
+                            enabled = enabled && value.isNotBlank(),
+                            modifier = Modifier.size(46.dp),
+                            shape = CircleShape,
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Send,
+                                contentDescription = "Send",
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                    ActionButtonState.MIC -> {
+                        IconButton(
+                            onClick = onMicClick,
+                            enabled = enabled && !isRunning,
+                            modifier = Modifier
+                                .size(46.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                        ) {
+                            Icon(
+                                Icons.Outlined.Mic,
+                                contentDescription = "Start voice typing",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun VoiceWaveformBar(
+    rmsFlow: StateFlow<Float>,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val rms by rmsFlow.collectAsState()
+    var elapsedSeconds by remember { mutableStateOf(0) }
+
+    LaunchedEffect(Unit) {
+        val start = System.currentTimeMillis()
+        while (isActive) {
+            elapsedSeconds = ((System.currentTimeMillis() - start) / 1000L).toInt()
+            delay(500L)
+        }
+    }
+
+    val minutes = elapsedSeconds / 60
+    val seconds = elapsedSeconds % 60
+    val timeFormatted = "%02d:%02d".format(minutes, seconds)
+
+    val infiniteTransition = rememberInfiniteTransition(label = "recordingPulse")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(700), RepeatMode.Reverse),
+        label = "pulseAlpha"
+    )
+
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(52.dp),
+        shape = RoundedCornerShape(26.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Live pulsing recording dot
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .size(10.dp)
+                    .graphicsLayer { alpha = pulseAlpha }
+                    .clip(CircleShape)
+                    .background(DettleRed)
+            )
+            Spacer(Modifier.width(8.dp))
+
+            // Timer
+            Text(
+                text = timeFormatted,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(Modifier.width(12.dp))
+
+            // Live Waveform Visualizer
+            Canvas(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(26.dp)
+                    .graphicsLayer()
             ) {
-                OutlinedTextField(
-                    value = value,
-                    onValueChange = onValueChange,
-                    enabled = enabled,
-                    modifier = Modifier.weight(1f),
-                    placeholder = {
-                        Text(
-                            if (isListening) "Listening to speech..."
-                            else if (!enabled && isRunning) "Agent is working..."
-                            else "Ask Dettle anything...",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    },
-                    shape = MaterialTheme.shapes.large,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = if (isListening) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                    ),
-                    keyboardOptions = KeyboardOptions(
-                        capitalization = KeyboardCapitalization.Sentences,
-                        imeAction = ImeAction.Send
-                    ),
-                    keyboardActions = KeyboardActions(onSend = { onSend() }),
-                    maxLines = 5,
-                    textStyle = MaterialTheme.typography.bodyMedium
+                val barCount = 22
+                val barWidth = 3.dp.toPx()
+                val totalWidth = size.width
+                val spacing = (totalWidth - (barCount * barWidth)) / (barCount - 1).coerceAtLeast(1)
+                val baseHeight = 4.dp.toPx()
+                val maxHeight = size.height
+
+                for (i in 0 until barCount) {
+                    val x = i * (barWidth + spacing)
+                    val waveFactor = kotlin.math.sin((i.toDouble() / barCount) * Math.PI).toFloat()
+                    val modulatedHeight = (baseHeight + (maxHeight - baseHeight) * rms * waveFactor * 1.5f)
+                        .coerceIn(baseHeight, maxHeight)
+                    val y = (maxHeight - modulatedHeight) / 2f
+
+                    drawRoundRect(
+                        color = Color(0xFF6B6661),
+                        topLeft = Offset(x, y),
+                        size = Size(barWidth, modulatedHeight),
+                        cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx())
+                    )
+                }
+            }
+
+            Spacer(Modifier.width(8.dp))
+
+            // Cancel button
+            IconButton(
+                onClick = onCancel,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    Icons.Outlined.Close,
+                    contentDescription = "Cancel voice typing",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp)
                 )
-
-                Spacer(Modifier.width(8.dp))
-
-                // Voice Typing Button
-                IconButton(
-                    onClick = onMicClick,
-                    enabled = enabled,
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(MaterialTheme.shapes.small)
-                        .background(
-                            if (isListening) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                            else Color.Transparent
-                        )
-                        .border(
-                            1.dp,
-                            if (isListening) MaterialTheme.colorScheme.primary.copy(alpha = micPulseAlpha)
-                            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                            MaterialTheme.shapes.small
-                        )
-                ) {
-                    Icon(
-                        if (isListening) Icons.Filled.Mic else Icons.Outlined.Mic,
-                        contentDescription = if (isListening) "Stop voice typing" else "Start voice typing",
-                        tint = if (isListening) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-
-                Spacer(Modifier.width(8.dp))
-
-                FilledIconButton(
-                    onClick = onSend,
-                    enabled = enabled && value.isNotBlank(),
-                    modifier = Modifier.size(46.dp),
-                    shape = MaterialTheme.shapes.small,
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.Send,
-                        contentDescription = "Send",
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
             }
         }
     }

@@ -21,6 +21,7 @@ data class ProjectEntity(
     @ColumnInfo(name = "enforced_protocol_json") val enforcedProtocolJson: String? = null,
     @ColumnInfo(name = "is_unleashed") val isUnleashed: Boolean = true, // Default to true (uncensored)
     @ColumnInfo(name = "linked_repo") val linkedRepo: String = "",  // "owner/repo" or ""
+    @ColumnInfo(name = "memory_mode", defaultValue = "'PROJECT_ONLY'") val memoryMode: String = "PROJECT_ONLY", // "PROJECT_ONLY" vs "COMPLETE_MEMORY"
     @ColumnInfo(name = "is_archived") val isArchived: Boolean = false,
     @ColumnInfo(name = "created_at") val createdAt: Long = System.currentTimeMillis(),
     @ColumnInfo(name = "last_used_at") val lastUsedAt: Long = System.currentTimeMillis()

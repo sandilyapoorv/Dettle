@@ -3,7 +3,10 @@ package com.dettle.app.data.webview
 import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Log
+import android.content.Intent
+import android.os.Message
 import android.webkit.CookieManager
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -139,19 +142,35 @@ class WebViewSession(
             databaseEnabled = true
             cacheMode = WebSettings.LOAD_DEFAULT
             userAgentString = CHROME_USER_AGENT  // Appear as normal Chrome browser
-            setSupportZoom(false)
-            builtInZoomControls = false
+            setSupportZoom(true)
+            builtInZoomControls = true
             displayZoomControls = false
             mediaPlaybackRequiresUserGesture = false
-            javaScriptCanOpenWindowsAutomatically = false
-            allowFileAccess = false
-            allowContentAccess = false
+            javaScriptCanOpenWindowsAutomatically = true
+            setSupportMultipleWindows(true)
+            allowFileAccess = true
+            allowContentAccess = true
         }
 
         // Persist cookies across app restarts
         CookieManager.getInstance().apply {
             setAcceptCookie(true)
             setAcceptThirdPartyCookies(wv, true)
+        }
+
+        // Support popups / window.open for OAuth (Google, Apple, Auth0)
+        wv.webChromeClient = object : WebChromeClient() {
+            override fun onCreateWindow(
+                view: WebView?,
+                isDialog: Boolean,
+                isUserGesture: Boolean,
+                resultMsg: Message?
+            ): Boolean {
+                val transport = resultMsg?.obj as? WebView.WebViewTransport ?: return false
+                transport.webView = view
+                resultMsg.sendToTarget()
+                return true
+            }
         }
 
         // Register the Kotlin bridge — accessible as window.AndroidBridge in JS
@@ -168,13 +187,21 @@ class WebViewSession(
             }
 
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                // Allow normal navigation within the provider's domain
-                val host = request.url.host ?: return false
-                val providerHost = providerType.baseUrl
-                    .removePrefix("https://")
-                    .removePrefix("http://")
-                    .substringBefore("/")
-                return !host.contains(providerHost)
+                val uri = request.url ?: return false
+                val scheme = uri.scheme?.lowercase() ?: return false
+                // Allow all normal HTTP/HTTPS navigations so OAuth and SSO logins proceed smoothly
+                if (scheme == "http" || scheme == "https") {
+                    return false
+                }
+                return try {
+                    val intent = Intent(Intent.ACTION_VIEW, uri)
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(intent)
+                    true
+                } catch (e: Exception) {
+                    Log.w(TAG, "Cannot launch external scheme $uri: ${e.message}")
+                    true
+                }
             }
         }
 

@@ -148,8 +148,8 @@ fun ProjectsScreen(
     if (showCreateSheet) {
         CreateProjectSheet(
             onDismiss = { showCreateSheet = false },
-            onCreate = { name, desc ->
-                viewModel.createProject(name, desc, "", 0xFF3D3835, "", "")
+            onCreate = { name, desc, memoryMode ->
+                viewModel.createProject(name, desc, "", 0xFF3D3835, "", "", memoryMode)
                 showCreateSheet = false
             }
         )
@@ -159,11 +159,12 @@ fun ProjectsScreen(
 @Composable
 fun ProjectCard(project: Project, onClick: () -> Unit) {
     val df = remember { SimpleDateFormat("MMM d", Locale.getDefault()) }
+    val isCompleteMemory = project.memoryMode == "COMPLETE_MEMORY"
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(148.dp)
+            .height(162.dp)
             .clickable(onClick = onClick)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -176,32 +177,41 @@ fun ProjectCard(project: Project, onClick: () -> Unit) {
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             Column {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
-                        contentAlignment = Alignment.Center
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f, fill = false)
                     ) {
-                        Icon(
-                            Icons.Outlined.Folder,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.primary
+                        Box(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Outlined.Folder,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            project.name,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        project.name,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
                 }
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(8.dp))
                 Text(
                     project.description.ifEmpty { "No description provided." },
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -213,8 +223,26 @@ fun ProjectCard(project: Project, onClick: () -> Unit) {
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = if (isCompleteMemory)
+                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f)
+                    else
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+                    modifier = Modifier.padding(vertical = 2.dp)
+                ) {
+                    Text(
+                        text = if (isCompleteMemory) "Complete Memory" else "Project Memory",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Medium,
+                        color = if (isCompleteMemory) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        fontSize = 10.sp
+                    )
+                }
                 Text(
                     "Active ${df.format(Date(project.lastUsedAt))}",
                     color = MaterialTheme.colorScheme.outline,
@@ -227,9 +255,10 @@ fun ProjectCard(project: Project, onClick: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreateProjectSheet(onDismiss: () -> Unit, onCreate: (String, String) -> Unit) {
+fun CreateProjectSheet(onDismiss: () -> Unit, onCreate: (String, String, String) -> Unit) {
     var name by remember { mutableStateOf("") }
     var desc by remember { mutableStateOf("") }
+    var memoryMode by remember { mutableStateOf("PROJECT_ONLY") }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -243,10 +272,16 @@ fun CreateProjectSheet(onDismiss: () -> Unit, onCreate: (String, String) -> Unit
                 .padding(bottom = 36.dp)
         ) {
             Text(
-                "New Project",
+                "New Project Workspace",
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.SemiBold
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Organize context, custom instructions, and memory boundaries.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(16.dp))
             OutlinedTextField(
@@ -263,7 +298,7 @@ fun CreateProjectSheet(onDismiss: () -> Unit, onCreate: (String, String) -> Unit
                     unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                 )
             )
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(12.dp))
             OutlinedTextField(
                 value = desc,
                 onValueChange = { desc = it },
@@ -277,6 +312,37 @@ fun CreateProjectSheet(onDismiss: () -> Unit, onCreate: (String, String) -> Unit
                     unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                 )
             )
+            Spacer(Modifier.height(18.dp))
+
+            Text(
+                "Memory Scope",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(Modifier.height(8.dp))
+
+            // Memory Mode: Project-Wise vs Complete
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                MemoryModeOption(
+                    title = "Project-Wise",
+                    subtitle = "Isolated to this project only",
+                    selected = memoryMode == "PROJECT_ONLY",
+                    modifier = Modifier.weight(1f),
+                    onClick = { memoryMode = "PROJECT_ONLY" }
+                )
+                MemoryModeOption(
+                    title = "Complete",
+                    subtitle = "Shared cross-project global memory",
+                    selected = memoryMode == "COMPLETE_MEMORY",
+                    modifier = Modifier.weight(1f),
+                    onClick = { memoryMode = "COMPLETE_MEMORY" }
+                )
+            }
+
             Spacer(Modifier.height(24.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -287,7 +353,7 @@ fun CreateProjectSheet(onDismiss: () -> Unit, onCreate: (String, String) -> Unit
                 }
                 Spacer(Modifier.width(12.dp))
                 Button(
-                    onClick = { if (name.isNotBlank()) onCreate(name, desc) },
+                    onClick = { if (name.isNotBlank()) onCreate(name, desc, memoryMode) },
                     enabled = name.isNotBlank(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
@@ -298,6 +364,48 @@ fun CreateProjectSheet(onDismiss: () -> Unit, onCreate: (String, String) -> Unit
                     Text("Create Project")
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun MemoryModeOption(
+    title: String,
+    subtitle: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = modifier
+            .clickable(onClick = onClick)
+            .border(
+                width = if (selected) 2.dp else 1.dp,
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                shape = RoundedCornerShape(12.dp)
+            ),
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected)
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+            else
+                MaterialTheme.colorScheme.surfaceVariant
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 14.sp
+            )
         }
     }
 }

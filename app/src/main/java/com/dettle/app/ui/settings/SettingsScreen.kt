@@ -1,5 +1,7 @@
 package com.dettle.app.ui.settings
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -21,8 +23,21 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Calculate
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.CloudSync
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import com.dettle.app.domain.model.AIProviderType
+import com.dettle.app.domain.model.ProviderAccount
+import com.dettle.app.domain.model.GitHubAccount
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.DesignServices
 import androidx.compose.material.icons.outlined.FolderCopy
@@ -47,6 +62,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -70,6 +86,7 @@ import com.dettle.app.ui.theme.DettleOrange
 fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
     val state = viewModel.state
 
     Scaffold(
@@ -99,81 +116,37 @@ fun SettingsScreen(
                 }
             }
 
-            // Free API Keys Section
+            // Aggregate Mathematics & Token Metrics Card
             item {
-                SettingsSection(
-                    title = "Free API Keys",
-                    subtitle = "Stored securely and encrypted on your device."
-                ) {
-                    ApiKeyField(
-                        label = "Groq API Key",
-                        hint = "gsk_...",
-                        value = state.groqKey,
-                        isSaved = state.groqSaved,
-                        onSave = viewModel::saveGroqKey,
-                        link = "console.groq.com"
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    ApiKeyField(
-                        label = "Google AI Studio (Gemini)",
-                        hint = "AIza...",
-                        value = state.geminiKey,
-                        isSaved = state.geminiSaved,
-                        onSave = viewModel::saveGeminiKey,
-                        link = "aistudio.google.com"
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    ApiKeyField(
-                        label = "OpenRouter API Key",
-                        hint = "sk-or-...",
-                        value = state.openRouterKey,
-                        isSaved = state.openRouterSaved,
-                        onSave = viewModel::saveOpenRouterKey,
-                        link = "openrouter.ai/keys"
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    ApiKeyField(
-                        label = "SambaNova API Key",
-                        hint = "sn-...",
-                        value = state.sambaNovaKey,
-                        isSaved = state.sambaNovaSaved,
-                        onSave = viewModel::saveSambaNovaKey,
-                        link = "cloud.sambanova.ai"
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    ApiKeyField(
-                        label = "GitHub Models Token (PAT)",
-                        hint = "ghp_...",
-                        value = state.githubModelsKey,
-                        isSaved = state.githubModelsSaved,
-                        onSave = viewModel::saveGitHubModelsKey,
-                        link = "github.com/settings/tokens"
-                    )
-                }
+                AggregateMetricsCard(metrics = state.aggregateMetrics)
             }
 
-            // GitHub Integration
+            // Unlimited Multi-Account API Pool Section
             item {
-                SettingsSection(
-                    title = "GitHub Integration",
-                    subtitle = "Scoped to: contents, pull_requests, actions (read/write)"
-                ) {
-                    ApiKeyField(
-                        label = "GitHub Personal Access Token",
-                        hint = "ghp_... or github_pat_...",
-                        value = state.githubPat,
-                        isSaved = state.githubPatSaved,
-                        onSave = viewModel::saveGithubPat,
-                        link = "github.com/settings/tokens"
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    SimpleTextField(
-                        label = "Default GitHub Owner/Org",
-                        hint = "your-username-or-org",
-                        value = state.githubOwner,
-                        onValueChange = viewModel::setGithubOwner
-                    )
-                }
+                MultiAccountPoolSection(
+                    accounts = state.providerAccounts,
+                    onAddAccount = viewModel::addProviderAccount,
+                    onToggleAccount = viewModel::toggleProviderAccount,
+                    onDeleteAccount = viewModel::deleteProviderAccount
+                )
+            }
+
+            // GitHub Multi-Account & Interactive Scopes Builder
+            item {
+                GitHubMultiAccountSection(
+                    accounts = state.gitHubAccounts,
+                    selectedScopes = state.selectedGitHubScopes,
+                    onToggleScope = viewModel::toggleGitHubScope,
+                    onGenerateTokenLink = {
+                        val url = viewModel.buildCustomGitHubTokenUrl()
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                    },
+                    onAddAccount = { label, pat, user ->
+                        viewModel.addGitHubAccount(label, pat, user)
+                    },
+                    onSetActiveAccount = viewModel::setActiveGitHubAccount,
+                    onDeleteAccount = viewModel::deleteGitHubAccount
+                )
             }
 
             // Cloudflare
@@ -797,3 +770,394 @@ fun VoiceTypingSettingsCard(
         }
     }
 }
+
+// ─── Multi-Account & Metrics UI Components ─────────────────────────────────
+
+@Composable
+fun AggregateMetricsCard(
+    metrics: com.dettle.app.domain.model.AggregateAccountMetrics
+) {
+    ElevatedCard(
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    Icons.Outlined.Calculate,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Text(
+                    "Connected Accounts & Token Mathematics",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                MetricItem(label = "Total Accounts", value = "${metrics.totalAccounts}")
+                MetricItem(label = "Active Keys", value = "${metrics.activeAccounts}")
+                MetricItem(label = "Total Requests", value = "${metrics.totalRequests}")
+                MetricItem(label = "Total Tokens", value = "${metrics.totalTokens}")
+            }
+        }
+    }
+}
+
+@Composable
+fun MetricItem(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            value,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+fun MultiAccountPoolSection(
+    accounts: List<ProviderAccount>,
+    onAddAccount: (AIProviderType, String, String) -> Unit,
+    onToggleAccount: (String, Boolean) -> Unit,
+    onDeleteAccount: (String) -> Unit
+) {
+    var selectedProvider by remember { mutableStateOf(AIProviderType.GROQ) }
+    var accountLabel by remember { mutableStateOf("") }
+    var apiKeyInput by remember { mutableStateOf("") }
+    var showAddDialog by remember { mutableStateOf(false) }
+
+    val supportedProviders = listOf(
+        AIProviderType.GROQ,
+        AIProviderType.GEMINI,
+        AIProviderType.OPENROUTER,
+        AIProviderType.SAMBANOVA,
+        AIProviderType.GITHUB_MODELS
+    )
+
+    SettingsSection(
+        title = "Unlimited Multi-Account API Pool",
+        subtitle = "Add unlimited accounts/keys per provider. Automatic failover and token load-balancing."
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "Connected Keys (${accounts.size})",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+            Button(
+                onClick = { showAddDialog = true },
+                shape = MaterialTheme.shapes.small,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Add Account", style = MaterialTheme.typography.labelSmall)
+            }
+        }
+
+        if (accounts.isEmpty()) {
+            Text(
+                "No custom accounts added yet. Tap 'Add Account' to link multiple ChatGPT, Claude, Gemini, or Groq keys.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                accounts.forEach { acc ->
+                    Surface(
+                        shape = MaterialTheme.shapes.small,
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    acc.label,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    "${acc.provider.displayName} • ${acc.requestsUsed} reqs • ${acc.tokensUsed} tokens",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Switch(
+                                    checked = acc.isActive,
+                                    onCheckedChange = { onToggleAccount(acc.id, it) },
+                                    modifier = Modifier.size(36.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                IconButton(onClick = { onDeleteAccount(acc.id) }, modifier = Modifier.size(28.dp)) {
+                                    Icon(Icons.Outlined.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (showAddDialog) {
+            ElevatedCard(
+                shape = MaterialTheme.shapes.medium,
+                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text("Add Provider Account", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+
+                    Text("Select Provider:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        supportedProviders.forEach { prov ->
+                            val isSelected = prov == selectedProvider
+                            Surface(
+                                shape = MaterialTheme.shapes.extraSmall,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier.clickable { selectedProvider = prov }
+                            ) {
+                                Text(
+                                    prov.displayName,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    SimpleTextField(label = "Account Nickname", hint = "e.g. Work Account, Plus 2", value = accountLabel, onValueChange = { accountLabel = it })
+                    OutlinedTextField(
+                        value = apiKeyInput,
+                        onValueChange = { apiKeyInput = it },
+                        label = { Text("API Key / Token") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small
+                    )
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { showAddDialog = false }) { Text("Cancel") }
+                        Spacer(Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                if (apiKeyInput.isNotBlank()) {
+                                    onAddAccount(selectedProvider, accountLabel, apiKeyInput)
+                                    accountLabel = ""
+                                    apiKeyInput = ""
+                                    showAddDialog = false
+                                }
+                            },
+                            enabled = apiKeyInput.isNotBlank()
+                        ) {
+                            Text("Save Key")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun GitHubMultiAccountSection(
+    accounts: List<GitHubAccount>,
+    selectedScopes: List<String>,
+    onToggleScope: (String) -> Unit,
+    onGenerateTokenLink: () -> Unit,
+    onAddAccount: (String, String, String?) -> Unit,
+    onSetActiveAccount: (String) -> Unit,
+    onDeleteAccount: (String) -> Unit
+) {
+    var labelInput by remember { mutableStateOf("") }
+    var patInput by remember { mutableStateOf("") }
+    var usernameInput by remember { mutableStateOf("") }
+    val allScopes = listOf(
+        Pair("repo", "Full control of private repositories"),
+        Pair("workflow", "Update GitHub Action workflows"),
+        Pair("read:org", "Read org and team membership"),
+        Pair("gist", "Create and edit gists"),
+        Pair("user:email", "Access user email address"),
+        Pair("write:packages", "Upload packages to GitHub Registry")
+    )
+
+    SettingsSection(
+        title = "GitHub Multi-Account & Scope Builder",
+        subtitle = "Configure permission scopes and generate customized personal access tokens with 1 tap."
+    ) {
+        Text(
+            "Select Permissions Needed:",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            allScopes.forEach { (scope, desc) ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onToggleScope(scope) }
+                ) {
+                    Checkbox(
+                        checked = selectedScopes.contains(scope),
+                        onCheckedChange = { onToggleScope(scope) }
+                    )
+                    Column(modifier = Modifier.padding(start = 4.dp)) {
+                        Text(scope, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                        Text(desc, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        OutlinedButton(
+            onClick = onGenerateTokenLink,
+            shape = MaterialTheme.shapes.small,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Outlined.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Generate Scoped Token on GitHub (1-Click)")
+        }
+
+        Spacer(Modifier.height(12.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+        Spacer(Modifier.height(12.dp))
+
+        Text(
+            "Add GitHub Account",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold
+        )
+
+        SimpleTextField(label = "Account Nickname", hint = "e.g. Personal, Work, Organization", value = labelInput, onValueChange = { labelInput = it })
+        Spacer(Modifier.height(8.dp))
+        SimpleTextField(label = "Username (Optional)", hint = "octocat", value = usernameInput, onValueChange = { usernameInput = it })
+        Spacer(Modifier.height(8.dp))
+        OutlinedTextField(
+            value = patInput,
+            onValueChange = { patInput = it },
+            label = { Text("GitHub Token (ghp_... or github_pat_...)") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            shape = MaterialTheme.shapes.small
+        )
+        Spacer(Modifier.height(10.dp))
+        Button(
+            onClick = {
+                if (patInput.isNotBlank()) {
+                    onAddAccount(labelInput, patInput, usernameInput)
+                    labelInput = ""
+                    patInput = ""
+                    usernameInput = ""
+                }
+            },
+            enabled = patInput.isNotBlank(),
+            shape = MaterialTheme.shapes.small,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("Add GitHub Account to Pool")
+        }
+
+        if (accounts.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            Text("Connected GitHub Accounts (${accounts.size})", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+            Column(modifier = Modifier.padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                accounts.forEach { acc ->
+                    Surface(
+                        shape = MaterialTheme.shapes.small,
+                        color = if (acc.isActive) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                        border = BorderStroke(1.dp, if (acc.isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text(acc.label, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                                    if (acc.isActive) {
+                                        Surface(shape = MaterialTheme.shapes.extraSmall, color = MaterialTheme.colorScheme.primary) {
+                                            Text("ACTIVE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp))
+                                        }
+                                    }
+                                }
+                                if (!acc.username.isNullOrBlank()) {
+                                    Text("@${acc.username}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (!acc.isActive) {
+                                    TextButton(onClick = { onSetActiveAccount(acc.id) }) {
+                                        Text("Set Active", style = MaterialTheme.typography.labelSmall)
+                                    }
+                                }
+                                IconButton(onClick = { onDeleteAccount(acc.id) }, modifier = Modifier.size(28.dp)) {
+                                    Icon(Icons.Outlined.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+

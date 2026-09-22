@@ -16,6 +16,7 @@ data class Project(
     val colorHex: Long,
     val systemInstructions: String,
     val linkedRepo: String,
+    val memoryMode: String = "PROJECT_ONLY",
     val isArchived: Boolean,
     val createdAt: Long,
     val lastUsedAt: Long
@@ -43,7 +44,8 @@ class ProjectRepository @Inject constructor(
         emoji: String = "",
         colorHex: Long = 0xFF6200EE,
         systemInstructions: String = "",
-        linkedRepo: String = ""
+        linkedRepo: String = "",
+        memoryMode: String = "PROJECT_ONLY"
     ): Project {
         val entity = ProjectEntity(
             name = name,
@@ -51,7 +53,8 @@ class ProjectRepository @Inject constructor(
             emoji = emoji,
             colorHex = colorHex,
             systemInstructions = systemInstructions,
-            linkedRepo = linkedRepo
+            linkedRepo = linkedRepo,
+            memoryMode = memoryMode
         )
         dao.insertProject(entity)
         return entity.toDomain()
@@ -94,7 +97,7 @@ class ProjectRepository @Inject constructor(
 }
 
 private fun ProjectEntity.toDomain() = Project(
-    id, name, description, emoji, colorHex, systemInstructions, linkedRepo, isArchived, createdAt, lastUsedAt
+    id, name, description, emoji, colorHex, systemInstructions, linkedRepo, memoryMode, isArchived, createdAt, lastUsedAt
 )
 private fun Project.toEntity() = ProjectEntity(
     id = id,
@@ -104,6 +107,7 @@ private fun Project.toEntity() = ProjectEntity(
     colorHex = colorHex,
     systemInstructions = systemInstructions,
     linkedRepo = linkedRepo,
+    memoryMode = memoryMode,
     isArchived = isArchived,
     createdAt = createdAt,
     lastUsedAt = lastUsedAt

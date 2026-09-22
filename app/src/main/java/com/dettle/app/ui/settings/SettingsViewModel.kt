@@ -9,10 +9,10 @@ import com.dettle.app.data.api.ProviderStatus
 import com.dettle.app.data.drive.GoogleDriveConnector
 import com.dettle.app.data.settings.ApiKeyStore
 import com.dettle.app.domain.model.AIProviderType
+import com.dettle.app.domain.model.AggregateAccountMetrics
+import com.dettle.app.domain.model.GitHubAccount
+import com.dettle.app.domain.model.ProviderAccount
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
@@ -29,7 +29,7 @@ class SettingsViewModel @Inject constructor(
         loadState()
     }
 
-    private fun loadState() {
+    fun loadState() {
         state = state.copy(
             groqKey = "",
             groqSaved = keyStore.hasKey(AIProviderType.GROQ),
@@ -48,6 +48,10 @@ class SettingsViewModel @Inject constructor(
             cloudflareSaved = keyStore.cloudflareApiToken != null,
             cloudflareAccountId = keyStore.cloudflareAccountId ?: "",
             providerStatuses = keyPoolManager.getProviderStatuses(),
+            // Multi-account & aggregate mathematics
+            providerAccounts = keyStore.getAllProviderAccounts(),
+            aggregateMetrics = keyStore.getAggregateMetrics(),
+            gitHubAccounts = keyStore.getAllGitHubAccounts(),
             // Google Drive
             driveConnected = driveConnector.isConnected(),
             driveUserEmail = keyStore.driveUserEmail ?: "",
@@ -57,7 +61,77 @@ class SettingsViewModel @Inject constructor(
         )
     }
 
-    /** Called from the UI after Google Sign-In completes */
+    // ─── Multi-Account API Pool Actions ───────────────────────────────────
+
+    fun addProviderAccount(provider: AIProviderType, label: String, apiKey: String) {
+        val trimmedKey = apiKey.trim()
+        val finalLabel = label.trim().ifBlank { "${provider.displayName} Key" }
+        val newAccount = ProviderAccount(
+            provider = provider,
+            label = finalLabel,
+            apiKey = trimmedKey
+        )
+        keyStore.addProviderAccount(newAccount)
+        // Also update legacy single-key store for compatibility
+        keyStore.setKey(provider, trimmedKey)
+        loadState()
+    }
+
+    fun toggleProviderAccount(accountId: String, isActive: Boolean) {
+        val account = keyStore.getAllProviderAccounts().find { it.id == accountId } ?: return
+        keyStore.updateProviderAccount(account.copy(isActive = isActive))
+        loadState()
+    }
+
+    fun deleteProviderAccount(accountId: String) {
+        keyStore.deleteProviderAccount(accountId)
+        loadState()
+    }
+
+    // ─── Multi-Account GitHub & Custom Scope Link ─────────────────────────
+
+    fun toggleGitHubScope(scope: String) {
+        val current = state.selectedGitHubScopes.toMutableList()
+        if (current.contains(scope)) {
+            current.remove(scope)
+        } else {
+            current.add(scope)
+        }
+        state = state.copy(selectedGitHubScopes = current)
+    }
+
+    fun buildCustomGitHubTokenUrl(): String {
+        val scopesString = state.selectedGitHubScopes.joinToString(",")
+        return "https://github.com/settings/tokens/new?description=Dettle+Android+Agent&scopes=$scopesString"
+    }
+
+    fun addGitHubAccount(label: String, pat: String, username: String?) {
+        val trimmedPat = pat.trim()
+        val finalLabel = label.trim().ifBlank { "GitHub Account" }
+        val newAccount = GitHubAccount(
+            label = finalLabel,
+            pat = trimmedPat,
+            username = username?.trim()?.ifBlank { null },
+            selectedScopes = state.selectedGitHubScopes,
+            isActive = true
+        )
+        keyStore.addGitHubAccount(newAccount)
+        keyStore.githubPat = trimmedPat
+        loadState()
+    }
+
+    fun setActiveGitHubAccount(id: String) {
+        keyStore.setActiveGitHubAccount(id)
+        loadState()
+    }
+
+    fun deleteGitHubAccount(id: String) {
+        keyStore.deleteGitHubAccount(id)
+        loadState()
+    }
+
+    // ─── Drive ────────────────────────────────────────────────────────────
+
     fun onDriveSignInResult(email: String, idToken: String) {
         keyStore.driveIdToken = idToken
         keyStore.driveUserEmail = email
@@ -69,34 +143,30 @@ class SettingsViewModel @Inject constructor(
         state = state.copy(driveConnected = false, driveUserEmail = "")
     }
 
+    // ─── Legacy Single Key Setters ────────────────────────────────────────
+
     fun saveGroqKey(key: String) {
-        keyStore.setKey(AIProviderType.GROQ, key)
-        state = state.copy(groqSaved = true)
+        addProviderAccount(AIProviderType.GROQ, "Groq Key", key)
     }
 
     fun saveGeminiKey(key: String) {
-        keyStore.setKey(AIProviderType.GEMINI, key)
-        state = state.copy(geminiSaved = true)
+        addProviderAccount(AIProviderType.GEMINI, "Gemini Key", key)
     }
 
     fun saveOpenRouterKey(key: String) {
-        keyStore.setKey(AIProviderType.OPENROUTER, key)
-        state = state.copy(openRouterSaved = true)
+        addProviderAccount(AIProviderType.OPENROUTER, "OpenRouter Key", key)
     }
 
     fun saveSambaNovaKey(key: String) {
-        keyStore.setKey(AIProviderType.SAMBANOVA, key)
-        state = state.copy(sambaNovaSaved = true)
+        addProviderAccount(AIProviderType.SAMBANOVA, "SambaNova Key", key)
     }
 
     fun saveGitHubModelsKey(key: String) {
-        keyStore.setKey(AIProviderType.GITHUB_MODELS, key)
-        state = state.copy(githubModelsSaved = true)
+        addProviderAccount(AIProviderType.GITHUB_MODELS, "GitHub Models Key", key)
     }
 
     fun saveGithubPat(pat: String) {
-        keyStore.githubPat = pat
-        state = state.copy(githubPatSaved = true)
+        addGitHubAccount("Primary Account", pat, null)
     }
 
     fun setGithubOwner(owner: String) {
@@ -143,6 +213,11 @@ data class SettingsState(
     val cloudflareSaved: Boolean = false,
     val cloudflareAccountId: String = "",
     val providerStatuses: List<ProviderStatus> = emptyList(),
+    // Multi-account pooling & metrics
+    val providerAccounts: List<ProviderAccount> = emptyList(),
+    val aggregateMetrics: AggregateAccountMetrics = AggregateAccountMetrics(),
+    val gitHubAccounts: List<GitHubAccount> = emptyList(),
+    val selectedGitHubScopes: List<String> = listOf("repo", "workflow", "read:org", "user:email"),
     // Google Drive
     val driveConnected: Boolean = false,
     val driveUserEmail: String = "",

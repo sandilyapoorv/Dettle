@@ -42,16 +42,16 @@ class AuthVaultViewModel @Inject constructor(
     }
 
     fun startLogin(providerType: AIProviderType) {
-        val session = webViewPool.getSession(providerType)
-            ?: webViewPool.getAllSessions().find { it.providerType == providerType }
-        session?.show()
+        val session = webViewPool.getOrCreateSession(providerType)
+        session.show()
+        session.initialize()
         _uiState.update { it.copy(activeLoginProvider = providerType, reauthAlert = null) }
     }
 
     fun onLoginDone() {
         val provider = _uiState.value.activeLoginProvider ?: return
-        val session = webViewPool.getAllSessions().find { it.providerType == provider }
-        session?.hide()
+        val session = webViewPool.getOrCreateSession(provider)
+        session.hide()
         webViewPool.clearReauthFlag()
         _uiState.update { it.copy(activeLoginProvider = null) }
         refreshStatuses()
@@ -59,15 +59,15 @@ class AuthVaultViewModel @Inject constructor(
 
     fun onLoginCancelled() {
         val provider = _uiState.value.activeLoginProvider ?: return
-        val session = webViewPool.getAllSessions().find { it.providerType == provider }
-        session?.hide()
+        val session = webViewPool.getOrCreateSession(provider)
+        session.hide()
         _uiState.update { it.copy(activeLoginProvider = null) }
     }
 
-    fun getWebViewForLogin(providerType: AIProviderType): WebView? {
-        return webViewPool.getAllSessions()
-            .find { it.providerType == providerType }
-            ?.webView
+    fun getWebViewForLogin(providerType: AIProviderType): WebView {
+        val session = webViewPool.getOrCreateSession(providerType)
+        session.initialize()
+        return session.webView
     }
 }
 

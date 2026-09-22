@@ -42,11 +42,18 @@ class ProjectsViewModel @Inject constructor(
         emoji: String,
         colorHex: Long,
         systemInstructions: String,
-        linkedRepo: String
+        linkedRepo: String,
+        memoryMode: String = "PROJECT_ONLY"
     ) {
         viewModelScope.launch {
             val newProject = projectRepository.createProject(
-                name, description, emoji, colorHex, systemInstructions, linkedRepo
+                name = name,
+                description = description,
+                emoji = emoji,
+                colorHex = colorHex,
+                systemInstructions = systemInstructions,
+                linkedRepo = linkedRepo,
+                memoryMode = memoryMode
             )
             selectProject(newProject)
         }

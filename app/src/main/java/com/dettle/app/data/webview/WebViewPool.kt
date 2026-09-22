@@ -97,6 +97,18 @@ class WebViewPool @Inject constructor(
         sessions[providerType]?.takeIf { it.isAvailable() }
 
     /**
+     * Returns an existing session or creates and initializes one on-demand on the main thread.
+     */
+    fun getOrCreateSession(providerType: AIProviderType): WebViewSession {
+        var session = sessions[providerType]
+        if (session == null) {
+            createSession(providerType)
+            session = sessions[providerType]!!
+        }
+        return session
+    }
+
+    /**
      * Returns ALL sessions — available or not — for the status UI.
      */
     fun getAllSessions(): List<WebViewSession> = sessions.values.toList()

@@ -26,6 +26,7 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockOpen
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Button
@@ -322,6 +323,9 @@ fun WebViewLoginScreen(
                     )
                 },
                 actions = {
+                    IconButton(onClick = { webView?.reload() }) {
+                        Icon(Icons.Outlined.Refresh, contentDescription = "Reload page")
+                    }
                     Button(
                         onClick = onDone,
                         shape = MaterialTheme.shapes.small,
