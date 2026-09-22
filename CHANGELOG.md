@@ -6,6 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [v1.0.8] - 2026-09-22: Gemini 2.5 Flash Migration & Dynamic 404 Model Auto-Healing
+
+### Direct APK Download
+- **Release APK**: [app-debug.apk](https://github.com/sandilyapoorv/Dettle/releases/download/v1.0.8/app-debug.apk)
+- **GitHub Release Page**: [https://github.com/sandilyapoorv/Dettle/releases/tag/v1.0.8](https://github.com/sandilyapoorv/Dettle/releases/tag/v1.0.8)
+- **CI/CD Workflow**: [https://github.com/sandilyapoorv/Dettle/actions](https://github.com/sandilyapoorv/Dettle/actions)
+
+### Why This Release Was Done
+Resolves an issue where user requests to Google AI Studio returned HTTP 404: `This model models/gemini-2.0-flash is no longer available. Please update your code to use models/gemini-2.5-flash`. This release migrates Gemini to `gemini-2.5-flash` and implements dynamic self-healing fallback logic that extracts model suggestions from future deprecation notices, preventing API failures.
+
+### Key Architectural Changes & Commits
+1. **Gemini 2.5 Flash Migration**:
+   - Updated `AIModel.kt` (`FreeModels.GEMINI_FLASH` and `FreeModels.GEMINI_FLASH_THINKING`) to target `gemini-2.5-flash`.
+   - Updated display names to "Gemini 2.5 Flash" and "Gemini 2.5 Flash Thinking".
+2. **Dynamic 404 Model Auto-Healing in GeminiProvider**:
+   - Added pre-request mapping that remaps retired model names (`gemini-2.0-flash`, `gemini-2.0-flash-exp`, `gemini-2.0-flash-thinking-exp`) directly to `gemini-2.5-flash` to eliminate unnecessary HTTP roundtrips.
+   - Implemented an intelligent retry loop in `GeminiProvider.kt` across a candidate chain: primary model -> `gemini-2.5-flash` -> `gemini-1.5-flash` -> `gemini-2.5-pro` -> `gemini-1.5-pro`.
+   - Added regex extraction of `models/([a-zA-Z0-9\.\-_]+)` from HTTP 404 response bodies, allowing the provider to automatically adopt any future model replacement suggested by Google on the fly without requiring an app update.
+3. **Backward Compatibility in ALL_KNOWN_MODELS**:
+   - Preserved legacy model ID lookups in `ALL_KNOWN_MODELS` mapped to `FreeModels.GEMINI_FLASH` so that existing chat histories, stored settings, and custom mode configurations continue functioning seamlessly without deserialization errors.
+4. **Unit Test Verification**:
+   - Added test assertions in `AIModelTest.kt` verifying `gemini-2.5-flash` resolution alongside backward compatibility mappings.
+
+---
+
 ## [v1.0.7] - 2026-09-22: Full System Robustness, Crash Prevention & Thread-Isolated API Routing
 
 ### Direct APK Download

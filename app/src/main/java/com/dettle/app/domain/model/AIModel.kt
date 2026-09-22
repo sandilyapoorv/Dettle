@@ -89,8 +89,8 @@ object FreeModels {
     // Google AI Studio — best overall free tier
     val GEMINI_FLASH = AIModel(
         provider = AIProviderType.GEMINI,
-        modelId = "gemini-2.0-flash",
-        displayName = "Gemini 2.0 Flash",
+        modelId = "gemini-2.5-flash",
+        displayName = "Gemini 2.5 Flash",
         contextWindow = 1_000_000,
         dailyTokenLimit = -1,
         dailyRequestLimit = 1_500,
@@ -100,8 +100,8 @@ object FreeModels {
 
     val GEMINI_FLASH_THINKING = AIModel(
         provider = AIProviderType.GEMINI,
-        modelId = "gemini-2.0-flash-thinking-exp",
-        displayName = "Gemini 2.0 Flash Thinking",
+        modelId = "gemini-2.5-flash",
+        displayName = "Gemini 2.5 Flash Thinking",
         contextWindow = 1_000_000,
         dailyTokenLimit = -1,
         dailyRequestLimit = 500,
@@ -237,4 +237,9 @@ val ALL_KNOWN_MODELS: Map<String, AIModel> = listOf(
     FreeModels.GITHUB_GPT4O,
     FreeModels.GITHUB_DEEPSEEK_R1,
     FreeModels.OLLAMA_DOLPHIN_UNCENSORED
-).associateBy { it.modelId }
+).associateBy { it.modelId } + mapOf(
+    // Backward compatibility for deprecated model IDs stored in settings/history
+    "gemini-2.0-flash" to FreeModels.GEMINI_FLASH,
+    "gemini-2.0-flash-exp" to FreeModels.GEMINI_FLASH,
+    "gemini-2.0-flash-thinking-exp" to FreeModels.GEMINI_FLASH_THINKING
+)

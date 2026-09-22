@@ -82,16 +82,62 @@ class GeminiProvider(
             }.toString()
 
             val cleanApiKey = apiKey.trim().replace("\r", "").replace("\n", "")
-            val url = "${model.provider.baseUrl}/models/${model.modelId}:streamGenerateContent" +
-                    "?key=$cleanApiKey&alt=sse"
 
-            val request = Request.Builder()
-                .url(url)
-                .post(requestBody.toRequestBody("application/json".toMediaType()))
-                .header("Content-Type", "application/json")
-                .build()
+            // Map known retired models directly to avoid unnecessary 404 roundtrips
+            val primaryModel = when (model.modelId) {
+                "gemini-2.0-flash", "gemini-2.0-flash-exp", "gemini-2.0-flash-thinking-exp" -> "gemini-2.5-flash"
+                else -> model.modelId
+            }
 
-            val callResponse = client.newCall(request).execute()
+            // Build candidate model list with prioritized fallback on 404
+            val candidateModels = mutableListOf(
+                primaryModel,
+                "gemini-2.5-flash",
+                "gemini-1.5-flash",
+                "gemini-2.5-pro",
+                "gemini-1.5-pro"
+            ).distinct().toMutableList()
+
+            var callResponse: Response? = null
+            var lastErrorBody = "Unknown error"
+
+            var index = 0
+            while (index < candidateModels.size) {
+                val candidate = candidateModels[index]
+                val url = "${model.provider.baseUrl}/models/$candidate:streamGenerateContent" +
+                        "?key=$cleanApiKey&alt=sse"
+
+                val request = Request.Builder()
+                    .url(url)
+                    .post(requestBody.toRequestBody("application/json".toMediaType()))
+                    .header("Content-Type", "application/json")
+                    .build()
+
+                val testResp = client.newCall(request).execute()
+                if (testResp.code == 404) {
+                    val errorBody = testResp.body?.string() ?: ""
+                    lastErrorBody = errorBody
+                    testResp.close()
+
+                    // Extract replacement model if Google suggested one:
+                    // e.g., "Please update your code to use models/gemini-2.5-flash"
+                    val suggested = Regex("""models/([a-zA-Z0-9\.\-_]+)""").find(errorBody)?.groupValues?.getOrNull(1)
+                    if (!suggested.isNullOrBlank() && !candidateModels.contains(suggested)) {
+                        candidateModels.add(index + 1, suggested)
+                    }
+                    index++
+                    continue
+                }
+
+                callResponse = testResp
+                break
+            }
+
+            if (callResponse == null) {
+                emit(StreamChunk.Error("Gemini error 404: $lastErrorBody"))
+                return@flow
+            }
+
             response = callResponse
 
             when {

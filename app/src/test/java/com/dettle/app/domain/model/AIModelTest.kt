@@ -15,6 +15,7 @@ class AIModelTest {
     @Test
     fun testAllKnownModelsResolution() {
         assertNotNull(ALL_KNOWN_MODELS["llama-3.1-8b-instant"])
+        assertNotNull(ALL_KNOWN_MODELS["gemini-2.5-flash"])
         assertNotNull(ALL_KNOWN_MODELS["gemini-2.0-flash"])
         assertEquals(AIProviderType.GROQ, ALL_KNOWN_MODELS["llama-3.1-8b-instant"]?.provider)
     }
