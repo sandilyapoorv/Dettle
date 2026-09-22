@@ -73,7 +73,7 @@ class ToolExecutor @Inject constructor(
                     owner, repo, branch, fileChanges, commitMsg, prTitle, prBody
                 ).getOrElse { return errResult(toolCall, it.message ?: "Failed to create PR") }
 
-                "✅ Pull Request created successfully!\n" +
+                "Pull Request created successfully!\n" +
                         "**PR #${pr.number}**: ${pr.title}\n" +
                         "**Branch**: `${pr.branch}`\n" +
                         "**Files changed**: ${pr.filesChanged}\n" +
@@ -93,7 +93,7 @@ class ToolExecutor @Inject constructor(
 
                 githubClient.triggerWorkflow(owner, repo, workflowId, ref, inputs)
                     .getOrElse { return errResult(toolCall, it.message ?: "Failed to trigger workflow") }
-                "✅ Workflow `$workflowId` triggered on `$ref`"
+                "Workflow `$workflowId` triggered on `$ref`"
             }
 
             "web_search" -> {
@@ -174,7 +174,7 @@ class ToolExecutor @Inject constructor(
     private fun errResult(toolCall: ToolCall, message: String) = ToolResult(
         toolCallId = toolCall.id,
         toolName = toolCall.name,
-        content = "❌ Error: $message",
+        content = "Error: $message",
         isError = true
     )
 

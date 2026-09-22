@@ -41,7 +41,7 @@ class ProceduralReflexEngine @Inject constructor(
         // Reflex 2: Ping/Healthcheck
         if (lowerMsg == "ping" || lowerMsg == "healthcheck") {
             return flow {
-                emit(LoopEvent.FinalAnswer("Pong! My Motor Cortex intercepted this. No tokens used. ⚡"))
+                emit(LoopEvent.FinalAnswer("Pong! My Motor Cortex intercepted this. No tokens used."))
             }
         }
         
@@ -58,7 +58,7 @@ class ProceduralReflexEngine @Inject constructor(
     }
 
     private fun buildReflexFlow(toolName: String, args: Map<String, String>): Flow<LoopEvent> = flow {
-        Log.d(TAG, "⚡ Motor Cortex reflex triggered: $toolName")
+        Log.d(TAG, "Motor Cortex reflex triggered: $toolName")
         
         // Let UI know we are "thinking" (actually just reflexing)
         emit(LoopEvent.Thinking(1, 1))

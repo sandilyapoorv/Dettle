@@ -80,7 +80,7 @@ class SalienceEvaluator @Inject constructor(
     }
 
     private fun triggerAmygdalaHijack(content: String, type: SalienceType, score: Int) {
-        Log.e(TAG, "🚨 AMYGDALA HIJACK TRIGGERED 🚨 Score: $score | Reason: $content")
+        Log.e(TAG, "[ALERT] AMYGDALA HIJACK TRIGGERED | Score: $score | Reason: $content")
         // Post interrupt to the AgentBus to halt running loops
         agentBus.postEvent(
             AgentEvent.Interrupt(

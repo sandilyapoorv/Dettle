@@ -11,6 +11,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -39,34 +41,84 @@ fun ProjectsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Projects", fontWeight = FontWeight.Bold, color = Color.White) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = DettleDark)
+                title = {
+                    Text(
+                        "Projects",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
             )
         },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { showCreateSheet = true },
-                containerColor = DettleCyan,
-                contentColor = DettleDark
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                shape = RoundedCornerShape(16.dp)
             ) {
-                Icon(Icons.Filled.Add, "New Project")
+                Icon(Icons.Filled.Add, contentDescription = "New Project")
             }
         },
-        containerColor = DettleDark
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         if (projects.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("📁", fontSize = 48.sp)
-                    Spacer(Modifier.height(16.dp))
-                    Text("No projects yet", style = MaterialTheme.typography.titleMedium, color = Color.White)
-                    Text("Create a project to give the AI context.", color = DettleTextMuted, style = MaterialTheme.typography.bodySmall)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(horizontal = 32.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(72.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(20.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Outlined.FolderOpen,
+                            contentDescription = null,
+                            modifier = Modifier.size(36.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Spacer(Modifier.height(20.dp))
+                    Text(
+                        "No projects yet",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Create a project workspace to manage instructions, repositories, and context.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        lineHeight = 18.sp
+                    )
                     Spacer(Modifier.height(24.dp))
                     Button(
                         onClick = { showCreateSheet = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = DettleCyan)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("Create Project", color = DettleDark)
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Create Project")
                     }
                 }
             }
@@ -76,7 +128,9 @@ fun ProjectsScreen(
                 contentPadding = PaddingValues(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.padding(padding).fillMaxSize()
+                modifier = Modifier
+                    .padding(padding)
+                    .fillMaxSize()
             ) {
                 items(projects, key = { it.id }) { project ->
                     ProjectCard(
@@ -94,8 +148,8 @@ fun ProjectsScreen(
     if (showCreateSheet) {
         CreateProjectSheet(
             onDismiss = { showCreateSheet = false },
-            onCreate = { name, desc, emoji ->
-                viewModel.createProject(name, desc, emoji, 0xFF00D4FF, "", "")
+            onCreate = { name, desc ->
+                viewModel.createProject(name, desc, "", 0xFF3D3835, "", "")
                 showCreateSheet = false
             }
         )
@@ -104,48 +158,66 @@ fun ProjectsScreen(
 
 @Composable
 fun ProjectCard(project: Project, onClick: () -> Unit) {
-    val accentColor = Color(project.colorHex)
     val df = remember { SimpleDateFormat("MMM d", Locale.getDefault()) }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(140.dp)
+            .height(148.dp)
             .clickable(onClick = onClick)
-            .border(1.dp, accentColor.copy(alpha = 0.3f), RoundedCornerShape(12.dp)),
-        colors = CardDefaults.cardColors(containerColor = DettleSurface),
-        shape = RoundedCornerShape(12.dp)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = MaterialTheme.shapes.medium
     ) {
-        Column(modifier = Modifier.padding(12.dp).fillMaxSize()) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier.size(32.dp).clip(CircleShape).background(accentColor.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(project.emoji, fontSize = 16.sp)
+        Column(
+            modifier = Modifier
+                .padding(14.dp)
+                .fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Outlined.Folder,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        project.name,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.height(10.dp))
                 Text(
-                    project.name,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    project.description.ifEmpty { "No description provided." },
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 16.sp
                 )
             }
-            Spacer(Modifier.height(8.dp))
-            Text(
-                project.description.ifEmpty { "No description" },
-                color = DettleTextMuted,
-                style = MaterialTheme.typography.bodySmall,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
                 Text(
-                    "Used ${df.format(Date(project.lastUsedAt))}",
-                    color = DettleTextSecondary,
+                    "Active ${df.format(Date(project.lastUsedAt))}",
+                    color = MaterialTheme.colorScheme.outline,
                     style = MaterialTheme.typography.labelSmall
                 )
             }
@@ -155,44 +227,75 @@ fun ProjectCard(project: Project, onClick: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreateProjectSheet(onDismiss: () -> Unit, onCreate: (String, String, String) -> Unit) {
+fun CreateProjectSheet(onDismiss: () -> Unit, onCreate: (String, String) -> Unit) {
     var name by remember { mutableStateOf("") }
     var desc by remember { mutableStateOf("") }
-    var emoji by remember { mutableStateOf("📁") }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = DettleDark) {
-        Column(modifier = Modifier.padding(20.dp).padding(bottom = 32.dp)) {
-            Text("New Project", style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 36.dp)
+        ) {
+            Text(
+                "New Project",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold
+            )
             Spacer(Modifier.height(16.dp))
             OutlinedTextField(
-                value = name, onValueChange = { name = it },
+                value = name,
+                onValueChange = { name = it },
                 label = { Text("Project Name") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
+                shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = DettleCyan, unfocusedBorderColor = DettleSurface,
-                    focusedTextColor = Color.White, unfocusedTextColor = Color.White
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                 )
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(14.dp))
             OutlinedTextField(
-                value = desc, onValueChange = { desc = it },
-                label = { Text("Description") },
+                value = desc,
+                onValueChange = { desc = it },
+                label = { Text("Description (Optional)") },
                 modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = DettleCyan, unfocusedBorderColor = DettleSurface,
-                    focusedTextColor = Color.White, unfocusedTextColor = Color.White
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                 )
             )
             Spacer(Modifier.height(24.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onDismiss) { Text("Cancel", color = DettleTextMuted) }
-                Spacer(Modifier.width(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Spacer(Modifier.width(12.dp))
                 Button(
-                    onClick = { if (name.isNotBlank()) onCreate(name, desc, emoji) },
-                    colors = ButtonDefaults.buttonColors(containerColor = DettleCyan)
+                    onClick = { if (name.isNotBlank()) onCreate(name, desc) },
+                    enabled = name.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("Create", color = DettleDark)
+                    Text("Create Project")
                 }
             }
         }

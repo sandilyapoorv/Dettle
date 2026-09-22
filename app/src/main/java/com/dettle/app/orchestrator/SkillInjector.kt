@@ -136,13 +136,13 @@ class SkillInjector @Inject constructor(
         appendLine("Done = **implemented, wired, tested, built, and committed** — not just written.")
         appendLine()
         appendLine("**Required for substantial work:**")
-        if (d.requirePR) appendLine("- ✅ All code goes to a `${d.branchPrefix}*` branch → PR → merge. **Never push to `${d.defaultBranch}`.**")
-        if (d.requireCI) appendLine("- ✅ GitHub Actions CI must exist and succeed: `${d.debugWorkflow}`")
-        if (d.requireAPK) appendLine("- ✅ APK artifact uploaded to GitHub Actions")
-        if (d.requireTests) appendLine("- ✅ Unit tests pass")
-        if (d.requireLint) appendLine("- ✅ Android lint passes")
+        if (d.requirePR) appendLine("- All code goes to a `${d.branchPrefix}*` branch → PR → merge. **Never push to `${d.defaultBranch}`.**")
+        if (d.requireCI) appendLine("- GitHub Actions CI must exist and succeed: `${d.debugWorkflow}`")
+        if (d.requireAPK) appendLine("- APK artifact uploaded to GitHub Actions")
+        if (d.requireTests) appendLine("- Unit tests pass")
+        if (d.requireLint) appendLine("- Android lint passes")
         if (d.requireProductionCriticBeforeCompletion) {
-            appendLine("- ✅ **Production Critic review required before final_answer** — rank issues P0-P3, fix P0/P1/P2")
+            appendLine("- **Production Critic review required before final_answer** — rank issues P0-P3, fix P0/P1/P2")
         }
         appendLine()
         appendLine("**Final report must include:** App, Repo, Build, Tests, Actions, APK, Release, Signing, Critic, PlayStore.")
@@ -234,7 +234,7 @@ This is a LONG-RUNNING task. You MUST NOT stop until it is fully done.
 - If a step fails, debug it fully before moving to the next step.
 - Commit progress frequently — after each passing test, commit to the branch.
 - At the end, verify EVERY acceptance gate you defined at the start.
-- Report: "✅ Gate 1: PASSED / ❌ Gate 2: FAILED (reason)" for each gate.
+- Report: "Gate 1: PASSED / Gate 2: FAILED (reason)" for each gate.
         """.trimIndent()
 
         val TOOL_CALLING_FORMAT = """

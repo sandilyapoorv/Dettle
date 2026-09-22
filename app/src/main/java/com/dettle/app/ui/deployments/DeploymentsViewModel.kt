@@ -49,8 +49,8 @@ class DeploymentsViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     isVerifying = false,
-                    tokenStatus = if (result.isSuccess) "✅ Token valid (${result.getOrNull()})"
-                                  else "❌ Token invalid — check Settings"
+                    tokenStatus = if (result.isSuccess) "Token valid (${result.getOrNull()})"
+                                  else "Token invalid — check Settings"
                 )
             }
         }

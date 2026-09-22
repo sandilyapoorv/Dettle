@@ -187,7 +187,7 @@ class GitHubClient @Inject constructor(
             // 4. Open the Pull Request
             val prBody2 = buildJsonObject {
                 put("title", prTitle)
-                put("body", "🤖 *Created by Dettle AI Agent*\n\n$prBody")
+                put("body", "*Created by Dettle AI Agent*\n\n$prBody")
                 put("head", branchName)
                 put("base", baseBranch)
                 put("draft", false)

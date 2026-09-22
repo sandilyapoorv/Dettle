@@ -174,7 +174,7 @@ class OvernightLoop @Inject constructor(
                 durationMs = result.durationMs
             ))
 
-            log("${result.outcome.emoji} Task done: ${result.summary.take(80)}")
+            log("[${result.outcome.name}] Task done: ${result.summary.take(80)}")
             delay(2000) // Brief pause between tasks
         }
 
@@ -188,15 +188,15 @@ class OvernightLoop @Inject constructor(
                 totalDurationMs = System.currentTimeMillis() - startTime
             )
         } catch (e: Exception) {
-            log("⚠️ Summary write failed: ${e.message}")
+            log("[Warning] Summary write failed: ${e.message}")
         }
 
         agentBus.setAgentStatus(AgentRole.ORCHESTRATOR, AgentStatus.WORKING, "Dreaming (Consolidating Memory)...")
         try {
             experienceConsolidator.dream()
-            log("🧠 Dream phase complete")
+            log("Dream phase complete")
         } catch (e: Exception) {
-            log("⚠️ Dream phase failed: ${e.message}")
+            log("[Warning] Dream phase failed: ${e.message}")
         }
 
         // Update skills based on what happened tonight
@@ -215,7 +215,7 @@ class OvernightLoop @Inject constructor(
 
         agentBus.setAgentStatus(AgentRole.ORCHESTRATOR, AgentStatus.DONE,
             "${completedTasks.size} tasks completed")
-        log("🌅 Overnight run complete — ${completedTasks.size} tasks in " +
+        log("Overnight run complete — ${completedTasks.size} tasks in " +
             "${(System.currentTimeMillis() - startTime) / 60_000}min")
     }
 
@@ -314,7 +314,7 @@ data class LogEntry(
 )
 
 enum class TaskOutcome(val emoji: String) {
-    SUCCESS("✅"), FAILED("❌"), PARTIAL("⚠️")
+    SUCCESS("[SUCCESS]"), FAILED("[FAILED]"), PARTIAL("[PARTIAL]")
 }
 
 data class OvernightTaskResult(

@@ -1,11 +1,12 @@
 package com.dettle.app.ui.settings
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,23 +15,32 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Key
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.CloudSync
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.DesignServices
+import androidx.compose.material.icons.outlined.FolderCopy
+import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material.icons.outlined.OpenInNew
+import androidx.compose.material.icons.outlined.Save
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -41,22 +51,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.dettle.app.ui.theme.DettleCard
-import com.dettle.app.ui.theme.DettleCardBorder
-import com.dettle.app.ui.theme.DettleCyan
-import com.dettle.app.ui.theme.DettleDark
 import com.dettle.app.ui.theme.DettleGreen
-import com.dettle.app.ui.theme.DettleRed
-import com.dettle.app.ui.theme.DettleSurface
-import com.dettle.app.ui.theme.DettleTextMuted
-import com.dettle.app.ui.theme.DettleTextSecondary
-import com.dettle.app.ui.theme.DettleTextPrimary
+import com.dettle.app.ui.theme.DettleOrange
 
 @Composable
 fun SettingsScreen(
@@ -64,135 +67,159 @@ fun SettingsScreen(
 ) {
     val state = viewModel.state
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(DettleDark)
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp)
-    ) {
-        Text(
-            "Settings",
-            style = MaterialTheme.typography.headlineMedium,
-            color = Color.White,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(vertical = 8.dp)
-        )
-
-        // ── Free API Keys ────────────────────────────────────────────────
-        SettingsSection(title = "Free API Keys", subtitle = "Add keys for each provider. All stored encrypted on-device.") {
-            ApiKeyField(
-                label = "Groq API Key",
-                hint = "gsk_...",
-                value = state.groqKey,
-                isSaved = state.groqSaved,
-                onSave = viewModel::saveGroqKey,
-                link = "console.groq.com"
-            )
-            Spacer(Modifier.height(8.dp))
-            ApiKeyField(
-                label = "Google AI Studio (Gemini)",
-                hint = "AIza...",
-                value = state.geminiKey,
-                isSaved = state.geminiSaved,
-                onSave = viewModel::saveGeminiKey,
-                link = "aistudio.google.com"
-            )
-            Spacer(Modifier.height(8.dp))
-            ApiKeyField(
-                label = "OpenRouter API Key",
-                hint = "sk-or-...",
-                value = state.openRouterKey,
-                isSaved = state.openRouterSaved,
-                onSave = viewModel::saveOpenRouterKey,
-                link = "openrouter.ai/keys"
-            )
-            Spacer(Modifier.height(8.dp))
-            ApiKeyField(
-                label = "SambaNova API Key",
-                hint = "sn-...",
-                value = state.sambaNovaKey,
-                isSaved = state.sambaNovaSaved,
-                onSave = viewModel::saveSambaNovaKey,
-                link = "cloud.sambanova.ai"
-            )
-            Spacer(Modifier.height(8.dp))
-            ApiKeyField(
-                label = "GitHub Models Token (PAT)",
-                hint = "ghp_...",
-                value = state.githubModelsKey,
-                isSaved = state.githubModelsSaved,
-                onSave = viewModel::saveGitHubModelsKey,
-                link = "github.com/settings/tokens"
-            )
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        // ── GitHub Integration ───────────────────────────────────────────
-        SettingsSection(title = "GitHub Integration", subtitle = "PAT scoped to: contents, pull_requests, actions (read/write)") {
-            ApiKeyField(
-                label = "GitHub Personal Access Token",
-                hint = "ghp_... or github_pat_...",
-                value = state.githubPat,
-                isSaved = state.githubPatSaved,
-                onSave = viewModel::saveGithubPat,
-                link = "github.com/settings/tokens"
-            )
-            Spacer(Modifier.height(8.dp))
-            SimpleTextField(
-                label = "Default GitHub Owner/Org",
-                hint = "your-username-or-org",
-                value = state.githubOwner,
-                onValueChange = viewModel::setGithubOwner
-            )
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        // ── Cloudflare ───────────────────────────────────────────────────
-        SettingsSection(title = "Cloudflare", subtitle = "Free tier: 500 builds/month, 100K Worker requests/day") {
-            ApiKeyField(
-                label = "Cloudflare API Token",
-                hint = "...",
-                value = state.cloudflareToken,
-                isSaved = state.cloudflareSaved,
-                onSave = viewModel::saveCloudflareToken,
-                link = "dash.cloudflare.com/profile/api-tokens"
-            )
-            Spacer(Modifier.height(8.dp))
-            SimpleTextField(
-                label = "Cloudflare Account ID",
-                hint = "32-character hex string",
-                value = state.cloudflareAccountId,
-                onValueChange = viewModel::setCloudflareAccountId
-            )
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        // ── Google Drive ─────────────────────────────────────────────────
-        GoogleDriveCard(
-            isConnected = state.driveConnected,
-            userEmail = state.driveUserEmail,
-            onConnect = {
-                // Launch Google Sign-In — handled in the screen via Credential Manager
-                // The ViewModel's onDriveSignInResult() is called after success
-            },
-            onDisconnect = viewModel::disconnectDrive
-        )
-
-        Spacer(Modifier.height(16.dp))
-
-        // ── Provider Status ──────────────────────────────────────────────
-        SettingsSection(title = "Provider Budget Today", subtitle = "Resets at midnight") {
-            state.providerStatuses.forEach { status ->
-                ProviderStatusRow(status)
-                Spacer(Modifier.height(4.dp))
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background
+    ) { paddingValues ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Header
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        "Settings",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        "Configure encrypted on-device API credentials, providers, and storage.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
-        }
 
-        Spacer(Modifier.height(24.dp))
+            // Free API Keys Section
+            item {
+                SettingsSection(
+                    title = "Free API Keys",
+                    subtitle = "Stored securely and encrypted on your device."
+                ) {
+                    ApiKeyField(
+                        label = "Groq API Key",
+                        hint = "gsk_...",
+                        value = state.groqKey,
+                        isSaved = state.groqSaved,
+                        onSave = viewModel::saveGroqKey,
+                        link = "console.groq.com"
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    ApiKeyField(
+                        label = "Google AI Studio (Gemini)",
+                        hint = "AIza...",
+                        value = state.geminiKey,
+                        isSaved = state.geminiSaved,
+                        onSave = viewModel::saveGeminiKey,
+                        link = "aistudio.google.com"
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    ApiKeyField(
+                        label = "OpenRouter API Key",
+                        hint = "sk-or-...",
+                        value = state.openRouterKey,
+                        isSaved = state.openRouterSaved,
+                        onSave = viewModel::saveOpenRouterKey,
+                        link = "openrouter.ai/keys"
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    ApiKeyField(
+                        label = "SambaNova API Key",
+                        hint = "sn-...",
+                        value = state.sambaNovaKey,
+                        isSaved = state.sambaNovaSaved,
+                        onSave = viewModel::saveSambaNovaKey,
+                        link = "cloud.sambanova.ai"
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    ApiKeyField(
+                        label = "GitHub Models Token (PAT)",
+                        hint = "ghp_...",
+                        value = state.githubModelsKey,
+                        isSaved = state.githubModelsSaved,
+                        onSave = viewModel::saveGitHubModelsKey,
+                        link = "github.com/settings/tokens"
+                    )
+                }
+            }
+
+            // GitHub Integration
+            item {
+                SettingsSection(
+                    title = "GitHub Integration",
+                    subtitle = "Scoped to: contents, pull_requests, actions (read/write)"
+                ) {
+                    ApiKeyField(
+                        label = "GitHub Personal Access Token",
+                        hint = "ghp_... or github_pat_...",
+                        value = state.githubPat,
+                        isSaved = state.githubPatSaved,
+                        onSave = viewModel::saveGithubPat,
+                        link = "github.com/settings/tokens"
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    SimpleTextField(
+                        label = "Default GitHub Owner/Org",
+                        hint = "your-username-or-org",
+                        value = state.githubOwner,
+                        onValueChange = viewModel::setGithubOwner
+                    )
+                }
+            }
+
+            // Cloudflare
+            item {
+                SettingsSection(
+                    title = "Cloudflare Pages & Workers",
+                    subtitle = "Free tier: 500 builds/month, 100K Worker requests/day"
+                ) {
+                    ApiKeyField(
+                        label = "Cloudflare API Token",
+                        hint = "API Token with Pages write access",
+                        value = state.cloudflareToken,
+                        isSaved = state.cloudflareSaved,
+                        onSave = viewModel::saveCloudflareToken,
+                        link = "dash.cloudflare.com/profile/api-tokens"
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    SimpleTextField(
+                        label = "Cloudflare Account ID",
+                        hint = "32-character hex account string",
+                        value = state.cloudflareAccountId,
+                        onValueChange = viewModel::setCloudflareAccountId
+                    )
+                }
+            }
+
+            // Google Drive Card
+            item {
+                GoogleDriveCard(
+                    isConnected = state.driveConnected,
+                    userEmail = state.driveUserEmail,
+                    onConnect = { },
+                    onDisconnect = viewModel::disconnectDrive
+                )
+            }
+
+            // Provider Budget
+            item {
+                SettingsSection(
+                    title = "Daily Provider Budget",
+                    subtitle = "Rolling usage counters reset at midnight"
+                ) {
+                    state.providerStatuses.forEach { status ->
+                        ProviderStatusRow(status)
+                        Spacer(Modifier.height(6.dp))
+                    }
+                }
+            }
+
+            item { Spacer(Modifier.height(80.dp)) }
+        }
     }
 }
 
@@ -202,18 +229,31 @@ fun SettingsSection(
     subtitle: String,
     content: @Composable () -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(DettleCard)
-            .border(1.dp, DettleCardBorder, RoundedCornerShape(12.dp))
-            .padding(16.dp)
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     ) {
-        Text(title, style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.SemiBold)
-        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = DettleTextMuted)
-        Spacer(Modifier.height(12.dp))
-        content()
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(8.dp))
+            content()
+        }
     }
 }
 
@@ -230,79 +270,120 @@ fun ApiKeyField(
     var visible by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf(!isSaved) }
 
-    Column {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(label, style = MaterialTheme.typography.labelMedium, color = DettleTextSecondary)
+            Text(
+                label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Medium
+            )
             Spacer(Modifier.weight(1f))
             if (isSaved && !editing) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Check, null, tint = DettleGreen, modifier = Modifier.size(12.dp))
-                    Spacer(Modifier.width(3.dp))
+                    Icon(Icons.Outlined.Check, null, tint = DettleGreen, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(4.dp))
                     Text("Saved", style = MaterialTheme.typography.labelSmall, color = DettleGreen)
                 }
             }
         }
         if (link.isNotEmpty()) {
-            Text("↗ $link", style = MaterialTheme.typography.labelSmall, color = DettleCyan.copy(alpha = 0.7f))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Outlined.OpenInNew,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(12.dp)
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    link,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
         }
-        Spacer(Modifier.height(4.dp))
 
         if (editing) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it },
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text(hint, color = DettleTextMuted, style = MaterialTheme.typography.bodySmall) },
-                    shape = RoundedCornerShape(8.dp),
+                    placeholder = {
+                        Text(
+                            hint,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    },
+                    shape = MaterialTheme.shapes.small,
                     visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     trailingIcon = {
                         IconButton(onClick = { visible = !visible }) {
-                            Icon(if (visible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility, null, tint = DettleTextMuted)
+                            Icon(
+                                if (visible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                                null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
                     },
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = DettleCyan.copy(alpha = 0.5f),
-                        unfocusedBorderColor = DettleCardBorder,
-                        focusedContainerColor = DettleSurface,
-                        unfocusedContainerColor = DettleSurface,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                     ),
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodySmall
                 )
-                Spacer(Modifier.width(8.dp))
                 Button(
                     onClick = { onSave(text); editing = false },
                     enabled = text.isNotBlank() && text != "••••••••••••",
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = DettleCyan, contentColor = DettleDark)
+                    shape = MaterialTheme.shapes.small,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
                 ) {
-                    Text("Save", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    Text("Save", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                 }
             }
         } else {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(DettleSurface)
-                    .border(1.dp, DettleCardBorder, RoundedCornerShape(8.dp))
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.small,
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             ) {
-                Icon(Icons.Filled.Key, null, tint = DettleTextMuted, modifier = Modifier.size(14.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("••••••••••••", color = DettleTextSecondary, style = MaterialTheme.typography.bodySmall)
-                Spacer(Modifier.weight(1f))
-                Text(
-                    "Change",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = DettleCyan,
-                    modifier = androidx.compose.ui.Modifier.clickable { editing = true; text = "" }
-                )
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Outlined.Key,
+                        null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        "••••••••••••",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        "Change",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.clickable { editing = true; text = "" }
+                    )
+                }
             }
         }
     }
@@ -310,22 +391,28 @@ fun ApiKeyField(
 
 @Composable
 fun SimpleTextField(label: String, hint: String, value: String, onValueChange: (String) -> Unit) {
-    Column {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = DettleTextSecondary)
-        Spacer(Modifier.height(4.dp))
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.Medium
+        )
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text(hint, color = DettleTextMuted, style = MaterialTheme.typography.bodySmall) },
-            shape = RoundedCornerShape(8.dp),
+            placeholder = {
+                Text(
+                    hint,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            },
+            shape = MaterialTheme.shapes.small,
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = DettleCyan.copy(alpha = 0.5f),
-                unfocusedBorderColor = DettleCardBorder,
-                focusedContainerColor = DettleSurface,
-                unfocusedContainerColor = DettleSurface,
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
             ),
             singleLine = true,
             textStyle = MaterialTheme.typography.bodySmall
@@ -335,39 +422,43 @@ fun SimpleTextField(label: String, hint: String, value: String, onValueChange: (
 
 @Composable
 fun ProviderStatusRow(status: com.dettle.app.data.api.ProviderStatus) {
-    Row(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
     ) {
-        Box(
-            modifier = Modifier
-                .size(8.dp)
-                .clip(CircleShape)
-                .background(when {
-                    !status.isAvailable -> DettleRed
-                    status.requestsPercentUsed > 0.8f -> DettleOrange
-                    else -> DettleGreen
-                })
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            status.model.displayName,
-            style = MaterialTheme.typography.bodySmall,
-            color = DettleTextSecondary,
-            modifier = Modifier.weight(1f)
-        )
-        Text(
-            if (status.dailyRequestLimit > 0) "${status.requestsUsedToday}/${status.dailyRequestLimit} req"
-            else "${status.requestsUsedToday} req",
-            style = MaterialTheme.typography.labelSmall,
-            color = DettleTextMuted
-        )
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(
+                        when {
+                            !status.isAvailable -> MaterialTheme.colorScheme.error
+                            status.requestsPercentUsed > 0.8f -> DettleOrange
+                            else -> DettleGreen
+                        }
+                    )
+            )
+            Spacer(Modifier.width(10.dp))
+            Text(
+                status.model.displayName,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                if (status.dailyRequestLimit > 0) "${status.requestsUsedToday}/${status.dailyRequestLimit} req"
+                else "${status.requestsUsedToday} req",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
-
-private val DettleOrange = Color(0xFFFF6B35)
-
-// ─── Google Drive Card ─────────────────────────────────────────────────────
 
 @Composable
 fun GoogleDriveCard(
@@ -376,103 +467,104 @@ fun GoogleDriveCard(
     onConnect: () -> Unit,
     onDisconnect: () -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(DettleCard)
-            .border(
-                1.dp,
-                if (isConnected) DettleGreen.copy(alpha = 0.4f) else DettleCardBorder,
-                RoundedCornerShape(12.dp)
-            )
-            .padding(16.dp)
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            // Google Drive icon (using text placeholder — replace with actual icon)
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF1A73E8).copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Text("▲", color = Color(0xFF1A73E8), style = MaterialTheme.typography.titleMedium)
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "Google Drive",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    if (isConnected) "Connected • $userEmail"
-                    else "Not connected — tap to link your Gmail account",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (isConnected) DettleGreen else DettleTextMuted
-                )
-            }
-            if (isConnected) {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(DettleGreen)
-                )
-            }
-        }
-
-        Spacer(Modifier.height(12.dp))
-
-        // What Dettle syncs to Drive
-        if (isConnected) {
-            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                listOf(
-                    "📄 Overnight run summaries",
-                    "💾 Conversation export logs",
-                    "📐 Architecture documentation",
-                    "🗂️ Repo snapshots"
-                ).forEach { item ->
-                    Text(item, style = MaterialTheme.typography.bodySmall, color = DettleTextSecondary)
+                Surface(
+                    shape = MaterialTheme.shapes.small,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.size(42.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Outlined.CloudSync,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Google Drive",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        if (isConnected) "Connected • $userEmail"
+                        else "Not linked — connect your account for backups",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (isConnected) DettleGreen else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
-            Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
+
+            if (isConnected) {
+                Column(
+                    modifier = Modifier.padding(vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf(
+                        Pair(Icons.Outlined.Description, "Overnight run summaries"),
+                        Pair(Icons.Outlined.Save, "Conversation export logs"),
+                        Pair(Icons.Outlined.DesignServices, "Architecture documentation"),
+                        Pair(Icons.Outlined.FolderCopy, "Repository snapshots")
+                    ).forEach { (icon, item) ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                icon,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                item,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+                OutlinedButton(
                     onClick = onDisconnect,
-                    shape = RoundedCornerShape(8.dp),
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Text("Disconnect Drive", color = MaterialTheme.colorScheme.error)
+                }
+            } else {
+                Button(
+                    onClick = onConnect,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.small,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = DettleRed.copy(alpha = 0.15f),
-                        contentColor = DettleRed
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
-                    Text("Disconnect", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    Text("Connect Google Drive", fontWeight = FontWeight.SemiBold)
                 }
-            }
-        } else {
-            Button(
-                onClick = onConnect,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF1A73E8),
-                    contentColor = Color.White
-                )
-            ) {
                 Text(
-                    "Connect Google Drive",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold
+                    "Scope: drive.file (only files Dettle creates — not full Drive access)",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
             }
-            Spacer(Modifier.height(6.dp))
-            Text(
-                "Scope: drive.file (only files Dettle creates — not full Drive access)",
-                style = MaterialTheme.typography.labelSmall,
-                color = DettleTextMuted
-            )
         }
     }
 }

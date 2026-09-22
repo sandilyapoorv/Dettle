@@ -1,15 +1,17 @@
 package com.dettle.app.ui.navigation
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material.icons.filled.Bedtime
-import androidx.compose.material.icons.filled.Chat
-import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.Rocket
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.CloudUpload
+import androidx.compose.material.icons.outlined.FolderCopy
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.VpnKey
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -17,8 +19,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -34,19 +36,14 @@ import com.dettle.app.ui.deployments.DeploymentsScreen
 import com.dettle.app.ui.overnight.OvernightScreen
 import com.dettle.app.ui.repos.ReposScreen
 import com.dettle.app.ui.settings.SettingsScreen
-import com.dettle.app.ui.theme.DettleCyan
-import com.dettle.app.ui.theme.DettleDark
-import com.dettle.app.ui.theme.DettleSurface
-import com.dettle.app.ui.theme.DettleTextMuted
-import com.dettle.app.ui.theme.DettleTextSecondary
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
-    object Chat : Screen("chat", "Chat", Icons.Filled.Chat)
-    object Repos : Screen("repos", "Repos", Icons.Filled.Code)
-    object Deployments : Screen("deployments", "Deploy", Icons.Filled.Rocket)
-    object Agents : Screen("agents", "Vault", Icons.Filled.SmartToy)
-    object Overnight : Screen("overnight", "Overnight", Icons.Filled.Bedtime)
-    object Settings : Screen("settings", "Settings", Icons.Filled.Settings)
+    object Chat : Screen("chat", "Chat", Icons.Outlined.ChatBubbleOutline)
+    object Repos : Screen("repos", "Repos", Icons.Outlined.FolderCopy)
+    object Deployments : Screen("deployments", "Deploy", Icons.Outlined.CloudUpload)
+    object Agents : Screen("agents", "Vault", Icons.Outlined.VpnKey)
+    object Overnight : Screen("overnight", "Overnight", Icons.Outlined.Bedtime)
+    object Settings : Screen("settings", "Settings", Icons.Outlined.Tune)
 }
 
 val bottomNavItems = listOf(
@@ -65,11 +62,11 @@ fun DettleNavGraph() {
     val currentDestination = navBackStackEntry?.destination
 
     Scaffold(
-        containerColor = DettleDark,
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             NavigationBar(
-                containerColor = DettleSurface,
-                tonalElevation = 0.dp
+                containerColor = MaterialTheme.colorScheme.surface,
+                tonalElevation = 2.dp
             ) {
                 bottomNavItems.forEach { screen ->
                     val selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true
@@ -85,20 +82,21 @@ fun DettleNavGraph() {
                         icon = {
                             Icon(
                                 screen.icon,
-                                contentDescription = screen.label,
-                                tint = if (selected) DettleCyan else DettleTextMuted
+                                contentDescription = screen.label
                             )
                         },
                         label = {
                             Text(
                                 screen.label,
-                                color = if (selected) DettleCyan else DettleTextMuted
+                                style = MaterialTheme.typography.labelSmall
                             )
                         },
                         colors = NavigationBarItemDefaults.colors(
-                            indicatorColor = DettleCyan.copy(alpha = 0.15f),
-                            selectedIconColor = DettleCyan,
-                            unselectedIconColor = DettleTextMuted
+                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     )
                 }
@@ -122,10 +120,14 @@ fun DettleNavGraph() {
 
 @Composable
 fun PlaceholderScreen(label: String) {
-    androidx.compose.foundation.layout.Box(
-        modifier = androidx.compose.ui.Modifier.fillMaxSize(),
-        contentAlignment = androidx.compose.ui.Alignment.Center
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
     ) {
-        Text(label, color = DettleTextSecondary)
+        Text(
+            label,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium
+        )
     }
 }

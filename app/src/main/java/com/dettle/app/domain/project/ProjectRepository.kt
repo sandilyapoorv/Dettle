@@ -40,7 +40,7 @@ class ProjectRepository @Inject constructor(
     suspend fun createProject(
         name: String,
         description: String = "",
-        emoji: String = "📁",
+        emoji: String = "",
         colorHex: Long = 0xFF6200EE,
         systemInstructions: String = "",
         linkedRepo: String = ""

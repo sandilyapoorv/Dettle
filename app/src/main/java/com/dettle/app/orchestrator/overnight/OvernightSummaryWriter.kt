@@ -71,8 +71,8 @@ class OvernightSummaryWriter @Inject constructor(
                         content = markdown
                     )
                 ),
-                commitMessage = "🤖 Overnight run summary — $date",
-                prTitle = "🤖 Overnight Run Summary — $date",
+                commitMessage = "Overnight run summary — $date",
+                prTitle = "Overnight Run Summary — $date",
                 prBody = buildPrDescription(tasks, totalDurationMs)
             )
             Log.d(TAG, "Summary pushed to GitHub: $owner/dettle-workspace")
@@ -91,16 +91,16 @@ class OvernightSummaryWriter @Inject constructor(
         val totalTokens = tasks.sumOf { it.tokensUsed }
         val durationMin = totalDurationMs / 60_000
 
-        appendLine("# 🤖 Dettle Overnight Run")
+        appendLine("# Dettle Overnight Run")
         appendLine("**Date:** ${timeFormat.format(Date())}")
         appendLine()
         appendLine("## Summary")
         appendLine("| Metric | Value |")
         appendLine("|--------|-------|")
         appendLine("| Total tasks | ${tasks.size} |")
-        appendLine("| ✅ Succeeded | $successCount |")
-        appendLine("| ⚠️ Partial | $partialCount |")
-        appendLine("| ❌ Failed | $failedCount |")
+        appendLine("| Succeeded | $successCount |")
+        appendLine("| Partial | $partialCount |")
+        appendLine("| Failed | $failedCount |")
         appendLine("| Duration | ${durationMin}m |")
         appendLine("| Tokens used | ${"%,d".format(totalTokens)} |")
         appendLine("| Providers | ${tasks.map { it.providerUsed }.distinct().joinToString(", ")} |")
@@ -109,13 +109,13 @@ class OvernightSummaryWriter @Inject constructor(
         appendLine("## Task Results")
         appendLine()
         tasks.forEachIndexed { i, result ->
-            appendLine("### ${i + 1}. ${result.outcome.emoji} ${result.task.title}")
+            appendLine("### ${i + 1}. [${result.outcome.name}] ${result.task.title}")
             appendLine("**Type:** `${result.task.type.name}` | **Repo:** `${result.task.repoKey.ifBlank { "N/A" }}` | **Duration:** ${result.durationMs / 1000}s")
             appendLine()
             appendLine(result.summary)
             if (result.errorReason != null) {
                 appendLine()
-                appendLine("> ❌ **Error:** ${result.errorReason}")
+                appendLine("> **Error:** ${result.errorReason}")
             }
             appendLine()
             appendLine("---")
@@ -140,13 +140,13 @@ class OvernightSummaryWriter @Inject constructor(
     ): String {
         val success = tasks.count { it.outcome == TaskOutcome.SUCCESS }
         return buildString {
-            appendLine("## 🤖 Overnight Run Summary")
+            appendLine("## Overnight Run Summary")
             appendLine()
             appendLine("Dettle ran **${tasks.size} tasks** overnight. $success/${tasks.size} succeeded.")
             appendLine()
             appendLine("### Tasks:")
             tasks.forEach { r ->
-                appendLine("- ${r.outcome.emoji} **${r.task.title}** (${r.durationMs / 1000}s)")
+                appendLine("- [${r.outcome.name}] **${r.task.title}** (${r.durationMs / 1000}s)")
             }
             appendLine()
             appendLine("Total runtime: ${totalDurationMs / 60_000}min")

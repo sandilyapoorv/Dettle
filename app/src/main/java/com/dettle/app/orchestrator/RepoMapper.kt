@@ -47,9 +47,9 @@ class RepoMapper @Inject constructor(
                 .take(200)
                 .forEach { file ->
                     val indent = "  ".repeat(file.path.count { it == '/' })
-                    val icon = if (file.type == FileType.DIRECTORY) "📁" else "📄"
+                    val prefix = if (file.type == FileType.DIRECTORY) "/" else ""
                     val sizeStr = if (file.type == FileType.FILE) " (${file.size}B)" else ""
-                    appendLine("$indent$icon ${file.name}$sizeStr")
+                    appendLine("$indent$prefix${file.name}$sizeStr")
                 }
             appendLine("```")
             appendLine()

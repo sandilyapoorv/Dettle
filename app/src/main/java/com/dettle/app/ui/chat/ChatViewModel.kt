@@ -207,14 +207,14 @@ class ChatViewModel @Inject constructor(
             is LoopEvent.StepLimitReached -> {
                 addMessage(ChatMessage(
                     role = MessageRole.SYSTEM, type = MessageType.SYSTEM,
-                    content = "⚠️ ${event.message}"
+                    content = "[Step Limit] ${event.message}"
                 ))
                 _uiState.update { it.copy(isAgentRunning = false, inputEnabled = true, thinkingStep = 0) }
             }
 
             is LoopEvent.Error -> {
                 addMessage(ChatMessage(
-                    role = MessageRole.SYSTEM, type = MessageType.ERROR, content = "❌ ${event.message}"
+                    role = MessageRole.SYSTEM, type = MessageType.ERROR, content = "[Error] ${event.message}"
                 ))
                 _uiState.update { it.copy(isAgentRunning = false, inputEnabled = true, thinkingStep = 0) }
             }
@@ -261,7 +261,7 @@ class ChatViewModel @Inject constructor(
         approval.status = ApprovalStatus.APPROVED
         updateApprovalStatus(approval.id, ApprovalStatus.APPROVED)
         pendingApproval = null
-        addMessage(ChatMessage(role = MessageRole.SYSTEM, type = MessageType.SYSTEM, content = "✅ Action approved. Executing..."))
+        addMessage(ChatMessage(role = MessageRole.SYSTEM, type = MessageType.SYSTEM, content = "Action approved. Executing..."))
         _uiState.update { it.copy(isAgentRunning = true, inputEnabled = false) }
     }
 
@@ -270,7 +270,7 @@ class ChatViewModel @Inject constructor(
         approval.status = ApprovalStatus.REJECTED
         updateApprovalStatus(approval.id, ApprovalStatus.REJECTED)
         pendingApproval = null
-        addMessage(ChatMessage(role = MessageRole.SYSTEM, type = MessageType.SYSTEM, content = "🚫 Action rejected."))
+        addMessage(ChatMessage(role = MessageRole.SYSTEM, type = MessageType.SYSTEM, content = "Action rejected."))
         _uiState.update { it.copy(isAgentRunning = false, inputEnabled = true) }
     }
 

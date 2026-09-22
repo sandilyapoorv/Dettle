@@ -38,13 +38,28 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.Assignment
+import androidx.compose.material.icons.outlined.Build
+import androidx.compose.material.icons.outlined.Cancel
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.CloudUpload
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Public
+import androidx.compose.material.icons.outlined.RateReview
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.SmartToy
+import androidx.compose.material.icons.outlined.Speed
+import androidx.compose.material.icons.outlined.Terminal
+import androidx.compose.material.icons.outlined.TrackChanges
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -55,6 +70,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -72,6 +88,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -84,25 +101,25 @@ import com.dettle.app.domain.model.AgentTools
 import com.dettle.app.orchestrator.mode.AgentMode
 import com.dettle.app.orchestrator.mode.ModeConfig
 import com.dettle.app.orchestrator.mode.ModeId
-import com.dettle.app.ui.theme.DettleCyan
-import com.dettle.app.ui.theme.DettleDark
 import com.dettle.app.ui.theme.DettleGreen
 import com.dettle.app.ui.theme.DettleOrange
 import com.dettle.app.ui.theme.DettleRed
-import com.dettle.app.ui.theme.DettleSurface
-import com.dettle.app.ui.theme.DettleTextMuted
-import com.dettle.app.ui.theme.DettleTextSecondary
+
+// ─── Mode Icon Mapper ─────────────────────────────────────────────────────────
+
+fun getModeVectorIcon(id: ModeId): ImageVector = when (id) {
+    ModeId.CHAT -> Icons.Outlined.ChatBubbleOutline
+    ModeId.RESEARCH -> Icons.Outlined.Search
+    ModeId.CODE -> Icons.Outlined.Terminal
+    ModeId.PLAN -> Icons.Outlined.Assignment
+    ModeId.GOAL -> Icons.Outlined.TrackChanges
+    ModeId.WEB -> Icons.Outlined.Public
+    ModeId.REVIEW -> Icons.Outlined.RateReview
+    ModeId.DEPLOY -> Icons.Outlined.CloudUpload
+}
 
 // ─── Mode Pill Bar ────────────────────────────────────────────────────────────
 
-/**
- * Horizontal scrollable row of mode pills.
- *
- * - Tap to lock/unlock a mode (locked = auto-classification disabled)
- * - Settings icon on each pill → opens [ModeCustomizationSheet]
- * - Active mode is highlighted with its accent color
- * - Locked mode shows a 🔒 indicator
- */
 @Composable
 fun ModePillBar(
     modes: List<AgentMode>,
@@ -116,7 +133,7 @@ fun ModePillBar(
         modifier = modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -140,63 +157,68 @@ fun ModePill(
     onTap: () -> Unit,
     onSettings: () -> Unit
 ) {
-    val accentColor = mode.accentColor
-    val bgColor by animateColorAsState(
-        targetValue = if (isActive) accentColor.copy(alpha = 0.18f) else DettleSurface.copy(alpha = 0.5f),
-        animationSpec = spring(stiffness = Spring.StiffnessMedium),
-        label = "pillBg"
-    )
-    val borderColor by animateColorAsState(
-        targetValue = if (isActive) accentColor.copy(alpha = 0.7f) else DettleSurface,
-        animationSpec = spring(stiffness = Spring.StiffnessMedium),
-        label = "pillBorder"
-    )
-    val scale by animateFloatAsState(
-        targetValue = if (isActive) 1.04f else 1f,
-        animationSpec = spring(stiffness = Spring.StiffnessMedium),
-        label = "pillScale"
-    )
+    val containerColor = if (isActive) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+    }
 
-    Row(
-        modifier = Modifier
-            .scale(scale)
-            .clip(RoundedCornerShape(20.dp))
-            .background(bgColor)
-            .border(1.dp, borderColor, RoundedCornerShape(20.dp))
-            .clickable(onClick = onTap)
-            .padding(start = 10.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(mode.emoji, fontSize = 14.sp)
-        Spacer(Modifier.width(5.dp))
-        Text(
-            mode.displayName,
-            style = MaterialTheme.typography.labelMedium,
-            color = if (isActive) accentColor else DettleTextSecondary,
-            fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal
-        )
-        if (isLocked) {
-            Spacer(Modifier.width(4.dp))
-            Icon(Icons.Filled.Lock, contentDescription = "Locked", tint = accentColor, modifier = Modifier.size(11.dp))
+    val contentColor = if (isActive) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Surface(
+        onClick = onTap,
+        shape = MaterialTheme.shapes.medium,
+        color = containerColor,
+        border = if (isActive) {
+            androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        } else {
+            androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
         }
-        // Settings tap target (small, unobtrusive)
-        IconButton(onClick = onSettings, modifier = Modifier.size(24.dp)) {
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Icon(
-                Icons.Filled.Settings,
-                contentDescription = "Customize ${mode.displayName}",
-                tint = if (isActive) accentColor.copy(alpha = 0.6f) else DettleTextMuted,
-                modifier = Modifier.size(12.dp)
+                imageVector = getModeVectorIcon(mode.id),
+                contentDescription = null,
+                tint = contentColor,
+                modifier = Modifier.size(16.dp)
             )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                mode.displayName,
+                style = MaterialTheme.typography.labelMedium,
+                color = contentColor,
+                fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Medium
+            )
+            if (isLocked) {
+                Spacer(Modifier.width(4.dp))
+                Icon(
+                    Icons.Outlined.Lock,
+                    contentDescription = "Locked",
+                    tint = contentColor,
+                    modifier = Modifier.size(12.dp)
+                )
+            }
+            IconButton(onClick = onSettings, modifier = Modifier.size(24.dp)) {
+                Icon(
+                    Icons.Outlined.Settings,
+                    contentDescription = "Customize ${mode.displayName}",
+                    tint = contentColor.copy(alpha = 0.7f),
+                    modifier = Modifier.size(13.dp)
+                )
+            }
         }
     }
 }
 
 // ─── Goal Progress Card ───────────────────────────────────────────────────────
 
-/**
- * Live checklist shown during GOAL mode execution.
- * Each gate flips from ⏳ → ✅ / ❌ as the agent reports progress.
- */
 @Composable
 fun GoalProgressCard(
     gates: List<String>,
@@ -204,57 +226,77 @@ fun GoalProgressCard(
     modifier: Modifier = Modifier
 ) {
     if (gates.isEmpty()) return
-    Card(
+    ElevatedCard(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = DettleSurface.copy(alpha = 0.8f)),
-        shape = RoundedCornerShape(10.dp)
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     ) {
         Column(
-            modifier = Modifier
-                .border(1.dp, DettleCyan.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
-                .padding(12.dp)
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("🎯", fontSize = 14.sp)
-                Spacer(Modifier.width(6.dp))
+                Icon(
+                    Icons.Outlined.TrackChanges,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(8.dp))
                 Text(
                     "Goal Progress",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = DettleCyan,
-                    fontWeight = FontWeight.Bold
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold
                 )
                 Spacer(Modifier.weight(1f))
                 val passed = progress.values.count { it }
-                Text(
-                    "$passed / ${gates.size}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = DettleTextMuted
-                )
+                Surface(
+                    shape = MaterialTheme.shapes.extraSmall,
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Text(
+                        "$passed / ${gates.size}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
             }
-            Spacer(Modifier.height(8.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             gates.forEach { gate ->
                 val status = progress[gate]
-                val icon = when (status) {
-                    true  -> "✅"
-                    false -> "❌"
-                    null  -> "⏳"
-                }
-                val color = when (status) {
-                    true  -> DettleGreen
-                    false -> DettleRed
-                    null  -> DettleTextMuted
-                }
                 Row(
-                    modifier = Modifier.padding(vertical = 3.dp),
+                    modifier = Modifier.padding(vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(icon, fontSize = 13.sp)
+                    when (status) {
+                        true -> Icon(
+                            Icons.Outlined.CheckCircle,
+                            contentDescription = "Passed",
+                            tint = DettleGreen,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        false -> Icon(
+                            Icons.Outlined.Cancel,
+                            contentDescription = "Failed",
+                            tint = DettleRed,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        null -> CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            strokeWidth = 1.5.dp
+                        )
+                    }
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        gate.replace('_', ' '),
+                        gate,
                         style = MaterialTheme.typography.bodySmall,
-                        color = color,
-                        fontFamily = FontFamily.Monospace
+                        color = if (status == true) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -264,17 +306,6 @@ fun GoalProgressCard(
 
 // ─── Mode Customization Sheet ─────────────────────────────────────────────────
 
-/**
- * Bottom sheet for customizing a single agent mode.
- *
- * Sections:
- * 1. Header — mode name, description, reset button
- * 2. Model Waterfall — add/remove/reorder models
- * 3. Tools — toggle each tool on/off
- * 4. Step Budget — slider 2-100
- * 5. Custom Instructions — freeform text appended to system prompt
- * 6. Save / Reset buttons
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ModeCustomizationSheet(
@@ -286,7 +317,6 @@ fun ModeCustomizationSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val config = mode.effectiveConfig
 
-    // Editable state
     val modelWaterfall = remember { config.modelWaterfall.toMutableStateList() }
     val enabledTools = remember { config.enabledTools.toMutableStateList() }
     var maxSteps by remember { mutableStateOf(config.maxSteps.toFloat()) }
@@ -296,30 +326,43 @@ fun ModeCustomizationSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = DettleDark,
-        tonalElevation = 0.dp,
-        dragHandle = { BottomSheetDefaults.DragHandle(color = DettleTextMuted) }
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 2.dp,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.outlineVariant) }
     ) {
         LazyColumn(
             modifier = Modifier.padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // ── Header ──
+            // Header
             item {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(mode.emoji, fontSize = 24.sp)
-                    Spacer(Modifier.width(10.dp))
+                    Surface(
+                        shape = MaterialTheme.shapes.small,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                getModeVectorIcon(mode.id),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             "Customize ${mode.displayName}",
                             style = MaterialTheme.typography.titleMedium,
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             mode.description,
                             style = MaterialTheme.typography.bodySmall,
-                            color = DettleTextMuted
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     IconButton(onClick = {
@@ -329,12 +372,15 @@ fun ModeCustomizationSheet(
                         Icon(Icons.Filled.Refresh, "Reset to defaults", tint = DettleOrange)
                     }
                 }
-                HorizontalDivider(color = DettleSurface, modifier = Modifier.padding(top = 12.dp))
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.padding(top = 12.dp)
+                )
             }
 
-            // ── Model Waterfall ──
+            // Model Waterfall
             item {
-                SectionHeader("🤖 Model Waterfall", "Tried in order — fails over to next")
+                SectionHeader(Icons.Outlined.SmartToy, "Model Waterfall", "Tried in order — fails over to next")
             }
             items(modelWaterfall, key = { it }) { modelId ->
                 val model = ALL_KNOWN_MODELS[modelId]
@@ -351,19 +397,19 @@ fun ModeCustomizationSheet(
                     onClick = { showModelPicker = true },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, DettleSurface, RoundedCornerShape(8.dp))
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.small)
                 ) {
-                    Icon(Icons.Filled.Add, null, tint = DettleCyan, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Filled.Add, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Add Model", color = DettleCyan, style = MaterialTheme.typography.labelMedium)
+                    Text("Add Model", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
                 }
             }
 
-            // ── Tools ──
+            // Tools
             item {
-                HorizontalDivider(color = DettleSurface)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 Spacer(Modifier.height(4.dp))
-                SectionHeader("🔧 Tools", "Toggle which tools this mode can use")
+                SectionHeader(Icons.Outlined.Build, "Tools", "Toggle which tools this mode can use")
             }
             items(AgentTools.ALL.map { it.name }) { toolName ->
                 val enabled = toolName in enabledTools
@@ -381,74 +427,60 @@ fun ModeCustomizationSheet(
                         toolName,
                         style = MaterialTheme.typography.bodySmall,
                         fontFamily = FontFamily.Monospace,
-                        color = if (enabled) Color.White else DettleTextMuted,
+                        color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f)
                     )
                     Switch(
                         checked = enabled,
                         onCheckedChange = { on ->
                             if (on) enabledTools.add(toolName) else enabledTools.remove(toolName)
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = mode.accentColor,
-                            checkedTrackColor = mode.accentColor.copy(alpha = 0.3f),
-                            uncheckedThumbColor = DettleTextMuted,
-                            uncheckedTrackColor = DettleSurface
-                        )
+                        }
                     )
                 }
             }
 
-            // ── Step Budget ──
+            // Step Budget
             item {
-                HorizontalDivider(color = DettleSurface)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 Spacer(Modifier.height(4.dp))
-                SectionHeader("⚡ Step Budget", "Max ReAct loop iterations (${maxSteps.toInt()} steps)")
+                SectionHeader(Icons.Outlined.Speed, "Step Budget", "Max ReAct loop iterations (${maxSteps.toInt()} steps)")
                 Slider(
                     value = maxSteps,
                     onValueChange = { maxSteps = it },
                     valueRange = 2f..100f,
-                    steps = 49,
-                    colors = SliderDefaults.colors(
-                        thumbColor = mode.accentColor,
-                        activeTrackColor = mode.accentColor
-                    )
+                    steps = 49
                 )
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("2 (fast)", style = MaterialTheme.typography.labelSmall, color = DettleTextMuted)
-                    Text("100 (overnight)", style = MaterialTheme.typography.labelSmall, color = DettleTextMuted)
+                    Text("2 (fast)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("100 (deep)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
-            // ── Custom Instructions ──
+            // Custom Instructions
             item {
-                HorizontalDivider(color = DettleSurface)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 Spacer(Modifier.height(4.dp))
-                SectionHeader("📝 Custom Instructions", "Appended to the system prompt for this mode")
+                SectionHeader(Icons.Outlined.Description, "Custom Instructions", "Appended to system prompt")
                 OutlinedTextField(
                     value = customInstructions,
                     onValueChange = { customInstructions = it },
-                    modifier = Modifier.fillMaxWidth().height(130.dp),
-                    textStyle = MaterialTheme.typography.bodySmall.copy(color = Color.White),
+                    modifier = Modifier.fillMaxWidth().height(120.dp),
+                    shape = MaterialTheme.shapes.small,
+                    textStyle = MaterialTheme.typography.bodySmall,
                     placeholder = {
                         Text(
                             "e.g. 'Always write tests first. Never use var.'",
                             style = MaterialTheme.typography.bodySmall,
-                            color = DettleTextMuted,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                             fontStyle = FontStyle.Italic
                         )
                     },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = mode.accentColor,
-                        unfocusedBorderColor = DettleSurface,
-                        cursorColor = mode.accentColor
-                    ),
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                     maxLines = 6
                 )
             }
 
-            // ── Save ──
+            // Save actions
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp),
@@ -456,10 +488,12 @@ fun ModeCustomizationSheet(
                 ) {
                     TextButton(
                         onClick = onDismiss,
-                        modifier = Modifier.weight(1f)
-                            .border(1.dp, DettleSurface, RoundedCornerShape(10.dp))
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier
+                            .weight(1f)
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.small)
                     ) {
-                        Text("Cancel", color = DettleTextMuted)
+                        Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     TextButton(
                         onClick = {
@@ -473,20 +507,20 @@ fun ModeCustomizationSheet(
                             )
                             onDismiss()
                         },
-                        modifier = Modifier.weight(2f)
-                            .background(mode.accentColor.copy(alpha = 0.15f), RoundedCornerShape(10.dp))
-                            .border(1.dp, mode.accentColor.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier
+                            .weight(2f)
+                            .background(MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small)
                     ) {
-                        Icon(Icons.Filled.Check, null, tint = mode.accentColor, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Filled.Check, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Save Changes", color = mode.accentColor, fontWeight = FontWeight.SemiBold)
+                        Text("Save Changes", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
         }
     }
 
-    // ── Model Picker overlay ──
     if (showModelPicker) {
         ModelPickerSheet(
             currentWaterfall = modelWaterfall.toList(),
@@ -509,43 +543,53 @@ fun ModelWaterfallRow(
     contextWindow: Int,
     onRemove: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(DettleSurface.copy(alpha = 0.6f))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
-        Icon(Icons.Filled.DragHandle, null, tint = DettleTextMuted, modifier = Modifier.size(14.dp))
-        Spacer(Modifier.width(8.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(displayName, style = MaterialTheme.typography.bodySmall, color = Color.White, fontWeight = FontWeight.Medium)
-            if (bestFor.isNotBlank()) {
-                Text(bestFor.take(60), style = MaterialTheme.typography.labelSmall, color = DettleTextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Filled.DragHandle, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
+            Spacer(Modifier.width(8.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    displayName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Medium
+                )
+                if (bestFor.isNotBlank()) {
+                    Text(
+                        bestFor.take(60),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
-        }
-        if (contextWindow > 0) {
-            Text(
-                "${contextWindow / 1000}k ctx",
-                style = MaterialTheme.typography.labelSmall,
-                color = DettleCyan.copy(alpha = 0.7f),
-                fontFamily = FontFamily.Monospace
-            )
-        }
-        Spacer(Modifier.width(8.dp))
-        IconButton(onClick = onRemove, modifier = Modifier.size(28.dp)) {
-            Icon(Icons.Filled.Close, "Remove model", tint = DettleRed.copy(alpha = 0.7f), modifier = Modifier.size(14.dp))
+            if (contextWindow > 0) {
+                Text(
+                    "${contextWindow / 1000}k ctx",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            IconButton(onClick = onRemove, modifier = Modifier.size(28.dp)) {
+                Icon(Icons.Filled.Close, "Remove model", tint = DettleRed, modifier = Modifier.size(14.dp))
+            }
         }
     }
 }
 
 // ─── Model Picker Sheet ───────────────────────────────────────────────────────
 
-/**
- * Full model catalog picker — shows all known free models the user can add to a waterfall.
- * Already-added models show a checkmark.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ModelPickerSheet(
@@ -558,15 +602,15 @@ fun ModelPickerSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = DettleDark,
-        tonalElevation = 0.dp,
-        dragHandle = { BottomSheetDefaults.DragHandle(color = DettleTextMuted) }
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 2.dp,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.outlineVariant) }
     ) {
         Column(modifier = Modifier.padding(horizontal = 20.dp)) {
             Text(
                 "Add Model",
                 style = MaterialTheme.typography.titleMedium,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 12.dp)
             )
@@ -576,40 +620,60 @@ fun ModelPickerSheet(
             ) {
                 items(ALL_KNOWN_MODELS.values.toList()) { model ->
                     val alreadyAdded = model.modelId in currentWaterfall
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(DettleSurface.copy(alpha = 0.6f))
-                            .border(
-                                1.dp,
-                                if (alreadyAdded) DettleCyan.copy(alpha = 0.3f) else DettleSurface,
-                                RoundedCornerShape(10.dp)
-                            )
-                            .clickable(enabled = !alreadyAdded) { onModelSelected(model.modelId) }
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.small,
+                        color = if (alreadyAdded) {
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                        },
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (alreadyAdded) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f) else MaterialTheme.colorScheme.outlineVariant
+                        ),
+                        onClick = { if (!alreadyAdded) onModelSelected(model.modelId) }
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(model.displayName, style = MaterialTheme.typography.bodySmall, color = if (alreadyAdded) DettleTextMuted else Color.White, fontWeight = FontWeight.Medium)
-                            Text(
-                                model.bestFor.take(70),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = DettleTextMuted,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Text("${model.contextWindow / 1000}k ctx", style = MaterialTheme.typography.labelSmall, color = DettleCyan.copy(alpha = 0.6f), fontFamily = FontFamily.Monospace)
-                                if (model.dailyRequestLimit > 0) {
-                                    Text("${model.dailyRequestLimit} req/day", style = MaterialTheme.typography.labelSmall, color = DettleTextMuted, fontFamily = FontFamily.Monospace)
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    model.displayName,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (alreadyAdded) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    model.bestFor.take(70),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Text(
+                                        "${model.contextWindow / 1000}k ctx",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                    if (model.dailyRequestLimit > 0) {
+                                        Text(
+                                            "${model.dailyRequestLimit} req/day",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                    }
                                 }
                             }
-                        }
-                        if (alreadyAdded) {
-                            Icon(Icons.Filled.Check, "Already added", tint = DettleCyan, modifier = Modifier.size(18.dp))
-                        } else {
-                            Icon(Icons.Filled.Add, "Add", tint = DettleTextSecondary, modifier = Modifier.size(18.dp))
+                            if (alreadyAdded) {
+                                Icon(Icons.Filled.Check, "Already added", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            } else {
+                                Icon(Icons.Filled.Add, "Add", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                            }
                         }
                     }
                 }
@@ -621,9 +685,30 @@ fun ModelPickerSheet(
 // ─── Section Header ───────────────────────────────────────────────────────────
 
 @Composable
-fun SectionHeader(title: String, subtitle: String) {
-    Column(modifier = Modifier.padding(bottom = 4.dp)) {
-        Text(title, style = MaterialTheme.typography.labelLarge, color = Color.White, fontWeight = FontWeight.SemiBold)
-        Text(subtitle, style = MaterialTheme.typography.labelSmall, color = DettleTextMuted)
+fun SectionHeader(icon: ImageVector, title: String, subtitle: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(bottom = 4.dp)
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(18.dp)
+        )
+        Spacer(Modifier.width(8.dp))
+        Column {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }

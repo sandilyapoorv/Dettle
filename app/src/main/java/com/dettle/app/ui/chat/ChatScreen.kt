@@ -1,6 +1,5 @@
 package com.dettle.app.ui.chat
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -8,8 +7,8 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -37,26 +36,44 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Psychology
-import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material.icons.outlined.AccountTree
+import androidx.compose.material.icons.outlined.BugReport
+import androidx.compose.material.icons.outlined.Cancel
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Clear
+import androidx.compose.material.icons.outlined.CloudUpload
+import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.FolderCopy
+import androidx.compose.material.icons.outlined.Psychology
+import androidx.compose.material.icons.outlined.RateReview
+import androidx.compose.material.icons.outlined.Security
+import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.Terminal
+import androidx.compose.material.icons.outlined.WarningAmber
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -68,8 +85,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -80,24 +96,14 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.dettle.app.domain.model.ChatMessage
 import com.dettle.app.domain.model.MessageRole
 import com.dettle.app.domain.model.MessageType
-import com.dettle.app.ui.theme.AiBubble
-import com.dettle.app.ui.theme.AiBubbleBorder
-import com.dettle.app.ui.theme.ApprovalBg
-import com.dettle.app.ui.theme.ApprovalBorder
-import com.dettle.app.ui.theme.DettleCyan
-import com.dettle.app.ui.theme.DettleDark
+import com.dettle.app.ui.mode.GoalProgressCard
+import com.dettle.app.ui.mode.ModeCustomizationSheet
+import com.dettle.app.ui.mode.ModePillBar
 import com.dettle.app.ui.theme.DettleGreen
 import com.dettle.app.ui.theme.DettleOrange
-import com.dettle.app.ui.theme.DettlePurple
 import com.dettle.app.ui.theme.DettleRed
-import com.dettle.app.ui.theme.DettleSurface
-import com.dettle.app.ui.theme.DettleTextMuted
-import com.dettle.app.ui.theme.DettleTextSecondary
-import com.dettle.app.ui.theme.ToolCallBg
-import com.dettle.app.ui.theme.ToolCallBorder
-import com.dettle.app.ui.theme.UserBubble
-import com.dettle.app.ui.theme.UserBubbleBorder
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
     viewModel: ChatViewModel = hiltViewModel()
@@ -108,96 +114,146 @@ fun ChatScreen(
     var inputText by remember { mutableStateOf("") }
     var customizingMode by remember { mutableStateOf<com.dettle.app.orchestrator.mode.AgentMode?>(null) }
 
-    // Auto-scroll to bottom on new messages
     LaunchedEffect(uiState.messages.size) {
         if (uiState.messages.isNotEmpty()) {
             listState.animateScrollToItem(uiState.messages.size - 1)
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(DettleDark)
-    ) {
-        // ── Top Bar ──────────────────────────────────────────────────────
-        ChatTopBar(
-            isAgentRunning = uiState.isAgentRunning,
-            step = uiState.thinkingStep,
-            maxSteps = uiState.maxSteps,
-            onClear = viewModel::clearChat
-        )
-
-        // ── Mode Pill Bar ─────────────────────────────────────────────────
-        com.dettle.app.ui.mode.ModePillBar(
-            modes = allModes,
-            activeModeId = uiState.activeModeId,
-            lockedModeId = uiState.lockedModeId,
-            onModeTap = viewModel::toggleModelock,
-            onModeSettings = { mode -> customizingMode = mode }
-        )
-
-        // ── Message List ─────────────────────────────────────────────────
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            CenterAlignedTopAppBar(
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                ),
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            "Dettle",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        if (uiState.isAgentRunning && uiState.thinkingStep > 0) {
+                            Surface(
+                                shape = MaterialTheme.shapes.extraSmall,
+                                color = MaterialTheme.colorScheme.primaryContainer
+                            ) {
+                                Text(
+                                    "Step ${uiState.thinkingStep}/${uiState.maxSteps}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+                },
+                actions = {
+                    if (uiState.isAgentRunning) {
+                        CircularProgressIndicator(
+                            modifier = Modifier
+                                .size(20.dp)
+                                .padding(end = 4.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                            strokeWidth = 2.dp
+                        )
+                    }
+                    IconButton(onClick = viewModel::clearChat) {
+                        Icon(
+                            Icons.Outlined.DeleteOutline,
+                            contentDescription = "Clear chat",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            )
+        },
+        bottomBar = {
+            ChatInputBar(
+                value = inputText,
+                enabled = uiState.inputEnabled,
+                isRunning = uiState.isAgentRunning,
+                onValueChange = { inputText = it },
+                onSend = {
+                    if (inputText.isNotBlank()) {
+                        viewModel.sendMessage(inputText.trim())
+                        inputText = ""
+                    }
+                }
+            )
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
         ) {
-            if (uiState.messages.isEmpty()) {
-                item { WelcomeCard() }
-            }
+            // Mode Pills Row
+            ModePillBar(
+                modes = allModes,
+                activeModeId = uiState.activeModeId,
+                lockedModeId = uiState.lockedModeId,
+                onModeTap = viewModel::toggleModelock,
+                onModeSettings = { mode -> customizingMode = mode }
+            )
 
-            items(uiState.messages, key = { it.id }) { message ->
-                AnimatedVisibility(
-                    visible = true,
-                    enter = fadeIn() + slideInVertically { it / 2 }
-                ) {
-                    MessageItem(
-                        message = message,
-                        onApprove = viewModel::approveAction,
-                        onReject = viewModel::rejectAction
-                    )
+            // Message List
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                if (uiState.messages.isEmpty()) {
+                    item {
+                        WelcomeCard(onPromptSelected = { prompt ->
+                            viewModel.sendMessage(prompt)
+                        })
+                    }
                 }
-            }
 
-            // GOAL mode: live gate checklist
-            if (uiState.goalGates.isNotEmpty()) {
-                item {
-                    val activeMode = allModes.firstOrNull { it.id == uiState.activeModeId }
-                    val gates = activeMode?.effectiveConfig?.completionGates ?: emptyList()
-                    com.dettle.app.ui.mode.GoalProgressCard(
-                        gates = gates,
-                        progress = uiState.goalGates,
-                        modifier = Modifier.padding(horizontal = 4.dp)
-                    )
+                items(uiState.messages, key = { it.id }) { message ->
+                    AnimatedVisibility(
+                        visible = true,
+                        enter = fadeIn() + slideInVertically { it / 2 }
+                    ) {
+                        MessageItem(
+                            message = message,
+                            onApprove = viewModel::approveAction,
+                            onReject = viewModel::rejectAction
+                        )
+                    }
                 }
-            }
 
-            // Thinking indicator
-            if (uiState.isAgentRunning && uiState.thinkingStep > 0) {
-                item { ThinkingIndicator(step = uiState.thinkingStep, maxSteps = uiState.maxSteps) }
+                // GOAL mode checklist
+                if (uiState.goalGates.isNotEmpty()) {
+                    item {
+                        val activeMode = allModes.firstOrNull { it.id == uiState.activeModeId }
+                        val gates = activeMode?.effectiveConfig?.completionGates ?: emptyList()
+                        GoalProgressCard(
+                            gates = gates,
+                            progress = uiState.goalGates,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
+                    }
+                }
+
+                // Thinking state
+                if (uiState.isAgentRunning && uiState.thinkingStep > 0) {
+                    item {
+                        ThinkingIndicator(step = uiState.thinkingStep, maxSteps = uiState.maxSteps)
+                    }
+                }
             }
         }
-
-        // ── Input Bar ────────────────────────────────────────────────────
-        ChatInputBar(
-            value = inputText,
-            enabled = uiState.inputEnabled,
-            isRunning = uiState.isAgentRunning,
-            onValueChange = { inputText = it },
-            onSend = {
-                if (inputText.isNotBlank()) {
-                    viewModel.sendMessage(inputText.trim())
-                    inputText = ""
-                }
-            }
-        )
     }
 
-    // ── Mode customization bottom sheet ───────────────────────────────────
     customizingMode?.let { mode ->
-        com.dettle.app.ui.mode.ModeCustomizationSheet(
+        ModeCustomizationSheet(
             mode = mode,
             onSave = { config -> viewModel.saveModeConfig(mode.id, config) },
             onReset = { viewModel.resetModeToDefault(mode.id) },
@@ -206,135 +262,97 @@ fun ChatScreen(
     }
 }
 
-
-// ─── Top Bar ───────────────────────────────────────────────────────────────
-
-@Composable
-fun ChatTopBar(
-    isAgentRunning: Boolean,
-    step: Int,
-    maxSteps: Int,
-    onClear: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(DettleSurface)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Logo / name
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(CircleShape)
-                .background(
-                    Brush.radialGradient(listOf(DettleCyan, DettlePurple))
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Filled.Psychology,
-                contentDescription = null,
-                tint = DettleDark,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-
-        Spacer(Modifier.width(10.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                "Dettle",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-            if (isAgentRunning && step > 0) {
-                Text(
-                    "Step $step/$maxSteps",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = DettleCyan
-                )
-            } else {
-                Text(
-                    "Autonomous AI Agent",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = DettleTextMuted
-                )
-            }
-        }
-
-        if (isAgentRunning) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(20.dp),
-                color = DettleCyan,
-                strokeWidth = 2.dp
-            )
-            Spacer(Modifier.width(8.dp))
-        }
-
-        IconButton(onClick = onClear) {
-            Icon(Icons.Filled.MoreVert, contentDescription = "Options", tint = DettleTextSecondary)
-        }
-    }
-    HorizontalDivider(color = DettleSurface, thickness = 1.dp)
-}
-
-// ─── Welcome Card ──────────────────────────────────────────────────────────
+// ─── Welcome Hero Card ───────────────────────────────────────────────────────
 
 @Composable
-fun WelcomeCard() {
+fun WelcomeCard(onPromptSelected: (String) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(64.dp)
-                .clip(CircleShape)
-                .background(Brush.radialGradient(listOf(DettleCyan.copy(alpha = 0.3f), DettlePurple.copy(alpha = 0.1f)))),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(Icons.Filled.Memory, contentDescription = null, tint = DettleCyan, modifier = Modifier.size(32.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                "Autonomous pair programming on your phone.",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                "Dettle explores codebases, drafts implementation plans, runs multi-turn tool loops, and deploys directly from your device.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
-        Spacer(Modifier.height(16.dp))
-        Text("Dettle is ready", style = MaterialTheme.typography.headlineMedium, color = Color.White, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "Your autonomous AI developer agent.\nAsk me to read repos, write code, create PRs, or deploy to Cloudflare.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = DettleTextSecondary,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-        )
-        Spacer(Modifier.height(24.dp))
 
-        // Quick prompts
-        listOf(
-            "🔍 Map my GitHub repo",
-            "🐛 Fix a bug and open a PR",
-            "🚀 Deploy to Cloudflare",
-            "📋 Review my latest PR"
-        ).forEach { prompt ->
-            QuickPromptChip(prompt)
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        Icons.Outlined.Psychology,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        "Suggested actions",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                listOf(
+                    Pair(Icons.Outlined.FolderCopy, "Map my GitHub repository"),
+                    Pair(Icons.Outlined.BugReport, "Fix an issue and open a pull request"),
+                    Pair(Icons.Outlined.CloudUpload, "Deploy project to Cloudflare"),
+                    Pair(Icons.Outlined.RateReview, "Review latest changes against best practices")
+                ).forEach { (icon, text) ->
+                    QuickActionCard(icon = icon, text = text, onClick = { onPromptSelected(text) })
+                }
+            }
         }
     }
 }
 
 @Composable
-fun QuickPromptChip(text: String) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 3.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .border(1.dp, DettleSurface.copy(alpha = 0.8f), RoundedCornerShape(8.dp))
-            .background(DettleSurface.copy(alpha = 0.5f))
-            .padding(horizontal = 16.dp, vertical = 10.dp)
+fun QuickActionCard(icon: ImageVector, text: String, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = DettleTextSecondary)
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(16.dp)
+            )
+            Text(
+                text,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Medium
+            )
+        }
     }
 }
 
@@ -365,60 +383,59 @@ fun TextMessageBubble(message: ChatMessage) {
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
     ) {
         if (!isUser) {
-            // AI avatar
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(Brush.radialGradient(listOf(DettleCyan, DettlePurple))),
-                contentAlignment = Alignment.Center
+            Surface(
+                shape = MaterialTheme.shapes.small,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.size(28.dp)
             ) {
-                Text("D", fontSize = 12.sp, color = DettleDark, fontWeight = FontWeight.Bold)
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Outlined.Terminal,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
             Spacer(Modifier.width(8.dp))
         }
 
-        Column(modifier = Modifier.widthIn(max = 320.dp)) {
-            Box(
-                modifier = Modifier
-                    .clip(
-                        RoundedCornerShape(
-                            topStart = if (isUser) 16.dp else 4.dp,
-                            topEnd = if (isUser) 4.dp else 16.dp,
-                            bottomStart = 16.dp,
-                            bottomEnd = 16.dp
-                        )
-                    )
-                    .background(if (isUser) UserBubble else AiBubble)
-                    .border(
-                        1.dp,
-                        if (isUser) UserBubbleBorder else AiBubbleBorder,
-                        RoundedCornerShape(
-                            topStart = if (isUser) 16.dp else 4.dp,
-                            topEnd = if (isUser) 4.dp else 16.dp,
-                            bottomStart = 16.dp,
-                            bottomEnd = 16.dp
-                        )
-                    )
-                    .padding(12.dp)
-            ) {
-                Text(
-                    text = message.content,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White
+        Column(modifier = Modifier.widthIn(max = 330.dp)) {
+            Surface(
+                shape = if (isUser) {
+                    RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp)
+                } else {
+                    RoundedCornerShape(4.dp, 18.dp, 18.dp, 18.dp)
+                },
+                color = if (isUser) {
+                    MaterialTheme.colorScheme.primaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surface
+                },
+                border = BorderStroke(
+                    1.dp,
+                    if (isUser) MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                 )
-                if (message.isStreaming) {
-                    StreamingCursor()
+            ) {
+                Box(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                    Text(
+                        text = message.content,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (isUser) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                    )
+                    if (message.isStreaming) {
+                        StreamingCursor()
+                    }
                 }
             }
 
-            // Provider tag
             if (message.providerName != null) {
                 Text(
                     message.providerName,
                     style = MaterialTheme.typography.labelSmall,
-                    color = DettleTextMuted,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                 )
             }
         }
@@ -439,50 +456,57 @@ fun StreamingCursor() {
             .width(2.dp)
             .height(16.dp)
             .alpha(alpha)
-            .background(DettleCyan)
+            .background(MaterialTheme.colorScheme.primary)
     )
 }
 
 @Composable
 fun ToolCallCard(message: ChatMessage) {
-    Card(
+    ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = ToolCallBg),
-        shape = RoundedCornerShape(10.dp)
+        shape = MaterialTheme.shapes.small,
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+        )
     ) {
         Row(
-            modifier = Modifier
-                .border(1.dp, ToolCallBorder, RoundedCornerShape(10.dp))
-                .padding(12.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Filled.Terminal, contentDescription = null, tint = DettleCyan, modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(8.dp))
-            Column {
+            Icon(
+                Icons.Outlined.Terminal,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "Tool Call",
+                    "Executing Tool",
                     style = MaterialTheme.typography.labelSmall,
-                    color = DettleCyan,
+                    color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     message.content,
                     style = MaterialTheme.typography.bodySmall,
-                    color = DettleTextSecondary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontFamily = FontFamily.Monospace
                 )
-                // Show arguments
                 message.toolCall?.arguments?.entries?.forEach { (k, v) ->
                     Text(
                         "$k: ${v.take(60)}${if (v.length > 60) "..." else ""}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = DettleTextMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontFamily = FontFamily.Monospace
                     )
                 }
             }
-            Spacer(Modifier.weight(1f))
-            CircularProgressIndicator(modifier = Modifier.size(14.dp), color = DettleCyan, strokeWidth = 1.5.dp)
+            CircularProgressIndicator(
+                modifier = Modifier.size(14.dp),
+                color = MaterialTheme.colorScheme.primary,
+                strokeWidth = 1.5.dp
+            )
         }
     }
 }
@@ -490,28 +514,28 @@ fun ToolCallCard(message: ChatMessage) {
 @Composable
 fun ToolResultCard(message: ChatMessage) {
     val isError = message.toolResult?.isError == true
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = ToolCallBg),
-        shape = RoundedCornerShape(10.dp)
+        shape = MaterialTheme.shapes.small,
+        color = if (isError) MaterialTheme.colorScheme.error.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface,
+        border = BorderStroke(
+            1.dp,
+            if (isError) MaterialTheme.colorScheme.error.copy(alpha = 0.4f) else MaterialTheme.colorScheme.outlineVariant
+        )
     ) {
-        Column(
-            modifier = Modifier
-                .border(1.dp, if (isError) DettleRed.copy(alpha = 0.4f) else DettleGreen.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
-                .padding(12.dp)
-        ) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    if (isError) Icons.Filled.Clear else Icons.Filled.Code,
+                    if (isError) Icons.Outlined.Clear else Icons.Outlined.Code,
                     contentDescription = null,
-                    tint = if (isError) DettleRed else DettleGreen,
+                    tint = if (isError) MaterialTheme.colorScheme.error else DettleGreen,
                     modifier = Modifier.size(14.dp)
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    if (isError) "Tool Error" else "Tool Result: ${message.toolResult?.toolName}",
+                    if (isError) "Tool Error" else "Tool Output: ${message.toolResult?.toolName}",
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (isError) DettleRed else DettleGreen,
+                    color = if (isError) MaterialTheme.colorScheme.error else DettleGreen,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -519,7 +543,7 @@ fun ToolResultCard(message: ChatMessage) {
             Text(
                 message.content.take(500) + if (message.content.length > 500) "\n...(truncated)" else "",
                 style = MaterialTheme.typography.bodySmall,
-                color = DettleTextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontFamily = if (message.content.startsWith("{") || message.content.startsWith("[")) FontFamily.Monospace else FontFamily.Default
             )
         }
@@ -535,75 +559,94 @@ fun ApprovalCard(
     val request = message.approvalRequest ?: return
     val isPending = request.status == com.dettle.app.domain.model.ApprovalStatus.PENDING
 
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = ApprovalBg),
-        shape = RoundedCornerShape(12.dp)
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
     ) {
-        Column(
-            modifier = Modifier
-                .border(1.dp, ApprovalBorder, RoundedCornerShape(12.dp))
-                .padding(16.dp)
-        ) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("⚡", fontSize = 16.sp)
+                Icon(
+                    Icons.Outlined.Security,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
                 Spacer(Modifier.width(8.dp))
                 Text(
                     "Approval Required",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = DettleOrange,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold
                 )
             }
 
             Spacer(Modifier.height(8.dp))
-            Text(request.title, style = MaterialTheme.typography.bodyMedium, color = Color.White)
+            Text(
+                request.title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
             Spacer(Modifier.height(4.dp))
-            Text(request.description, style = MaterialTheme.typography.bodySmall, color = DettleTextSecondary)
+            Text(
+                request.description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
 
             if (request.details.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
-                HorizontalDivider(color = ApprovalBorder)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 Spacer(Modifier.height(8.dp))
                 request.details.entries.take(4).forEach { (k, v) ->
                     Row {
-                        Text("$k: ", style = MaterialTheme.typography.labelSmall, color = DettleTextMuted, fontFamily = FontFamily.Monospace)
-                        Text(v.take(80), style = MaterialTheme.typography.labelSmall, color = DettleTextSecondary, fontFamily = FontFamily.Monospace)
+                        Text("$k: ", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = FontFamily.Monospace)
+                        Text(v.take(80), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface, fontFamily = FontFamily.Monospace)
                     }
                 }
             }
 
             if (isPending) {
                 Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilledIconButton(
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    FilledTonalButton(
                         onClick = onApprove,
-                        modifier = Modifier.weight(1f).height(40.dp),
-                        colors = IconButtonDefaults.filledIconButtonColors(containerColor = DettleGreen.copy(alpha = 0.2f))
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                            Icon(Icons.Filled.Check, contentDescription = null, tint = DettleGreen, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Approve", color = DettleGreen, style = MaterialTheme.typography.labelMedium)
-                        }
+                        Icon(Icons.Outlined.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Approve")
                     }
-                    FilledIconButton(
+                    OutlinedButton(
                         onClick = onReject,
-                        modifier = Modifier.weight(1f).height(40.dp),
-                        colors = IconButtonDefaults.filledIconButtonColors(containerColor = DettleRed.copy(alpha = 0.2f))
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                            Icon(Icons.Filled.Clear, contentDescription = null, tint = DettleRed, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Reject", color = DettleRed, style = MaterialTheme.typography.labelMedium)
-                        }
+                        Icon(Icons.Outlined.Clear, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Reject")
                     }
                 }
             } else {
                 Spacer(Modifier.height(8.dp))
-                val statusText = if (request.status == com.dettle.app.domain.model.ApprovalStatus.APPROVED)
-                    "✅ Approved" else "🚫 Rejected"
-                Text(statusText, style = MaterialTheme.typography.labelMedium, color = DettleTextSecondary)
+                val isApproved = request.status == com.dettle.app.domain.model.ApprovalStatus.APPROVED
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        if (isApproved) Icons.Outlined.CheckCircle else Icons.Outlined.Cancel,
+                        contentDescription = null,
+                        tint = if (isApproved) DettleGreen else MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        if (isApproved) "Approved" else "Rejected",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }
@@ -616,135 +659,88 @@ fun SystemMessage(message: ChatMessage) {
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Center
     ) {
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .background((if (isError) DettleRed else DettleTextMuted).copy(alpha = 0.1f))
-                .padding(horizontal = 12.dp, vertical = 6.dp)
+        Surface(
+            shape = MaterialTheme.shapes.extraSmall,
+            color = if (isError) MaterialTheme.colorScheme.error.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            modifier = Modifier.padding(vertical = 4.dp)
         ) {
             Text(
                 message.content,
                 style = MaterialTheme.typography.bodySmall,
-                color = if (isError) DettleRed else DettleTextMuted,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
             )
         }
     }
 }
 
-// ─── Policy Cards ──────────────────────────────────────────────────────────
-
-/**
- * Hard-block card — shown when PolicyEngine stops a tool call cold.
- *
- * Tells the user (and the AI, via conversation history) exactly WHAT rule
- * was violated and HOW to fix it. The agent loop continues so the AI can
- * try a different approach.
- */
 @Composable
 fun PolicyBlockedCard(message: ChatMessage) {
     var expanded by remember { mutableStateOf(true) }
 
-    Card(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { expanded = !expanded },
-        colors = CardDefaults.cardColors(containerColor = DettleRed.copy(alpha = 0.08f)),
-        shape = RoundedCornerShape(12.dp)
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.error.copy(alpha = 0.08f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.3f))
     ) {
-        Column(
-            modifier = Modifier
-                .border(1.dp, DettleRed.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
-                .padding(14.dp)
-        ) {
-            // Header
+        Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("🛡️", fontSize = 15.sp)
+                Icon(
+                    Icons.Outlined.Shield,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(16.dp)
+                )
                 Spacer(Modifier.width(8.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         "Policy Blocked",
                         style = MaterialTheme.typography.labelLarge,
-                        color = DettleRed,
+                        color = MaterialTheme.colorScheme.error,
                         fontWeight = FontWeight.Bold
                     )
                     if (message.policyId != null) {
                         Text(
                             "rule: ${message.policyId}",
                             style = MaterialTheme.typography.labelSmall,
-                            color = DettleRed.copy(alpha = 0.6f),
+                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
                             fontFamily = FontFamily.Monospace
                         )
                     }
                 }
-                Text(
-                    if (expanded) "▾" else "▸",
-                    color = DettleRed.copy(alpha = 0.5f),
-                    fontSize = 12.sp
-                )
             }
 
             AnimatedVisibility(visible = expanded) {
                 Column {
-                    Spacer(Modifier.height(10.dp))
-                    HorizontalDivider(color = DettleRed.copy(alpha = 0.2f))
-                    Spacer(Modifier.height(10.dp))
-
-                    // Reason
-                    Text(
-                        "WHY",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = DettleTextMuted,
-                        letterSpacing = 1.sp
-                    )
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(8.dp))
                     Text(
                         message.policyReason ?: message.content,
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.85f)
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-
-                    // Fix
                     if (message.policyFix != null) {
-                        Spacer(Modifier.height(10.dp))
-                        Text(
-                            "FIX",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = DettleTextMuted,
-                            letterSpacing = 1.sp
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(DettleGreen.copy(alpha = 0.07f))
-                                .padding(10.dp)
+                        Spacer(Modifier.height(8.dp))
+                        Surface(
+                            shape = MaterialTheme.shapes.extraSmall,
+                            color = MaterialTheme.colorScheme.surfaceVariant
                         ) {
                             Text(
                                 message.policyFix,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = DettleGreen.copy(alpha = 0.9f)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(8.dp)
                             )
                         }
                     }
-
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        "The agent will automatically try an alternative approach.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = DettleTextMuted
-                    )
                 }
             }
         }
     }
 }
 
-/**
- * Warning badge — shown when PolicyEngine flagged something advisory
- * but the tool still ran. Subtle, collapsible.
- */
 @Composable
 fun PolicyWarningBadge(message: ChatMessage) {
     var expanded by remember { mutableStateOf(false) }
@@ -755,36 +751,33 @@ fun PolicyWarningBadge(message: ChatMessage) {
             .padding(start = 4.dp),
         horizontalArrangement = Arrangement.Start
     ) {
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(DettleOrange.copy(alpha = 0.1f))
-                .border(1.dp, DettleOrange.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
-                .clickable { expanded = !expanded }
-                .padding(horizontal = 10.dp, vertical = 5.dp)
+        Surface(
+            shape = MaterialTheme.shapes.extraSmall,
+            color = DettleOrange.copy(alpha = 0.1f),
+            border = BorderStroke(1.dp, DettleOrange.copy(alpha = 0.3f)),
+            modifier = Modifier.clickable { expanded = !expanded }
         ) {
-            Column {
+            Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("⚠️", fontSize = 12.sp)
-                    Spacer(Modifier.width(5.dp))
+                    Icon(
+                        Icons.Outlined.WarningAmber,
+                        contentDescription = null,
+                        tint = DettleOrange,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
                     Text(
                         "Policy Warning",
                         style = MaterialTheme.typography.labelSmall,
                         color = DettleOrange,
                         fontWeight = FontWeight.SemiBold
                     )
-                    Spacer(Modifier.width(5.dp))
-                    Text(
-                        if (expanded) "▾" else "▸",
-                        color = DettleOrange.copy(alpha = 0.5f),
-                        fontSize = 10.sp
-                    )
                 }
                 AnimatedVisibility(visible = expanded) {
                     Text(
                         message.content,
                         style = MaterialTheme.typography.labelSmall,
-                        color = DettleOrange.copy(alpha = 0.8f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp)
                     )
                 }
@@ -792,7 +785,6 @@ fun PolicyWarningBadge(message: ChatMessage) {
         }
     }
 }
-
 
 @Composable
 fun ThinkingIndicator(step: Int, maxSteps: Int) {
@@ -803,25 +795,26 @@ fun ThinkingIndicator(step: Int, maxSteps: Int) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         val transition = rememberInfiniteTransition(label = "thinking")
-        val alpha by transition.animateFloat(1f, 0.3f,
-            infiniteRepeatable(tween(800), RepeatMode.Reverse), label = "pulse")
+        val alpha by transition.animateFloat(
+            1f, 0.3f,
+            infiniteRepeatable(tween(800), RepeatMode.Reverse), label = "pulse"
+        )
 
-
-        repeat(3) { i ->
+        repeat(3) {
             Box(
                 modifier = Modifier
                     .padding(horizontal = 2.dp)
                     .size(6.dp)
                     .alpha(alpha)
                     .clip(CircleShape)
-                    .background(DettleCyan)
+                    .background(MaterialTheme.colorScheme.primary)
             )
         }
         Spacer(Modifier.width(8.dp))
         Text(
             "Thinking... Step $step/$maxSteps",
             style = MaterialTheme.typography.labelSmall,
-            color = DettleTextMuted
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -836,19 +829,19 @@ fun ChatInputBar(
     onValueChange: (String) -> Unit,
     onSend: () -> Unit
 ) {
-    Column(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .background(DettleSurface)
             .imePadding()
-            .navigationBarsPadding()
+            .navigationBarsPadding(),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 2.dp
     ) {
-        HorizontalDivider(color = DettleSurface, thickness = 1.dp)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.Bottom
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             OutlinedTextField(
                 value = value,
@@ -857,48 +850,44 @@ fun ChatInputBar(
                 modifier = Modifier.weight(1f),
                 placeholder = {
                     Text(
-                        if (!enabled && isRunning) "Agent is working..." else "Ask anything...",
-                        color = DettleTextMuted,
+                        if (!enabled && isRunning) "Agent is working..." else "Ask Dettle anything...",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 },
-                shape = RoundedCornerShape(24.dp),
+                shape = MaterialTheme.shapes.large,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = DettleCyan.copy(alpha = 0.6f),
-                    unfocusedBorderColor = DettleSurface,
-                    focusedContainerColor = DettleSurface,
-                    unfocusedContainerColor = DettleSurface,
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    disabledTextColor = DettleTextMuted,
-                    disabledBorderColor = DettleSurface
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                 ),
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.Sentences,
                     imeAction = ImeAction.Send
                 ),
                 keyboardActions = KeyboardActions(onSend = { onSend() }),
-                maxLines = 6,
+                maxLines = 5,
                 textStyle = MaterialTheme.typography.bodyMedium
             )
 
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(10.dp))
 
-            // Send button
             FilledIconButton(
                 onClick = onSend,
                 enabled = enabled && value.isNotBlank(),
                 modifier = Modifier.size(46.dp),
+                shape = MaterialTheme.shapes.small,
                 colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = DettleCyan,
-                    contentColor = DettleDark,
-                    disabledContainerColor = DettleSurface
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
                 )
             ) {
                 Icon(
                     Icons.AutoMirrored.Filled.Send,
                     contentDescription = "Send",
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }

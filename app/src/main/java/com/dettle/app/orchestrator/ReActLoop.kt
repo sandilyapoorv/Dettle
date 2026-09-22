@@ -191,7 +191,7 @@ class ReActLoop @Inject constructor(
                     // Feed the block back into history so the AI knows to change course
                     history.add(ApiMessage(
                         role = "tool",
-                        content = "❌ POLICY BLOCKED [${policyResult.policyId}]: ${policyResult.reason}\n\nFix: ${policyResult.fix}",
+                        content = "POLICY BLOCKED [${policyResult.policyId}]: ${policyResult.reason}\n\nFix: ${policyResult.fix}",
                         name = toolCall.name
                     ))
                     // Continue the loop — agent can try a different approach
@@ -200,7 +200,7 @@ class ReActLoop @Inject constructor(
                 is EvaluationResult.ApprovedWithWarnings -> {
                     // Warn but proceed
                     val warningText = policyResult.warnings.joinToString("\n") {
-                        "⚠️ [${it.policyId}]: ${it.message}"
+                        "[Warning] [${it.policyId}]: ${it.message}"
                     }
                     emit(LoopEvent.PolicyWarning(toolName = toolCall.name, warnings = warningText))
                     Log.d(TAG, "Policy warnings for ${toolCall.name}:\n$warningText")

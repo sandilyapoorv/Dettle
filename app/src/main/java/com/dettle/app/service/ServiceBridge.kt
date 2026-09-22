@@ -38,7 +38,7 @@ object ServiceBridge {
 // ─── Events (daemon → activity) ───────────────────────────────────────────────
 
 sealed class DaemonEvent {
-    data class StatusUpdate(val status: String, val icon: String = "🤖") : DaemonEvent()
+    data class StatusUpdate(val status: String, val icon: String = "") : DaemonEvent()
     data class GoalProgressUpdate(val goalId: String, val gateId: String, val passed: Boolean) : DaemonEvent()
     data class GoalCompleted(val goalId: String, val summary: String) : DaemonEvent()
     data class HeartbeatAlert(val source: String, val title: String, val body: String) : DaemonEvent()

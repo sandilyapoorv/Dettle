@@ -71,7 +71,7 @@ class SelfImprovingSkillUpdater @Inject constructor(
                 // Repeated failures of same type → add avoidance rule
                 val commonErrors = failures.mapNotNull { it.errorReason }.take(3).joinToString("; ")
                 memoryInjector.storeCorrection(
-                    "⚠️ ${type.name} tasks have been failing repeatedly. Common errors: $commonErrors. " +
+                    "[Warning] ${type.name} tasks have been failing repeatedly. Common errors: $commonErrors. " +
                     "Be extra careful with these tasks and verify preconditions first.",
                     ""
                 )

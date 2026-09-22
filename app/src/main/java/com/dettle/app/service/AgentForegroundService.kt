@@ -86,7 +86,7 @@ class AgentForegroundService : Service() {
             }
             ACTION_START_OVERNIGHT -> {
                 overnightLoop.start()
-                updateNotification("🌙 Overnight run active...")
+                updateNotification("Overnight run active...")
             }
             ACTION_STOP_OVERNIGHT -> {
                 overnightLoop.interrupt()

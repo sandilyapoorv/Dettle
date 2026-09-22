@@ -2,14 +2,12 @@ package com.dettle.app.ui.authvault
 
 import android.view.ViewGroup
 import android.webkit.WebView
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,60 +19,44 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.LockOpen
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.LockOpen
+import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dettle.app.data.webview.WebViewPool
 import com.dettle.app.domain.model.AIProviderType
-import com.dettle.app.ui.theme.DettleCard
-import com.dettle.app.ui.theme.DettleCardBorder
-import com.dettle.app.ui.theme.DettleCyan
-import com.dettle.app.ui.theme.DettleDark
 import com.dettle.app.ui.theme.DettleGreen
 import com.dettle.app.ui.theme.DettleOrange
-import com.dettle.app.ui.theme.DettleRed
-import com.dettle.app.ui.theme.DettleSurface
-import com.dettle.app.ui.theme.DettleTextMuted
-import com.dettle.app.ui.theme.DettleTextSecondary
 
-/**
- * Auth Vault — where the user logs into their AI subscriptions.
- *
- * There are two modes:
- * 1. OVERVIEW: Shows status of all 8 WebView providers (logged in / needs login)
- * 2. LOGIN: Shows the actual WebView for a specific provider, fullscreen,
- *    so the user can log in like a normal browser
- *
- * After login, the JS loginCheck selector detects success and:
- * - Hides the WebView (back to GONE)
- * - Marks the session as available
- * - Returns to overview
- *
- * Cookies are persisted to disk via CookieManager.flush() on every page load,
- * so login survives app restarts indefinitely.
- */
 @Composable
 fun AuthVaultScreen(
     viewModel: AuthVaultViewModel = hiltViewModel()
@@ -82,7 +64,6 @@ fun AuthVaultScreen(
     val uiState by viewModel.uiState.collectAsState()
 
     if (uiState.activeLoginProvider != null) {
-        // Full-screen WebView login for a specific provider
         WebViewLoginScreen(
             providerType = uiState.activeLoginProvider!!,
             webView = viewModel.getWebViewForLogin(uiState.activeLoginProvider!!),
@@ -90,7 +71,6 @@ fun AuthVaultScreen(
             onCancel = viewModel::onLoginCancelled
         )
     } else {
-        // Overview of all WebView providers
         ProviderOverview(
             statuses = uiState.providerStatuses,
             onLogin = viewModel::startLogin
@@ -105,41 +85,63 @@ fun ProviderOverview(
     statuses: List<WebViewPool.PoolStatus>,
     onLogin: (AIProviderType) -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(DettleDark)
-            .padding(16.dp)
-    ) {
-        Text(
-            "AI Subscriptions",
-            style = MaterialTheme.typography.headlineMedium,
-            color = Color.White,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            "Log into your paid accounts once — Dettle saves the session permanently.",
-            style = MaterialTheme.typography.bodySmall,
-            color = DettleTextMuted,
-            modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
-        )
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background
+    ) { paddingValues ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        "Auth Vault",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        "Log into your subscription providers once. Dettle securely preserves your session on-device.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
 
-        // Stats row
-        val loggedIn = statuses.count { it.isLoggedIn }
-        val available = statuses.count { it.isAvailable }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            StatChip("$loggedIn / ${statuses.size}", "Logged In", DettleGreen)
-            StatChip("$available", "Available Now", DettleCyan)
-            StatChip(
-                "${statuses.count { it.needsReauth }}",
-                "Needs Login",
-                if (statuses.any { it.needsReauth }) DettleOrange else DettleTextMuted
-            )
-        }
+            // Stats row
+            item {
+                val loggedIn = statuses.count { it.isLoggedIn }
+                val available = statuses.count { it.isAvailable }
+                val needsReauth = statuses.count { it.needsReauth }
 
-        Spacer(Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    StatCard("$loggedIn / ${statuses.size}", "Logged In", modifier = Modifier.weight(1f))
+                    StatCard("$available", "Available", modifier = Modifier.weight(1f))
+                    StatCard(
+                        "$needsReauth",
+                        "Needs Action",
+                        isWarning = needsReauth > 0,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
 
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            item {
+                Text(
+                    "SUBSCRIPTION PROVIDERS",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+
             items(statuses) { status ->
                 ProviderStatusCard(status = status, onLogin = { onLogin(status.providerType) })
             }
@@ -148,17 +150,38 @@ fun ProviderOverview(
 }
 
 @Composable
-fun StatChip(value: String, label: String, color: Color) {
-    Column(
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(color.copy(alpha = 0.1f))
-            .border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+fun StatCard(
+    value: String,
+    label: String,
+    isWarning: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.small,
+        color = if (isWarning) MaterialTheme.colorScheme.error.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        border = BorderStroke(
+            1.dp,
+            if (isWarning) MaterialTheme.colorScheme.error.copy(alpha = 0.3f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        )
     ) {
-        Text(value, style = MaterialTheme.typography.titleMedium, color = color, fontWeight = FontWeight.Bold)
-        Text(label, style = MaterialTheme.typography.labelSmall, color = DettleTextMuted)
+        Column(
+            modifier = Modifier.padding(vertical = 12.dp, horizontal = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                value,
+                style = MaterialTheme.typography.titleMedium,
+                color = if (isWarning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
@@ -171,92 +194,99 @@ fun ProviderStatusCard(
     val isOk = status.isAvailable
     val needsAction = status.needsReauth || !status.isLoggedIn
 
-    Card(
+    ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = DettleCard),
-        shape = RoundedCornerShape(12.dp)
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     ) {
         Row(
-            modifier = Modifier
-                .border(
-                    1.dp,
-                    when {
-                        isOk -> DettleGreen.copy(alpha = 0.3f)
-                        status.needsReauth -> DettleOrange.copy(alpha = 0.4f)
-                        else -> DettleCardBorder
-                    },
-                    RoundedCornerShape(12.dp)
-                )
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Status dot
-            Box(
-                modifier = Modifier
-                    .size(10.dp)
-                    .clip(CircleShape)
-                    .background(
-                        when {
-                            isOk -> DettleGreen
-                            status.needsReauth -> DettleOrange
-                            else -> DettleTextMuted
-                        }
+            Surface(
+                shape = MaterialTheme.shapes.small,
+                color = if (isOk) {
+                    MaterialTheme.colorScheme.primaryContainer
+                } else if (status.needsReauth) {
+                    DettleOrange.copy(alpha = 0.15f)
+                } else {
+                    MaterialTheme.colorScheme.surfaceVariant
+                },
+                modifier = Modifier.size(40.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        if (isOk) Icons.Outlined.CheckCircle else if (status.needsReauth) Icons.Outlined.WarningAmber else Icons.Outlined.Lock,
+                        contentDescription = null,
+                        tint = if (isOk) MaterialTheme.colorScheme.onPrimaryContainer else if (status.needsReauth) DettleOrange else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
                     )
-            )
-            Spacer(Modifier.width(12.dp))
+                }
+            }
 
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
                 Text(
                     provider.displayName,
                     style = MaterialTheme.typography.titleSmall,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
                     when {
-                        isOk -> "✅ Ready — session active"
-                        status.needsReauth -> "⚠️ Session expired — tap to re-login"
-                        !status.isLoggedIn -> "🔒 Not logged in — tap to connect"
-                        else -> "Loading..."
+                        isOk -> "Ready — session active"
+                        status.needsReauth -> "Session expired — tap to re-authenticate"
+                        !status.isLoggedIn -> "Not signed in — tap to connect"
+                        else -> "Initializing session..."
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = when {
                         isOk -> DettleGreen
                         status.needsReauth -> DettleOrange
-                        else -> DettleTextSecondary
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
                     }
                 )
                 Text(
                     provider.baseUrl,
                     style = MaterialTheme.typography.labelSmall,
-                    color = DettleTextMuted
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
             }
 
             if (needsAction) {
-                Spacer(Modifier.width(8.dp))
-                Button(
+                FilledTonalButton(
                     onClick = onLogin,
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (status.needsReauth) DettleOrange.copy(alpha = 0.2f) else DettleCyan.copy(alpha = 0.15f),
-                        contentColor = if (status.needsReauth) DettleOrange else DettleCyan
-                    )
+                    shape = MaterialTheme.shapes.small
                 ) {
                     Icon(
-                        if (status.needsReauth) Icons.Filled.LockOpen else Icons.Filled.Lock,
+                        if (status.needsReauth) Icons.Outlined.LockOpen else Icons.Outlined.Key,
                         contentDescription = null,
                         modifier = Modifier.size(14.dp)
                     )
-                    Spacer(Modifier.width(4.dp))
+                    Spacer(Modifier.width(6.dp))
                     Text(
-                        if (status.needsReauth) "Re-login" else "Login",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold
+                        if (status.needsReauth) "Re-login" else "Sign In",
+                        style = MaterialTheme.typography.labelSmall
                     )
                 }
             } else {
-                Icon(Icons.Filled.Check, contentDescription = null, tint = DettleGreen, modifier = Modifier.size(20.dp))
+                Surface(
+                    shape = MaterialTheme.shapes.extraSmall,
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Text(
+                        "Connected",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
         }
     }
@@ -264,6 +294,7 @@ fun ProviderStatusCard(
 
 // ─── WebView Login Screen ──────────────────────────────────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WebViewLoginScreen(
     providerType: AIProviderType,
@@ -271,69 +302,60 @@ fun WebViewLoginScreen(
     onDone: () -> Unit,
     onCancel: () -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(DettleDark)
-    ) {
-        // Top bar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(DettleSurface)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(Icons.Filled.LockOpen, contentDescription = null, tint = DettleCyan, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(8.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "Login to ${providerType.displayName}",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    "Log in normally — Dettle saves your session permanently",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = DettleTextMuted
-                )
-            }
-            Button(
-                onClick = onDone,
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = DettleGreen, contentColor = DettleDark)
-            ) {
-                Text("Done", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-            }
-            Spacer(Modifier.width(8.dp))
-            Button(
-                onClick = onCancel,
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = DettleRed.copy(alpha = 0.2f),
-                    contentColor = DettleRed
-                )
-            ) {
-                Text("Cancel", style = MaterialTheme.typography.labelMedium)
-            }
-        }
-
-        // The actual WebView — made visible here so user can interact with it
-        if (webView != null) {
-            AndroidView(
-                factory = {
-                    webView.apply {
-                        visibility = android.view.View.VISIBLE
-                        (parent as? ViewGroup)?.removeView(this)
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            CenterAlignedTopAppBar(
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                ),
+                navigationIcon = {
+                    IconButton(onClick = onCancel) {
+                        Icon(Icons.Outlined.Close, contentDescription = "Cancel")
                     }
                 },
-                modifier = Modifier.fillMaxSize(),
-                update = { /* No dynamic updates needed */ }
+                title = {
+                    Text(
+                        "Sign in to ${providerType.displayName}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                },
+                actions = {
+                    Button(
+                        onClick = onDone,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.padding(end = 12.dp)
+                    ) {
+                        Text("Done")
+                    }
+                }
             )
-        } else {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Loading ${providerType.displayName}...", color = DettleTextMuted)
+        }
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            if (webView != null) {
+                AndroidView(
+                    factory = {
+                        webView.apply {
+                            visibility = android.view.View.VISIBLE
+                            (parent as? ViewGroup)?.removeView(this)
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                    update = { }
+                )
+            } else {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        "Loading ${providerType.displayName}...",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }

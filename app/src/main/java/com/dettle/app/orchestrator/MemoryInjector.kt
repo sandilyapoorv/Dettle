@@ -63,12 +63,12 @@ class MemoryInjector @Inject constructor(
             appendLine("=== MEMORY (from past interactions) ===")
             unique.forEach { memory ->
                 val typeTag = when (memory.type) {
-                    MemoryType.CORRECTION.name -> "⚠️ CORRECTION"
-                    MemoryType.PREFERENCE.name -> "👤 PREFERENCE"
-                    MemoryType.REPO_STYLE.name -> "📐 CODE STYLE"
-                    MemoryType.TASK_OUTCOME.name -> "📋 PAST TASK"
-                    MemoryType.SKILL_LEARNED.name -> "💡 LEARNED"
-                    else -> "📝 CONTEXT"
+                    MemoryType.CORRECTION.name -> "CORRECTION"
+                    MemoryType.PREFERENCE.name -> "PREFERENCE"
+                    MemoryType.REPO_STYLE.name -> "CODE STYLE"
+                    MemoryType.TASK_OUTCOME.name -> "PAST TASK"
+                    MemoryType.SKILL_LEARNED.name -> "LEARNED"
+                    else -> "CONTEXT"
                 }
                 appendLine("• [$typeTag] ${memory.content}")
             }

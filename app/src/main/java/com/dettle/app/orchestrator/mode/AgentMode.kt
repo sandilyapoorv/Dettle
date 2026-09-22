@@ -12,35 +12,35 @@ import kotlinx.serialization.Serializable
 
 enum class ModeId(val displayName: String, val emoji: String, val description: String) {
     CHAT(
-        "Chat",       "💬",
+        "Chat",       "",
         "Quick answers and light tasks. Auto-routes for simplicity."
     ),
     RESEARCH(
-        "Research",   "🔍",
+        "Research",   "",
         "Deep-dive into topics, codebases, or docs. Reads everything. No writes."
     ),
     CODE(
-        "Code",       "💻",
+        "Code",       "",
         "Write, fix, and ship code. TDD enforced. Always branches, never touches main."
     ),
     PLAN(
-        "Plan",       "📋",
+        "Plan",       "",
         "Think before acting. Produces a structured implementation plan, not code."
     ),
     GOAL(
-        "Goal",       "🎯",
+        "Goal",       "",
         "Long-running autonomous objective. Tracks progress across sessions. Stops when done."
     ),
     WEB(
-        "Web",        "🌐",
+        "Web",        "",
         "Aggressive multi-query web research. Triangulates from 3+ sources."
     ),
     REVIEW(
-        "Review",     "👁️",
+        "Review",     "",
         "Code review with P0–P3 ranked findings. Production-critic standard."
     ),
     DEPLOY(
-        "Deploy",     "🚀",
+        "Deploy",     "",
         "Build → test → release. CI trigger, APK upload, GitHub Release."
     )
 }

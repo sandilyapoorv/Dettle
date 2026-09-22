@@ -75,32 +75,32 @@ class AgentBus @Inject constructor() {
 enum class AgentRole(val displayName: String, val emoji: String, val description: String) {
     ORCHESTRATOR(
         "Orchestrator",
-        "🎯",
+        "",
         "Breaks tasks into sub-tasks and synthesizes results"
     ),
     READER(
         "Reader",
-        "📖",
+        "",
         "Reads repos, finds relevant code, builds context"
     ),
     CODER(
         "Coder",
-        "⌨️",
+        "",
         "Writes code changes, implements features"
     ),
     REVIEWER(
         "Reviewer",
-        "🔍",
+        "",
         "Reviews code for bugs, style issues, security"
     ),
     DEPLOYER(
         "Deployer",
-        "🚀",
+        "",
         "Creates PRs, triggers Actions, deploys to Cloudflare"
     ),
     RESEARCHER(
         "Researcher",
-        "🔎",
+        "",
         "Searches the web, reads docs, explores APIs"
     )
 }
