@@ -53,6 +53,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Mic
@@ -932,7 +933,7 @@ fun ThinkingIndicator(step: Int, maxSteps: Int) {
 
 enum class ActionButtonState {
     MIC,
-    STOP,
+    HOLD,
     SEND
 }
 
@@ -1013,9 +1014,9 @@ fun ChatInputBar(
 
             Spacer(Modifier.width(10.dp))
 
-            // Dynamic Morphing Action Button: Mic / Stop / Send
+            // Dynamic Morphing Action Button: Mic / Hold (Stop) / Send
             val buttonState = when {
-                isListening -> ActionButtonState.STOP
+                isListening -> ActionButtonState.HOLD
                 value.isNotBlank() -> ActionButtonState.SEND
                 else -> ActionButtonState.MIC
             }
@@ -1029,7 +1030,7 @@ fun ChatInputBar(
                 label = "actionButtonMorph"
             ) { state ->
                 when (state) {
-                    ActionButtonState.STOP -> {
+                    ActionButtonState.HOLD -> {
                         FilledIconButton(
                             onClick = onStopVoiceClick,
                             modifier = Modifier.size(46.dp),
@@ -1040,8 +1041,8 @@ fun ChatInputBar(
                             )
                         ) {
                             Icon(
-                                Icons.Filled.Stop,
-                                contentDescription = "Stop recording and transcribe",
+                                Icons.Filled.Pause,
+                                contentDescription = "Hold / Tap to stop recording and transcribe",
                                 modifier = Modifier.size(20.dp)
                             )
                         }
