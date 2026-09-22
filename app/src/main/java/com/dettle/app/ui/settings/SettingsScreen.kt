@@ -30,6 +30,7 @@ import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.CloudSync
+import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
@@ -38,6 +39,8 @@ import androidx.compose.material3.SwitchDefaults
 import com.dettle.app.domain.model.AIProviderType
 import com.dettle.app.domain.model.ProviderAccount
 import com.dettle.app.domain.model.GitHubAccount
+import com.dettle.app.data.backup.BackupSummary
+import com.dettle.app.ui.backup.BackupRestoreSheet
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.DesignServices
 import androidx.compose.material.icons.outlined.FolderCopy
@@ -88,6 +91,7 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val state = viewModel.state
+    var showBackupSheet by remember { mutableStateOf(false) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background
@@ -183,6 +187,17 @@ fun SettingsScreen(
                 )
             }
 
+            // Granular Backup & Restore
+            item {
+                BackupRestoreCard(
+                    summary = viewModel.backupSummary,
+                    onOpenBackup = {
+                        viewModel.refreshBackupSummary()
+                        showBackupSheet = true
+                    }
+                )
+            }
+
             // Voice Typing (OpenWhispr)
             item {
                 VoiceTypingSettingsCard(
@@ -208,6 +223,17 @@ fun SettingsScreen(
 
             item { Spacer(Modifier.height(80.dp)) }
         }
+    }
+
+    if (showBackupSheet) {
+        BackupRestoreSheet(
+            summary = viewModel.backupSummary,
+            onDismiss = { showBackupSheet = false },
+            onCreateBackupJson = viewModel::createBackupJson,
+            onRestoreBackup = viewModel::restoreBackup,
+            onExportToFile = viewModel::exportBackupToFile,
+            onReadFromUri = viewModel::readBackupUri
+        )
     }
 }
 
@@ -552,6 +578,113 @@ fun GoogleDriveCard(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
+            }
+        }
+    }
+}
+
+@Composable
+fun BackupRestoreCard(
+    summary: BackupSummary?,
+    onOpenBackup: () -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Surface(
+                    shape = MaterialTheme.shapes.small,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.size(42.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Outlined.CloudUpload,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Backup & Restore",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        "Granular on-device backup with custom module selection",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            if (summary != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("${summary.apiCount + summary.subscriptionCount}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            Text("Accounts", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("${summary.projectCount}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                            Text("Projects", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("${summary.chatCount}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = DettleGreen)
+                            Text("Chats", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+
+            Button(
+                onClick = onOpenBackup,
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.small,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            ) {
+                Icon(Icons.Outlined.CloudUpload, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Manage Backup & Restore", fontWeight = FontWeight.SemiBold)
             }
         }
     }

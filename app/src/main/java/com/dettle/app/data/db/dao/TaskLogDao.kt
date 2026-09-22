@@ -20,4 +20,10 @@ interface TaskLogDao {
 
     @Query("DELETE FROM task_logs WHERE createdAt < :olderThan")
     suspend fun pruneOlderThan(olderThan: Long)
+
+    @Query("SELECT * FROM task_logs")
+    suspend fun getAllLogs(): List<TaskLogEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertLogs(logs: List<TaskLogEntity>)
 }

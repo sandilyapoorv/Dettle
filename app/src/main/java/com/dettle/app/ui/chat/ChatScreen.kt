@@ -34,10 +34,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -136,7 +139,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ChatScreen(
     viewModel: ChatViewModel = hiltViewModel()
@@ -217,7 +220,8 @@ fun ChatScreen(
         }
     }
 
-    LaunchedEffect(uiState.messages.size) {
+    val isImeVisible = WindowInsets.isImeVisible
+    LaunchedEffect(uiState.messages.size, isImeVisible) {
         if (uiState.messages.isNotEmpty()) {
             listState.animateScrollToItem(uiState.messages.size - 1)
         }
@@ -565,7 +569,7 @@ fun StreamingCursor() {
         modifier = Modifier
             .width(2.dp)
             .height(16.dp)
-            .alpha(alpha)
+            .graphicsLayer { this.alpha = alpha }
             .background(MaterialTheme.colorScheme.primary)
     )
 }
@@ -915,7 +919,7 @@ fun ThinkingIndicator(step: Int, maxSteps: Int) {
                 modifier = Modifier
                     .padding(horizontal = 2.dp)
                     .size(6.dp)
-                    .alpha(alpha)
+                    .graphicsLayer { this.alpha = alpha }
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primary)
             )
@@ -937,6 +941,7 @@ enum class ActionButtonState {
     SEND
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ChatInputBar(
     value: String,
@@ -950,11 +955,14 @@ fun ChatInputBar(
     onStopVoiceClick: () -> Unit,
     onCancelVoiceClick: () -> Unit
 ) {
+    val isImeVisible = WindowInsets.isImeVisible
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .imePadding()
-            .navigationBarsPadding(),
+            .then(
+                if (isImeVisible) Modifier.imePadding()
+                else Modifier.navigationBarsPadding()
+            ),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 2.dp
     ) {
@@ -1024,8 +1032,8 @@ fun ChatInputBar(
             AnimatedContent(
                 targetState = buttonState,
                 transitionSpec = {
-                    (scaleIn(tween(200)) + fadeIn(tween(150)))
-                        .togetherWith(scaleOut(tween(150)) + fadeOut(tween(120)))
+                    (scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)) + fadeIn(tween(150)))
+                        .togetherWith(scaleOut(spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium)) + fadeOut(tween(120)))
                 },
                 label = "actionButtonMorph"
             ) { state ->

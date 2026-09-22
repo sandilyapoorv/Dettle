@@ -44,4 +44,10 @@ interface ProjectDao {
 
     @Query("DELETE FROM project_memories WHERE project_id = :projectId")
     suspend fun clearProjectMemories(projectId: String)
+
+    @Query("SELECT * FROM projects")
+    suspend fun getAllProjects(): List<ProjectEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertProjects(projects: List<ProjectEntity>)
 }

@@ -148,6 +148,17 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideBackupManager(
+        @ApplicationContext context: Context,
+        apiKeyStore: ApiKeyStore,
+        conversationDao: com.dettle.app.data.db.dao.ConversationDao,
+        projectDao: com.dettle.app.data.db.dao.ProjectDao,
+        taskLogDao: TaskLogDao
+    ): com.dettle.app.data.backup.BackupManager =
+        com.dettle.app.data.backup.BackupManager(context, apiKeyStore, conversationDao, projectDao, taskLogDao)
+
+    @Provides
+    @Singleton
     fun provideContext(@ApplicationContext context: Context): Context = context
 
     // ─── Phase 3: Cloudflare + Multi-agent + MCP ───────────────────────────

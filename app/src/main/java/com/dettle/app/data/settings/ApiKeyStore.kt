@@ -9,6 +9,7 @@ import com.dettle.app.domain.model.AggregateAccountMetrics
 import com.dettle.app.domain.model.GitHubAccount
 import com.dettle.app.domain.model.ProviderAccount
 import com.dettle.app.domain.model.ProviderMetrics
+import com.dettle.app.domain.model.WebViewAccount
 import dagger.hilt.android.qualifiers.ApplicationContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -332,6 +333,112 @@ class ApiKeyStore @Inject constructor(
 
     fun getConfiguredApiProviders(): List<AIProviderType> =
         AIProviderType.entries.filter { !it.isWebView && hasKey(it) }
+
+    // ─── Multi-Account Subscription / WebView Provider Storage ─────────────
+
+    fun getAllWebViewAccounts(): List<WebViewAccount> {
+        val json = prefs.getString("webview_accounts_json", null)
+        if (json.isNullOrBlank()) {
+            // Seed defaults on initial launch
+            val defaults = listOf(
+                WebViewAccount(
+                    providerType = AIProviderType.CHATGPT_WEB,
+                    label = "ChatGPT Account 1",
+                    loginUrl = AIProviderType.CHATGPT_WEB.loginUrl,
+                    baseUrl = AIProviderType.CHATGPT_WEB.baseUrl
+                ),
+                WebViewAccount(
+                    providerType = AIProviderType.CLAUDE_WEB,
+                    label = "Claude Account 1",
+                    loginUrl = AIProviderType.CLAUDE_WEB.loginUrl,
+                    baseUrl = AIProviderType.CLAUDE_WEB.baseUrl
+                ),
+                WebViewAccount(
+                    providerType = AIProviderType.DEEPSEEK_WEB,
+                    label = "DeepSeek Account 1",
+                    loginUrl = AIProviderType.DEEPSEEK_WEB.loginUrl,
+                    baseUrl = AIProviderType.DEEPSEEK_WEB.baseUrl
+                ),
+                WebViewAccount(
+                    providerType = AIProviderType.GROK_WEB,
+                    label = "Grok Account 1",
+                    loginUrl = AIProviderType.GROK_WEB.loginUrl,
+                    baseUrl = AIProviderType.GROK_WEB.baseUrl
+                )
+            )
+            saveWebViewAccounts(defaults)
+            return defaults
+        }
+
+        return try {
+            val array = JSONArray(json)
+            val list = mutableListOf<WebViewAccount>()
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                val providerStr = obj.getString("providerType")
+                val provider = runCatching { AIProviderType.valueOf(providerStr) }.getOrNull() ?: continue
+                list.add(
+                    WebViewAccount(
+                        id = obj.getString("id"),
+                        providerType = provider,
+                        label = obj.getString("label"),
+                        loginUrl = obj.optString("loginUrl", provider.loginUrl),
+                        baseUrl = obj.optString("baseUrl", provider.baseUrl),
+                        isEnabled = obj.optBoolean("isEnabled", true),
+                        requestsUsed = obj.optLong("requestsUsed", 0L),
+                        tokensUsed = obj.optLong("tokensUsed", 0L),
+                        isLoggedIn = obj.optBoolean("isLoggedIn", false)
+                    )
+                )
+            }
+            list
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    fun saveWebViewAccounts(accounts: List<WebViewAccount>) {
+        val array = JSONArray()
+        for (acc in accounts) {
+            val obj = JSONObject().apply {
+                put("id", acc.id)
+                put("providerType", acc.providerType.name)
+                put("label", acc.label)
+                put("loginUrl", acc.loginUrl)
+                put("baseUrl", acc.baseUrl)
+                put("isEnabled", acc.isEnabled)
+                put("requestsUsed", acc.requestsUsed)
+                put("tokensUsed", acc.tokensUsed)
+                put("isLoggedIn", acc.isLoggedIn)
+            }
+            array.put(obj)
+        }
+        prefs.edit().putString("webview_accounts_json", array.toString()).apply()
+    }
+
+    fun addWebViewAccount(account: WebViewAccount) {
+        val accounts = getAllWebViewAccounts().toMutableList()
+        accounts.add(account)
+        saveWebViewAccounts(accounts)
+    }
+
+    fun updateWebViewAccount(account: WebViewAccount) {
+        val accounts = getAllWebViewAccounts().toMutableList()
+        val index = accounts.indexOfFirst { it.id == account.id }
+        if (index >= 0) {
+            accounts[index] = account
+            saveWebViewAccounts(accounts)
+        }
+    }
+
+    fun deleteWebViewAccount(id: String) {
+        val accounts = getAllWebViewAccounts().filter { it.id != id }
+        saveWebViewAccounts(accounts)
+    }
+
+    fun getWebViewAccount(id: String): WebViewAccount? {
+        return getAllWebViewAccounts().firstOrNull { it.id == id }
+    }
 
     // ─── WebView provider enable/disable ──────────────────────────────────
 

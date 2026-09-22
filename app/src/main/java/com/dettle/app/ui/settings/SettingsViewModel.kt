@@ -4,6 +4,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.dettle.app.data.backup.BackupManager
+import com.dettle.app.data.backup.BackupOptions
+import com.dettle.app.data.backup.BackupSummary
+import com.dettle.app.data.backup.RestoreResult
+import android.net.Uri
+import kotlinx.coroutines.launch
 import com.dettle.app.data.api.KeyPoolManager
 import com.dettle.app.data.api.ProviderStatus
 import com.dettle.app.data.drive.GoogleDriveConnector
@@ -19,15 +26,44 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     private val keyStore: ApiKeyStore,
     private val keyPoolManager: KeyPoolManager,
-    private val driveConnector: GoogleDriveConnector
+    private val driveConnector: GoogleDriveConnector,
+    val backupManager: BackupManager
 ) : ViewModel() {
 
     var state by mutableStateOf(SettingsState())
         private set
 
+    var backupSummary by mutableStateOf<BackupSummary?>(null)
+        private set
+
     init {
         loadState()
+        refreshBackupSummary()
     }
+
+    fun refreshBackupSummary() {
+        viewModelScope.launch {
+            backupSummary = backupManager.getLiveSummary()
+        }
+    }
+
+    suspend fun createBackupJson(options: BackupOptions): String =
+        backupManager.createBackupJson(options)
+
+    suspend fun restoreBackup(json: String, options: BackupOptions): RestoreResult {
+        val result = backupManager.restoreBackup(json, options)
+        if (result.success) {
+            loadState()
+            refreshBackupSummary()
+        }
+        return result
+    }
+
+    fun exportBackupToFile(json: String): Uri =
+        backupManager.exportToFile(json)
+
+    fun readBackupUri(uri: Uri): String =
+        backupManager.readJsonFromUri(uri)
 
     fun loadState() {
         state = state.copy(

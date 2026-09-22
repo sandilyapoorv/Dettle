@@ -5,6 +5,7 @@ import android.util.Log
 import com.dettle.app.data.settings.ApiKeyStore
 import com.dettle.app.domain.model.AIModel
 import com.dettle.app.domain.model.AIProviderType
+import com.dettle.app.domain.model.WebViewAccount
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -13,32 +14,18 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
 private const val TAG = "WebViewPool"
 
 /**
- * Manages the pool of hidden WebViews — one per provider.
- *
- * The pool is initialized when the user has at least one WebView provider enabled.
- * Each session is created ONCE and kept alive by AgentForegroundService.
- *
- * Provider priority order (tried in sequence when API providers are exhausted):
- *   ChatGPT → Claude → DeepSeek → Grok → Gemini Web → Kimi → Mistral → Qwen
- *
- * This is Track B: the user's own paid subscriptions provide the compute.
- * Combined: ~25M+ tokens/day from multiple $20/mo subscriptions.
- *
- * WebViews must be created on the Main thread — this class handles that.
- *
- * When a session needs re-auth:
- *   1. Pool flags the session as needs_login
- *   2. AuthVaultScreen shows that session's WebView visibly
- *   3. User logs in normally
- *   4. JS detects loginCheck element → fires onReady
- *   5. Session marks itself as available again
+ * Manages the pool of hidden WebViews.
+ * Upgraded in v1.0.6:
+ *  - Fully lazy on-demand initialization to guarantee 120 FPS performance and avoid CPU/RAM thrashing.
+ *  - Dynamic multi-account support: user can have multiple accounts per subscription provider
+ *    (e.g., 5 ChatGPT accounts, 3 Claude accounts) or custom web providers.
+ *  - Dynamic removal/deletion of any subscription provider.
  */
 @Singleton
 class WebViewPool @Inject constructor(
@@ -48,95 +35,100 @@ class WebViewPool @Inject constructor(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
-    private val sessions = mutableMapOf<AIProviderType, WebViewSession>()
-    private val _needsReauthFor = MutableStateFlow<AIProviderType?>(null)
-    val needsReauthFor: StateFlow<AIProviderType?> = _needsReauthFor.asStateFlow()
+    // Keyed by unique account ID so users can run multiple accounts per provider
+    private val sessions = mutableMapOf<String, WebViewSession>()
+    private val _needsReauthFor = MutableStateFlow<String?>(null) // Account ID
+    val needsReauthFor: StateFlow<String?> = _needsReauthFor.asStateFlow()
 
     private var isInitialized = false
 
     // ── Public API ─────────────────────────────────────────────────────────
 
     /**
-     * Initialize all enabled WebView sessions.
-     * Fetches remote selectors first, then creates sessions on Main thread.
-     * Call from AgentForegroundService.onCreate().
+     * Initializes the selector registry.
+     * Note: Sessions are strictly lazy and created on-demand to ensure 120 FPS
+     * and prevent 8 concurrent Chromium processes from bogging down the Android runtime.
      */
     fun initialize(gistUrl: String? = null) {
         if (isInitialized) return
         isInitialized = true
 
         scope.launch {
-            // Fetch remote selectors if URL is configured
             gistUrl?.let { selectorRegistry.fetch(it) }
-
-            // Create a session for each WebView provider the user has enabled
-            WEBVIEW_PROVIDERS.forEach { providerType ->
-                if (isProviderEnabled(providerType)) {
-                    createSession(providerType)
-                }
-            }
-
-            Log.d(TAG, "Pool initialized with ${sessions.size} sessions: ${sessions.keys.map { it.name }}")
+            Log.d(TAG, "WebViewPool initialized (lazy on-demand mode active for 120 FPS)")
         }
     }
 
     /**
-     * Returns the next available WebView session for the waterfall,
-     * or null if no WebView providers are ready.
+     * Returns the next available WebView session for the waterfall.
      */
     fun getNextAvailable(): WebViewSession? {
-        return WEBVIEW_PROVIDERS
-            .mapNotNull { sessions[it] }
-            .firstOrNull { it.isAvailable() }
+        val accounts = keyStore.getAllWebViewAccounts().filter { it.isEnabled }
+        for (acc in accounts) {
+            val session = sessions[acc.id]
+            if (session != null && session.isAvailable()) {
+                return session
+            }
+        }
+        return null
     }
 
     /**
-     * Returns a specific provider session if available.
+     * Returns a specific account session if available.
      */
-    fun getSession(providerType: AIProviderType): WebViewSession? =
-        sessions[providerType]?.takeIf { it.isAvailable() }
+    fun getSession(accountId: String): WebViewSession? =
+        sessions[accountId]?.takeIf { it.isAvailable() }
 
     /**
      * Returns an existing session or creates and initializes one on-demand on the main thread.
      */
-    fun getOrCreateSession(providerType: AIProviderType): WebViewSession {
-        var session = sessions[providerType]
+    fun getOrCreateSession(account: WebViewAccount): WebViewSession {
+        var session = sessions[account.id]
         if (session == null) {
-            createSession(providerType)
-            session = sessions[providerType]!!
+            session = createSessionForAccount(account)
+            sessions[account.id] = session
         }
         return session
     }
 
     /**
-     * Returns ALL sessions — available or not — for the status UI.
+     * Overload for AIProviderType for backwards compatibility.
      */
-    fun getAllSessions(): List<WebViewSession> = sessions.values.toList()
-
-    /**
-     * Returns the WebView for a provider that needs re-auth,
-     * so it can be embedded in AuthVaultScreen.
-     */
-    fun getSessionNeedingReauth(): WebViewSession? {
-        val provider = _needsReauthFor.value ?: return null
-        return sessions[provider]
+    fun getOrCreateSession(providerType: AIProviderType): WebViewSession {
+        val accounts = keyStore.getAllWebViewAccounts()
+        val account = accounts.firstOrNull { it.providerType == providerType }
+            ?: WebViewAccount(
+                providerType = providerType,
+                label = "${providerType.displayName} Account 1"
+            ).also { keyStore.addWebViewAccount(it) }
+        return getOrCreateSession(account)
     }
 
     /**
-     * Call after user has successfully logged back in.
+     * Destroys an active session when an account is removed or deleted.
      */
+    fun destroySession(accountId: String) {
+        sessions[accountId]?.destroy()
+        sessions.remove(accountId)
+        if (_needsReauthFor.value == accountId) {
+            _needsReauthFor.value = null
+        }
+        Log.d(TAG, "Destroyed session for account $accountId")
+    }
+
+    /**
+     * Returns ALL active sessions.
+     */
+    fun getAllSessions(): List<WebViewSession> = sessions.values.toList()
+
     fun clearReauthFlag() {
         _needsReauthFor.value = null
     }
 
-    /**
-     * Refresh selectors from remote Gist (e.g. if automation is failing).
-     */
     fun refreshSelectors(gistUrl: String) {
         scope.launch { selectorRegistry.fetch(gistUrl) }
     }
 
-    /** Tear down all sessions — call from AgentForegroundService.onDestroy() */
     fun destroy() {
         sessions.values.forEach { it.destroy() }
         sessions.clear()
@@ -147,30 +139,35 @@ class WebViewPool @Inject constructor(
     // ── Status ─────────────────────────────────────────────────────────────
 
     data class PoolStatus(
-        val providerType: AIProviderType,
+        val account: WebViewAccount,
         val isAvailable: Boolean,
         val isLoggedIn: Boolean,
         val needsReauth: Boolean
-    )
+    ) {
+        val providerType: AIProviderType get() = account.providerType
+    }
 
-    fun getPoolStatus(): List<PoolStatus> = WEBVIEW_PROVIDERS.map { provider ->
-        val session = sessions[provider]
-        PoolStatus(
-            providerType = provider,
-            isAvailable = session?.isAvailable() ?: false,
-            isLoggedIn = session?.isLoggedIn() ?: false,
-            needsReauth = _needsReauthFor.value == provider
-        )
+    fun getPoolStatus(): List<PoolStatus> {
+        val accounts = keyStore.getAllWebViewAccounts()
+        return accounts.map { account ->
+            val session = sessions[account.id]
+            PoolStatus(
+                account = account,
+                isAvailable = session?.isAvailable() ?: false,
+                isLoggedIn = session?.isLoggedIn() ?: account.isLoggedIn,
+                needsReauth = _needsReauthFor.value == account.id
+            )
+        }
     }
 
     // ── Internal ──────────────────────────────────────────────────────────
 
-    private fun createSession(providerType: AIProviderType) {
-        val selectors = selectorRegistry.get(providerType.name.lowercase())
+    private fun createSessionForAccount(account: WebViewAccount): WebViewSession {
+        val selectors = selectorRegistry.get(account.providerType.name.lowercase())
         val model = AIModel(
-            provider = providerType,
-            modelId = "webview-${providerType.name.lowercase()}",
-            displayName = providerType.displayName,
+            provider = account.providerType,
+            modelId = "webview-${account.id}",
+            displayName = account.label,
             contextWindow = 128_000,
             dailyTokenLimit = -1,
             dailyRequestLimit = -1,
@@ -180,38 +177,16 @@ class WebViewPool @Inject constructor(
 
         val session = WebViewSession(
             context = context,
-            providerType = providerType,
+            providerType = account.providerType,
             model = model,
             selectors = selectors,
-            onNeedsReauth = { provider ->
-                Log.w(TAG, "Session needs re-auth: ${provider.name}")
-                _needsReauthFor.value = provider
+            onNeedsReauth = {
+                Log.w(TAG, "Session needs re-auth: ${account.label} (${account.id})")
+                _needsReauthFor.value = account.id
             }
         )
 
-        sessions[providerType] = session
-        session.initialize()
-        Log.d(TAG, "Created session for ${providerType.displayName}")
-    }
-
-    private fun isProviderEnabled(providerType: AIProviderType): Boolean {
-        // A WebView provider is enabled if:
-        // - User hasn't explicitly disabled it (stored in settings)
-        // - In Phase 2 default: all are enabled
-        return keyStore.isWebViewProviderEnabled(providerType)
-    }
-
-    companion object {
-        /** Priority order for WebView provider waterfall */
-        val WEBVIEW_PROVIDERS = listOf(
-            AIProviderType.CHATGPT_WEB,
-            AIProviderType.CLAUDE_WEB,
-            AIProviderType.DEEPSEEK_WEB,
-            AIProviderType.GROK_WEB,
-            AIProviderType.GEMINI_WEB,
-            AIProviderType.KIMI_WEB,
-            AIProviderType.MISTRAL_WEB,
-            AIProviderType.QWEN_WEB
-        )
+        Log.d(TAG, "Created on-demand session for ${account.label} (${account.providerType.displayName})")
+        return session
     }
 }
