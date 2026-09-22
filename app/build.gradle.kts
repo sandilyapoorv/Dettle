@@ -79,6 +79,11 @@ android {
     }
 }
 
+// Exclude legacy annotations-java5 which conflicts with modern JetBrains annotations
+configurations.configureEach {
+    exclude(group = "org.jetbrains", module = "annotations-java5")
+}
+
 // Task for CI to read the version name without a full build
 tasks.register("printVersionName") {
     doLast {
