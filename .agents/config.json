@@ -1,0 +1,101 @@
+{
+  "_comment": "Machine-readable project config. Source of truth for all agents. See orchestrator/config/AgentConfig.kt for the typed equivalent.",
+  "project": "Dettle",
+  "version": "1.0",
+  "android": {
+    "minSdk": 26,
+    "targetSdk": 35,
+    "compileSdk": 35,
+    "agp": "8.5",
+    "kotlin": "2.0",
+    "jdk": "17",
+    "compose": true,
+    "material3": true,
+    "dependencyInjection": "hilt",
+    "buildSystem": "gradle-kotlin-dsl",
+    "defaultBuildVariant": "debug",
+    "applicationId": "com.dettle.app",
+    "versionCodeMinimum": 1
+  },
+  "delivery": {
+    "requireCI": true,
+    "requireAPK": true,
+    "requireTests": true,
+    "requireLint": true,
+    "defaultBranch": "main",
+    "branchPrefix": "dettle/",
+    "requirePR": true,
+    "neverPushDirectlyToMain": true,
+    "requireProductionCriticBeforeCompletion": true,
+    "releaseWorkflow": "release.yml",
+    "debugWorkflow": "build.yml"
+  },
+  "backend": {
+    "auth": "firebase-auth",
+    "authProviders": ["email-password", "google-sign-in", "anonymous"],
+    "database": "firestore",
+    "realtimeSync": "firebase-rtdb",
+    "media": "imagekit",
+    "edgeFunctions": "cloudflare-workers",
+    "staticHosting": "cloudflare-pages",
+    "coordinationDurableObjects": "cloudflare-do-sqlite",
+    "requireSecurityRules": true,
+    "neverClientOnlyAuthz": true
+  },
+  "security": {
+    "forbiddenPatterns": [
+      "ANDROID_KEYSTORE",
+      "-----BEGIN.*PRIVATE KEY-----",
+      "-----BEGIN.*CERTIFICATE-----",
+      "password\\s*[:=]\\s*\\S+",
+      "api_key\\s*[:=]\\s*\\S+",
+      "apiKey\\s*[:=]\\s*\\S+",
+      "secret\\s*[:=]\\s*\\S+",
+      "access_token\\s*[:=]\\s*\\S+"
+    ],
+    "signingSecretsStorage": "github_actions_secrets",
+    "githubActionsSecrets": [
+      "ANDROID_KEYSTORE_BASE64",
+      "ANDROID_KEYSTORE_PASSWORD",
+      "ANDROID_KEY_ALIAS",
+      "ANDROID_KEY_PASSWORD"
+    ],
+    "neverInDrive": true,
+    "neverInCode": true,
+    "neverInCommit": true
+  },
+  "freeTier": {
+    "cloudflare": {
+      "workersRequestsPerDay": 100000,
+      "workerCpuMsPerInvocation": 10,
+      "pagesRequestsPerMonth": -1,
+      "durableObjectsFree": true
+    },
+    "firebase": {
+      "firestoreReadsPerDay": 50000,
+      "firestoreWritesPerDay": 20000,
+      "firestoreDeletesPerDay": 20000,
+      "realtimeDatabaseGbStored": 1,
+      "authUsersMax": -1
+    },
+    "github": {
+      "actionsMinutesPerMonth": 2000,
+      "artifactStorageGb": 0.5
+    },
+    "imagekit": {
+      "bandwidthGbPerMonth": 20,
+      "mediaStorageGb": 20
+    }
+  },
+  "skills": {
+    "android-release-pipeline": {
+      "active": true,
+      "triggers": ["release", "build", "ship", "publish", "deploy android"]
+    },
+    "production-critic": {
+      "active": true,
+      "requiredBeforeCompletion": true,
+      "triggers": ["done", "complete", "finished", "ship"]
+    }
+  }
+}

@@ -1,0 +1,206 @@
+name: Android CI
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+    tags:
+      - 'v*.*.*'
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  JAVA_VERSION: '17'
+  GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4g
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────
+  # Job 1: Build, Lint, Test + Debug APK
+  # Runs on every push and PR — always produces a debug APK artifact
+  # ─────────────────────────────────────────────────────────────────
+  build-debug:
+    name: Build Debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.android/build-cache
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle.kts', '**/libs.versions.toml', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
+      - name: Run lint
+        run: ./gradlew lint --stacktrace
+
+      - name: Run unit tests
+        run: ./gradlew test --stacktrace
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Upload debug APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dettle-debug-${{ github.sha }}
+          path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-report-${{ github.sha }}
+          path: app/build/reports/lint-results-*.html
+          retention-days: 7
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ github.sha }}
+          path: app/build/test-results/
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────────
+  # Job 2: Release build + GitHub Release
+  # Runs only on version tags (v*.*.*) or manual dispatch
+  # ─────────────────────────────────────────────────────────────────
+  build-release:
+    name: Build Release APK + AAB
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    needs: build-debug
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle.kts', '**/libs.versions.toml') }}
+          restore-keys: ${{ runner.os }}-gradle-
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
+      # ── Signing setup (only when secrets are present) ────────────
+      - name: Decode keystore
+        if: env.ANDROID_KEYSTORE_BASE64 != ''
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > $RUNNER_TEMP/dettle-release.keystore
+          echo "KEYSTORE_PATH=$RUNNER_TEMP/dettle-release.keystore" >> $GITHUB_ENV
+
+      - name: Build release APK (signed if keystore present)
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            ./gradlew assembleRelease \
+              -Pandroid.injected.signing.store.file="$KEYSTORE_PATH" \
+              -Pandroid.injected.signing.store.password="$ANDROID_KEYSTORE_PASSWORD" \
+              -Pandroid.injected.signing.key.alias="$ANDROID_KEY_ALIAS" \
+              -Pandroid.injected.signing.key.password="$ANDROID_KEY_PASSWORD" \
+              --stacktrace
+          else
+            echo "⚠️ Production signing secrets not found. Building unsigned release APK."
+            ./gradlew assembleRelease --stacktrace
+          fi
+
+      - name: Build release AAB (signed if keystore present)
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            ./gradlew bundleRelease \
+              -Pandroid.injected.signing.store.file="$KEYSTORE_PATH" \
+              -Pandroid.injected.signing.store.password="$ANDROID_KEYSTORE_PASSWORD" \
+              -Pandroid.injected.signing.key.alias="$ANDROID_KEY_ALIAS" \
+              -Pandroid.injected.signing.key.password="$ANDROID_KEY_PASSWORD" \
+              --stacktrace
+          else
+            ./gradlew bundleRelease --stacktrace
+          fi
+
+      - name: Get version name
+        id: version
+        run: |
+          VERSION=$(./gradlew -q printVersionName 2>/dev/null || echo "${{ github.ref_name }}")
+          echo "VERSION_NAME=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Upload release APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dettle-release-${{ steps.version.outputs.VERSION_NAME }}
+          path: app/build/outputs/apk/release/app-release*.apk
+          retention-days: 90
+
+      - name: Upload release AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dettle-release-aab-${{ steps.version.outputs.VERSION_NAME }}
+          path: app/build/outputs/bundle/release/app-release*.aab
+          retention-days: 90
+
+      # ── GitHub Release (tags only) ───────────────────────────────
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Dettle ${{ github.ref_name }}"
+          tag_name: ${{ github.ref_name }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-alpha') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-rc') }}
+          generate_release_notes: true
+          files: |
+            app/build/outputs/apk/release/app-release*.apk
+            app/build/outputs/bundle/release/app-release*.aab
+          body: |
+            ## Dettle ${{ github.ref_name }}
+
+            **Install:** Download `app-release.apk` → transfer to device → install (allow unknown sources)
+            **Play Store:** Use `app-release.aab`
+
+            ### Signing
+            ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && '✅ Production signed' || '⚠️ Unsigned release — add ANDROID_KEYSTORE_BASE64 secret for production signing' }}
+
+            ---
+            *Built by GitHub Actions from commit ${{ github.sha }}*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

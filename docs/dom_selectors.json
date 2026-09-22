@@ -1,0 +1,60 @@
+{
+  "version": "1.0",
+  "_comment": "Upload this file to a GitHub Gist. Copy the raw URL into Dettle Settings → Selector Registry URL. Edit here to fix broken selectors — no app update needed.",
+  "chatgpt": {
+    "input": "#prompt-textarea",
+    "send": "[data-testid='send-button']",
+    "response": "[data-message-author-role='assistant'] .markdown",
+    "streamingIndicator": ".result-streaming",
+    "loginCheck": "[data-testid='profile-button']"
+  },
+  "claude": {
+    "input": ".ProseMirror[contenteditable='true']",
+    "send": "button[aria-label='Send Message']",
+    "response": ".font-claude-message",
+    "streamingIndicator": "[data-is-streaming='true']",
+    "loginCheck": "[data-testid='user-menu']"
+  },
+  "deepseek": {
+    "input": "textarea#chat-input",
+    "send": "div[role='button'][aria-label='Send']",
+    "response": ".ds-markdown",
+    "streamingIndicator": ".loading-dots",
+    "loginCheck": ".user-avatar"
+  },
+  "grok": {
+    "input": "textarea[placeholder*='Ask']",
+    "send": "button[type='submit']",
+    "response": ".message-bubble[data-author='grok']",
+    "streamingIndicator": ".streaming-indicator",
+    "loginCheck": "[data-testid='UserAvatar-Container']"
+  },
+  "gemini": {
+    "input": "rich-textarea .ql-editor",
+    "send": "button[aria-label='Send message']",
+    "response": ".model-response-text",
+    "streamingIndicator": ".loading-indicator",
+    "loginCheck": ".gb_A.gb_B"
+  },
+  "kimi": {
+    "input": "textarea.chat-input",
+    "send": "button.send-button",
+    "response": ".message-content.assistant",
+    "streamingIndicator": ".generating",
+    "loginCheck": ".user-info"
+  },
+  "mistral": {
+    "input": "textarea[placeholder*='message']",
+    "send": "button[type='submit']",
+    "response": ".assistant-message",
+    "streamingIndicator": ".cursor-blink",
+    "loginCheck": ".user-avatar"
+  },
+  "qwen": {
+    "input": "textarea.ant-input",
+    "send": "button.send-btn",
+    "response": ".chat-message-content.assistant",
+    "streamingIndicator": ".loading",
+    "loginCheck": ".user-info"
+  }
+}

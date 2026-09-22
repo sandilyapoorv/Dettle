@@ -1,0 +1,58 @@
+{
+  "name": "production-critic",
+  "description": "Skeptical production readiness review. Run before declaring any substantial work done.",
+  "version": "1.0",
+  "triggers": ["done", "complete", "finished", "production critic", "critic review"],
+  "must_run_before": ["final_answer"],
+  "severity_levels": {
+    "P0": { "label": "Catastrophic", "must_fix": true, "description": "App crash, auth bypass, data loss, secret leak" },
+    "P1": { "label": "Severe", "must_fix": true, "description": "Core flow broken, security flaw, wrong data shown" },
+    "P2": { "label": "Meaningful", "must_fix": true, "description": "Feature incomplete, significant UX issue, CI broken" },
+    "P3": { "label": "Minor", "must_fix": false, "description": "Polish, minor UX, nice-to-have" }
+  },
+  "checklist": {
+    "requirements": [
+      "All specified features are implemented, not mocked",
+      "No TODO or placeholder code paths in critical flows"
+    ],
+    "android_specific": [
+      "compileSdk/targetSdk are current",
+      "Permissions are minimal and justified in AndroidManifest",
+      "App handles process death and config changes",
+      "Offline/network-loss states are handled",
+      "Insets and navigation bar are respected"
+    ],
+    "auth_authz": [
+      "Firebase Security Rules enforce ownership, not just client-side checks",
+      "No admin operations possible from client without server verification",
+      "Anonymous session → authenticated session migration is correct"
+    ],
+    "secrets": [
+      "No API keys, passwords, or keystores in code or commits",
+      "Signing credentials only in GitHub Actions Secrets",
+      "No secrets in Drive or docs"
+    ],
+    "reliability": [
+      "Retries and exponential backoff for transient failures",
+      "Idempotency for writes that might be duplicated",
+      "Concurrent write races handled with transactions or version checks"
+    ],
+    "free_tier": [
+      "Cloudflare Workers: <100k req/day, <10ms CPU per invocation",
+      "Firestore reads/writes within free tier",
+      "GitHub Actions minutes within 2000/month",
+      "No paid-only features silently enabled"
+    ],
+    "ci": [
+      "GitHub Actions workflow exists and last run succeeded",
+      "APK artifact is uploaded as Actions artifact",
+      "Build does not require manual steps"
+    ],
+    "play_readiness": [
+      "stable applicationId",
+      "versionCode is incrementing integer",
+      "targetSdk is current Google Play requirement",
+      "Icons and metadata are not placeholder"
+    ]
+  }
+}

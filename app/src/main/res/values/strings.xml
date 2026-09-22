@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Dettle</string>
+    <string name="agent_channel_name">Dettle Agent</string>
+    <string name="agent_channel_description">Keeps the AI agent running in the background</string>
+</resources>

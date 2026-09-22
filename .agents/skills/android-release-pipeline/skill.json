@@ -1,0 +1,71 @@
+{
+  "name": "android-release-pipeline",
+  "description": "Full Android build, test, sign, release cycle. Produces APK + AAB, triggers CI, creates GitHub Release.",
+  "version": "1.0",
+  "triggers": ["release", "build", "ship", "publish", "deploy android", "make apk", "create release"],
+  "requires_tools": [
+    "github_map_repo",
+    "github_read_file",
+    "github_create_branch_pr",
+    "github_trigger_action"
+  ],
+  "steps": [
+    {
+      "id": "inspect_repo",
+      "description": "Map repo, read build.gradle.kts, verify compileSdk/targetSdk/minSdk are current",
+      "tool": "github_map_repo",
+      "required": true
+    },
+    {
+      "id": "implement",
+      "description": "Write or modify code. All changes go to a feature branch, never main.",
+      "tool": "github_create_branch_pr",
+      "required": true,
+      "constraints": {
+        "branch_prefix": "dettle/",
+        "never_branch": "main"
+      }
+    },
+    {
+      "id": "trigger_debug_build",
+      "description": "Trigger CI to run ./gradlew assembleDebug",
+      "tool": "github_trigger_action",
+      "workflow": "build.yml",
+      "required": true
+    },
+    {
+      "id": "trigger_release_build",
+      "description": "Trigger CI to run ./gradlew assembleRelease bundleRelease (requires signing secrets)",
+      "tool": "github_trigger_action",
+      "workflow": "release.yml",
+      "required_for_release": true
+    }
+  ],
+  "completion_gates": [
+    { "id": "build_passed", "description": "Debug build passes in CI without errors" },
+    { "id": "tests_passed", "description": "Unit tests + lint pass" },
+    { "id": "apk_uploaded", "description": "APK artifact uploaded to GitHub Actions" },
+    { "id": "pr_created", "description": "Pull request opened, not direct push to main" },
+    { "id": "release_tagged", "description": "Git tag vX.Y.Z created for meaningful releases" },
+    { "id": "release_created", "description": "GitHub Release created with APK attached" }
+  ],
+  "final_report_fields": [
+    "App",
+    "Repo",
+    "Build",
+    "Tests",
+    "Actions",
+    "APK",
+    "AAB",
+    "Release",
+    "Signing",
+    "Critic",
+    "PlayStore"
+  ],
+  "forbidden": [
+    "Commit keystores or signing passwords to code",
+    "Push directly to main branch",
+    "Claim release exists without verified artifact URL",
+    "Change applicationId without explicit approval"
+  ]
+}
