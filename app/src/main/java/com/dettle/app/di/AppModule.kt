@@ -6,6 +6,7 @@ import com.dettle.app.data.api.KeyPoolManager
 import com.dettle.app.data.cloudflare.CloudflareClient
 import com.dettle.app.data.db.DettleDatabase
 import com.dettle.app.data.db.dao.DeploymentDao
+import com.dettle.app.data.db.dao.KnowledgeGraphDao
 import com.dettle.app.data.db.dao.MemoryDao
 import com.dettle.app.data.db.dao.TaskLogDao
 import com.dettle.app.data.settings.ApiKeyStore
@@ -140,6 +141,14 @@ object AppModule {
     @Provides
     @Singleton
     fun provideDeploymentDao(db: DettleDatabase): DeploymentDao = db.deploymentDao()
+
+    @Provides
+    @Singleton
+    fun provideKnowledgeGraphDao(db: DettleDatabase): KnowledgeGraphDao = db.knowledgeGraphDao()
+
+    @Provides
+    @Singleton
+    fun provideContext(@ApplicationContext context: Context): Context = context
 
     // ─── Phase 3: Cloudflare + Multi-agent + MCP ───────────────────────────
 
