@@ -1,5 +1,7 @@
 package com.dettle.app.ui.authvault
 
+import android.content.Intent
+import android.net.Uri
 import android.view.ViewGroup
 import android.webkit.WebView
 import androidx.compose.foundation.BorderStroke
@@ -26,6 +28,7 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockOpen
+import androidx.compose.material.icons.outlined.OpenInBrowser
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.WarningAmber
@@ -38,6 +41,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -47,9 +51,12 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -63,11 +70,17 @@ fun AuthVaultScreen(
     viewModel: AuthVaultViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val activeProvider = uiState.activeLoginProvider
 
-    if (uiState.activeLoginProvider != null) {
+    if (activeProvider != null) {
+        val loginWebView = remember(activeProvider) {
+            viewModel.getWebViewForLogin(activeProvider)
+        }
         WebViewLoginScreen(
-            providerType = uiState.activeLoginProvider!!,
-            webView = viewModel.getWebViewForLogin(uiState.activeLoginProvider!!),
+            providerType = activeProvider,
+            webView = loginWebView,
+            progress = uiState.loginProgress,
+            onReload = viewModel::reloadLogin,
             onDone = viewModel::onLoginDone,
             onCancel = viewModel::onLoginCancelled
         )
@@ -300,41 +313,80 @@ fun ProviderStatusCard(
 fun WebViewLoginScreen(
     providerType: AIProviderType,
     webView: WebView?,
+    progress: Int,
+    onReload: () -> Unit,
     onDone: () -> Unit,
     onCancel: () -> Unit
 ) {
+    val context = LocalContext.current
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            CenterAlignedTopAppBar(
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                ),
-                navigationIcon = {
-                    IconButton(onClick = onCancel) {
-                        Icon(Icons.Outlined.Close, contentDescription = "Cancel")
+            Column {
+                CenterAlignedTopAppBar(
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background
+                    ),
+                    navigationIcon = {
+                        IconButton(onClick = onCancel) {
+                            Icon(Icons.Outlined.Close, contentDescription = "Cancel")
+                        }
+                    },
+                    title = {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                "Sign in to ${providerType.displayName}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                providerType.loginUrl,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(providerType.loginUrl)).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                // Ignore
+                            }
+                        }) {
+                            Icon(Icons.Outlined.OpenInBrowser, contentDescription = "Open in browser")
+                        }
+                        IconButton(onClick = onReload) {
+                            Icon(Icons.Outlined.Refresh, contentDescription = "Reload page")
+                        }
+                        Button(
+                            onClick = onDone,
+                            shape = MaterialTheme.shapes.small,
+                            modifier = Modifier.padding(end = 12.dp)
+                        ) {
+                            Text("Done")
+                        }
                     }
-                },
-                title = {
-                    Text(
-                        "Sign in to ${providerType.displayName}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                )
+                if (progress in 1..99) {
+                    LinearProgressIndicator(
+                        progress = { progress / 100f },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(2.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant
                     )
-                },
-                actions = {
-                    IconButton(onClick = { webView?.reload() }) {
-                        Icon(Icons.Outlined.Refresh, contentDescription = "Reload page")
-                    }
-                    Button(
-                        onClick = onDone,
-                        shape = MaterialTheme.shapes.small,
-                        modifier = Modifier.padding(end = 12.dp)
-                    ) {
-                        Text("Done")
-                    }
                 }
-            )
+            }
         }
     ) { paddingValues ->
         Box(
@@ -348,10 +400,19 @@ fun WebViewLoginScreen(
                         webView.apply {
                             visibility = android.view.View.VISIBLE
                             (parent as? ViewGroup)?.removeView(this)
+                            layoutParams = ViewGroup.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.MATCH_PARENT
+                            )
+                            isFocusable = true
+                            isFocusableInTouchMode = true
+                            requestFocus()
                         }
                     },
                     modifier = Modifier.fillMaxSize(),
-                    update = { }
+                    update = { view ->
+                        view.visibility = android.view.View.VISIBLE
+                    }
                 )
             } else {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

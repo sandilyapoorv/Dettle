@@ -26,8 +26,10 @@ googleDriveApi = "v3-rev20240914-2.0.0"
 googleApiClient = "2.7.0"
 googleCredentials = "1.4.2"
 mediapipe = "0.10.14"
+webkit = "1.12.1"
 
 [libraries]
+androidx-webkit = { group = "androidx.webkit", name = "webkit", version.ref = "webkit" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }

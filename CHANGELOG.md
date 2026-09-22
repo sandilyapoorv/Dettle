@@ -6,6 +6,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [v1.0.5] - 2026-09-22: ChatGPT Auth Endpoint, WebView Blank Screen Fix & Anti-Bot Hardening
+
+### Direct APK Download
+- **Release APK (54 MB)**: [app-debug.apk](https://github.com/sandilyapoorv/Dettle/releases/download/v1.0.5/app-debug.apk)
+- **GitHub Release Page**: [https://github.com/sandilyapoorv/Dettle/releases/tag/v1.0.5](https://github.com/sandilyapoorv/Dettle/releases/tag/v1.0.5)
+- **CI/CD Workflow**: [https://github.com/sandilyapoorv/Dettle/actions](https://github.com/sandilyapoorv/Dettle/actions)
+
+### Why This Release Was Done
+Resolves an issue where attempting to sign in to ChatGPT or other subscription providers in Auth Vault opened a blank white page. This release pinpoints and eliminates every root cause of WebView loading failures, configures exact authentication endpoints, and hardens WebSettings to match genuine Google Chrome.
+
+### Root Cause Analysis (Blank Page on ChatGPT Login)
+1. **Multiple Windows Destruction**: `setSupportMultipleWindows(true)` paired with `transport.webView = view` inside `onCreateWindow` was destroying the parent page. Scripts running on `chatgpt.com` (Cloudflare Turnstile, Datadome, Stripe) execute window capability checks via `window.open("")`. Assigning the parent WebView to the transport wiped its DOM and loaded `about:blank`. Disabling `setSupportMultipleWindows` routes all navigations within the primary instance.
+2. **Recomposition Reload Loop**: In `AuthVaultScreen`, `viewModel.getWebViewForLogin()` was invoked on every recomposition, and `getWebViewForLogin()` was calling `session.initialize()`. Every state update or frame tick issued a new `wv.loadUrl()`, continuously aborting in-flight HTTP requests and keeping the screen blank.
+3. **SPA Base URL vs Dedicated Login Endpoint**: `https://chatgpt.com` loads a Next.js Single Page App that relies on client-side session redirects. Loading `https://chatgpt.com/auth/login` directly serves the OpenAI authentication interface with email, Google, Microsoft, and Apple sign-in options.
+4. **Anti-Bot X-Requested-With Detection**: Android WebView injects `X-Requested-With: com.dettle.app` by default. Cloudflare and Google OAuth flag this header to detect embedded WebViews and issue challenges or block access.
+5. **Layout Sizing in Compose**: AndroidView lacked explicit `MATCH_PARENT` LayoutParams and input focus flags upon container attachment.
+
+### Key Architectural Changes & Commits
+- **Dedicated Auth URLs**:
+  - `AIModel.kt`: Added `loginUrl` parameter to `AIProviderType`. Configured dedicated auth endpoints: `CHATGPT_WEB` (`https://chatgpt.com/auth/login`), `CLAUDE_WEB` (`https://claude.ai/login`), `DEEPSEEK_WEB` (`https://chat.deepseek.com/sign_in`), `MISTRAL_WEB` (`https://chat.mistral.ai/auth/login`).
+- **WebViewSession Hardening**:
+  - `WebViewSession.kt`: Disabled `setSupportMultipleWindows(false)` to prevent `about:blank` document replacement.
+  - Added `androidx.webkit:webkit:1.12.1` and configured `WebSettingsCompat.setRequestedWithHeaderOriginAllowList(wv.settings, emptySet())` to completely suppress `X-Requested-With` on all requests.
+  - Configured `mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW`, `loadWithOverviewMode = true`, and `useWideViewPort = true`.
+  - Updated User-Agent to standard frozen Chrome on Android (`Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36`).
+  - Added `loadLoginUrl()`, guarded `initialize()` against re-entrant calls when already loading, and added error logging in `onReceivedError` / `onReceivedHttpError`.
+- **AuthVault Architecture & UI Polish**:
+  - `AuthVaultViewModel.kt`: Updated `startLogin()` to invoke `session.loadLoginUrl()` once. Removed recursive `initialize()` call from `getWebViewForLogin()`. Added `loginProgress` flow and `reloadLogin()`.
+  - `AuthVaultScreen.kt`: Memoized WebView lookup via `remember(activeProvider)`. Added linear progress indicator, provider login URL display, reload button, and "Open in Browser" action fallback. Configured explicit `MATCH_PARENT` layout parameters and touch focus.
+
+---
+
 ## [v1.0.4] - 2026-09-22: 90+ FPS Rendering, WebView OAuth Fix, Multi-Account Pools, GitHub Scope Builder & Voice Overhaul
 
 ### Direct APK Download

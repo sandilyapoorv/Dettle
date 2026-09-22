@@ -110,6 +110,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.activity.compose)
     implementation(libs.splashscreen)
+    implementation(libs.androidx.webkit)
 
     // Compose
     implementation(platform(libs.androidx.compose.bom))

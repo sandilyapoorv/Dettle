@@ -44,35 +44,50 @@ class AuthVaultViewModel @Inject constructor(
     fun startLogin(providerType: AIProviderType) {
         val session = webViewPool.getOrCreateSession(providerType)
         session.show()
-        session.initialize()
-        _uiState.update { it.copy(activeLoginProvider = providerType, reauthAlert = null) }
+        session.loadLoginUrl()
+        _uiState.update { it.copy(
+            activeLoginProvider = providerType,
+            reauthAlert = null,
+            loginProgress = 10
+        ) }
+        session.onProgressUpdate = { progress ->
+            _uiState.update { it.copy(loginProgress = progress) }
+        }
     }
 
     fun onLoginDone() {
         val provider = _uiState.value.activeLoginProvider ?: return
         val session = webViewPool.getOrCreateSession(provider)
+        session.onProgressUpdate = null
         session.hide()
         webViewPool.clearReauthFlag()
-        _uiState.update { it.copy(activeLoginProvider = null) }
+        _uiState.update { it.copy(activeLoginProvider = null, loginProgress = 0) }
         refreshStatuses()
     }
 
     fun onLoginCancelled() {
         val provider = _uiState.value.activeLoginProvider ?: return
         val session = webViewPool.getOrCreateSession(provider)
+        session.onProgressUpdate = null
         session.hide()
-        _uiState.update { it.copy(activeLoginProvider = null) }
+        _uiState.update { it.copy(activeLoginProvider = null, loginProgress = 0) }
     }
 
     fun getWebViewForLogin(providerType: AIProviderType): WebView {
         val session = webViewPool.getOrCreateSession(providerType)
-        session.initialize()
         return session.webView
+    }
+
+    fun reloadLogin() {
+        val provider = _uiState.value.activeLoginProvider ?: return
+        val session = webViewPool.getOrCreateSession(provider)
+        session.reload()
     }
 }
 
 data class AuthVaultUiState(
     val providerStatuses: List<WebViewPool.PoolStatus> = emptyList(),
     val activeLoginProvider: AIProviderType? = null,
-    val reauthAlert: AIProviderType? = null
+    val reauthAlert: AIProviderType? = null,
+    val loginProgress: Int = 0
 )

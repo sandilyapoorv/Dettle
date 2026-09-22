@@ -4,13 +4,16 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Log
 import android.content.Intent
-import android.os.Message
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.webkit.WebSettingsCompat
+import androidx.webkit.WebViewFeature
 import com.dettle.app.data.api.AIProvider
 import com.dettle.app.data.api.StreamChunk
 import com.dettle.app.domain.model.AIModel
@@ -60,6 +63,10 @@ class WebViewSession(
     private var _isRateLimited = false
     private var rateLimitResetMs = 0L
 
+    var onProgressUpdate: ((Int) -> Unit)? = null
+    var lastLoadedUrl: String? = null
+        private set
+
     // Channel for coordinating responses (one at a time per session)
     private val responseChannel = Channel<BridgeEvent>(Channel.UNLIMITED)
 
@@ -99,12 +106,34 @@ class WebViewSession(
 
     /**
      * Load the provider URL and inject automation on page ready.
+     * Only loads if the webview is not already on a valid page to avoid cancelling ongoing requests.
      * Must be called on the main thread.
      */
     fun initialize() {
-        val wv = webView  // Creates if needed
-        wv.loadUrl(providerType.baseUrl)
-        Log.d(TAG, "Loading ${providerType.displayName}: ${providerType.baseUrl}")
+        val wv = webView
+        val currentUrl = wv.url
+        if (currentUrl.isNullOrBlank() || currentUrl == "about:blank") {
+            lastLoadedUrl = providerType.baseUrl
+            Log.d(TAG, "Loading ${providerType.displayName}: ${providerType.baseUrl}")
+            wv.loadUrl(providerType.baseUrl)
+        }
+    }
+
+    /**
+     * Explicitly loads the login endpoint for manual user authentication in Auth Vault.
+     * Must be called on the main thread.
+     */
+    fun loadLoginUrl() {
+        val wv = webView
+        val target = providerType.loginUrl
+        lastLoadedUrl = target
+        Log.d(TAG, "Loading login URL for ${providerType.displayName}: $target")
+        wv.loadUrl(target)
+    }
+
+    /** Reload the current page */
+    fun reload() {
+        _webView?.reload()
     }
 
     /** Returns true if the user appears to be logged in */
@@ -140,16 +169,28 @@ class WebViewSession(
             javaScriptEnabled = true
             domStorageEnabled = true          // Required for persistent sessions
             databaseEnabled = true
+            mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+            loadWithOverviewMode = true
+            useWideViewPort = true
             cacheMode = WebSettings.LOAD_DEFAULT
-            userAgentString = CHROME_USER_AGENT  // Appear as normal Chrome browser
+            userAgentString = CHROME_USER_AGENT  // Appear as standard Chrome on Android
             setSupportZoom(true)
             builtInZoomControls = true
             displayZoomControls = false
             mediaPlaybackRequiresUserGesture = false
             javaScriptCanOpenWindowsAutomatically = true
-            setSupportMultipleWindows(true)
+            setSupportMultipleWindows(false)    // False prevents wiping parent WebView on popups/bot-checks
             allowFileAccess = true
             allowContentAccess = true
+        }
+
+        // Strip X-Requested-With header to bypass Cloudflare / Google OAuth bot-detection
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.REQUESTED_WITH_HEADER_ALLOW_LIST)) {
+            try {
+                WebSettingsCompat.setRequestedWithHeaderOriginAllowList(wv.settings, emptySet())
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not set requested-with header allowlist: ${e.message}")
+            }
         }
 
         // Persist cookies across app restarts
@@ -158,18 +199,10 @@ class WebViewSession(
             setAcceptThirdPartyCookies(wv, true)
         }
 
-        // Support popups / window.open for OAuth (Google, Apple, Auth0)
         wv.webChromeClient = object : WebChromeClient() {
-            override fun onCreateWindow(
-                view: WebView?,
-                isDialog: Boolean,
-                isUserGesture: Boolean,
-                resultMsg: Message?
-            ): Boolean {
-                val transport = resultMsg?.obj as? WebView.WebViewTransport ?: return false
-                transport.webView = view
-                resultMsg.sendToTarget()
-                return true
+            override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                super.onProgressChanged(view, newProgress)
+                onProgressUpdate?.invoke(newProgress)
             }
         }
 
@@ -189,8 +222,8 @@ class WebViewSession(
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val uri = request.url ?: return false
                 val scheme = uri.scheme?.lowercase() ?: return false
-                // Allow all normal HTTP/HTTPS navigations so OAuth and SSO logins proceed smoothly
-                if (scheme == "http" || scheme == "https") {
+                // Allow all internal web navigations, popups, and auth redirects to load in this WebView
+                if (scheme == "http" || scheme == "https" || scheme == "about" || scheme == "data" || scheme == "blob") {
                     return false
                 }
                 return try {
@@ -201,6 +234,20 @@ class WebViewSession(
                 } catch (e: Exception) {
                     Log.w(TAG, "Cannot launch external scheme $uri: ${e.message}")
                     true
+                }
+            }
+
+            override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
+                super.onReceivedError(view, request, error)
+                if (request?.isForMainFrame == true) {
+                    Log.w(TAG, "[${providerType.name}] Main frame error: ${error?.errorCode} ${error?.description} for ${request.url}")
+                }
+            }
+
+            override fun onReceivedHttpError(view: WebView?, request: WebResourceRequest?, errorResponse: WebResourceResponse?) {
+                super.onReceivedHttpError(view, request, errorResponse)
+                if (request?.isForMainFrame == true) {
+                    Log.w(TAG, "[${providerType.name}] Main frame HTTP error: ${errorResponse?.statusCode} ${errorResponse?.reasonPhrase} for ${request.url}")
                 }
             }
         }
@@ -323,9 +370,8 @@ class WebViewSession(
     }
 
     companion object {
-        // Realistic Chrome on Android user agent — prevents "browser not supported" blocks
+        // Standard Android Chrome user-agent (frozen modern build) — matches real Google Chrome
         private const val CHROME_USER_AGENT =
-            "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 " +
-            "(KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36"
+            "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36"
     }
 }
