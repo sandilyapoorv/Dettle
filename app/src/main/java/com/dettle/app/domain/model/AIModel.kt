@@ -74,18 +74,6 @@ object FreeModels {
     val OLLAMA_DOLPHIN_UNCENSORED = AIModel(
         provider = AIProviderType.LOCAL_OLLAMA,
         modelId = "dolphin-mixtral",
-        displayName = "Dolphin Mixtral (Uncensored Local)",
-        contextWindow = 32_000,
-        dailyTokenLimit = -1,
-        dailyRequestLimit = -1,
-        rpmLimit = -1,
-        bestFor = "Raw execution without any safety guardrails or apologies."
-    )
-
-    // Uncensored / Local Models (Ollama Network - runs on a separate PC, NOT on the phone)
-    val OLLAMA_DOLPHIN_UNCENSORED = AIModel(
-        provider = AIProviderType.LOCAL_OLLAMA,
-        modelId = "dolphin-mixtral",
         displayName = "Dolphin Mixtral (Uncensored Network)",
         contextWindow = 32_000,
         dailyTokenLimit = -1,
@@ -235,3 +223,17 @@ object ModelSets {
     /** Full waterfall — used by Goal mode (needs everything) */
     val ALL: List<AIModel> = FreeModels.WATERFALL_ORDER
 }
+
+/** All known models by ID — used for resolving waterfall model IDs back to AIModel objects */
+val ALL_KNOWN_MODELS: Map<String, AIModel> = listOf(
+    FreeModels.GROQ_LLAMA_8B,
+    FreeModels.GROQ_LLAMA_70B,
+    FreeModels.GEMINI_FLASH,
+    FreeModels.GEMINI_FLASH_THINKING,
+    FreeModels.OPENROUTER_LLAMA,
+    FreeModels.OPENROUTER_QWEN,
+    FreeModels.SAMBANOVA_LLAMA_70B,
+    FreeModels.GITHUB_GPT4O,
+    FreeModels.GITHUB_DEEPSEEK_R1,
+    FreeModels.OLLAMA_DOLPHIN_UNCENSORED
+).associateBy { it.modelId }

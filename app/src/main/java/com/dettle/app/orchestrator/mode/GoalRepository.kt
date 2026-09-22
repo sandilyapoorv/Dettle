@@ -13,6 +13,7 @@ import androidx.room.TypeConverter
 import androidx.room.TypeConverters
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
@@ -140,9 +141,11 @@ class GoalRepository @Inject constructor(
     }
 
     /** Observe all goals (for the Goals screen in Phase 3) */
-    fun observeAll(): Flow<List<Goal>> = kotlinx.coroutines.flow.map(dao.observeAll()) { list ->
+    fun observeAll(): Flow<List<Goal>> = dao.observeAll().map { list ->
         list.map { it.toDomain(json) }
     }
+
+    suspend fun getGoal(goalId: String): Goal? = dao.getById(goalId)?.toDomain(json)
 
     suspend fun deleteGoal(goalId: String) = dao.delete(goalId)
     suspend fun clearCompleted() = dao.clearCompleted()

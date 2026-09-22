@@ -314,6 +314,7 @@ fun AgentEventRow(event: AgentEvent) {
         is AgentEvent.DeploymentStarted -> Triple("🚀", "Deploying to ${event.target}...", DettleOrange)
         is AgentEvent.DeploymentComplete -> Triple("🌐", "Live: ${event.url}", DettleGreen)
         is AgentEvent.Message -> Triple("💬", "${event.from.emoji}→${event.to.emoji} ${event.content.take(60)}", DettleTextSecondary)
+        is AgentEvent.Interrupt -> Triple("⛔", "Interrupted: ${event.reason}", DettleRed)
     }
 
     Row(

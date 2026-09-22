@@ -21,25 +21,3 @@ data class ConversationEntity(
     @ColumnInfo(name = "created_at") val createdAt: Long = System.currentTimeMillis(),
     @ColumnInfo(name = "updated_at") val updatedAt: Long = System.currentTimeMillis()
 )
-
-/**
- * A single message belonging to a conversation, persisted in Room.
- * Mirrors ChatMessage from the UI layer but is the persistent source of truth.
- */
-@Entity(tableName = "conversation_messages", foreignKeys = [
-    androidx.room.ForeignKey(
-        entity = ConversationEntity::class,
-        parentColumns = ["id"],
-        childColumns = ["conversation_id"],
-        onDelete = androidx.room.ForeignKey.CASCADE
-    )
-])
-data class ConversationMessageEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    @ColumnInfo(name = "conversation_id", index = true) val conversationId: String,
-    @ColumnInfo(name = "role") val role: String,        // "user" | "assistant" | "system" | "tool"
-    @ColumnInfo(name = "content") val content: String,
-    @ColumnInfo(name = "type") val type: String = "TEXT",  // MessageType name
-    @ColumnInfo(name = "tool_name") val toolName: String? = null,
-    @ColumnInfo(name = "created_at") val createdAt: Long = System.currentTimeMillis()
-)

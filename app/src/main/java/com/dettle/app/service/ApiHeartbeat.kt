@@ -56,8 +56,8 @@ class ApiHeartbeat @Inject constructor(
     }
 
     private suspend fun poll() {
-        val owner = keyStore.githubOwner.ifBlank { return }
-        val repo = keyStore.githubRepo.ifBlank { return }
+        val owner = keyStore.githubOwner?.ifBlank { null } ?: return
+        val repo = keyStore.githubRepo?.ifBlank { null } ?: return
 
         Log.d(TAG, "Polling $owner/$repo")
         // Check for new notifications from GitHub

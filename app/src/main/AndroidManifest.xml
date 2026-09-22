@@ -43,6 +43,10 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <service
+            android:name=".orchestrator.events.EventReceiverService"
+            android:exported="false" />
+
     </application>
 
 </manifest>

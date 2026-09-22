@@ -57,33 +57,25 @@ class McpClient @Inject constructor(
 
     // ── Serena tools ──────────────────────────────────────────────────────
 
-    suspend fun serenaListFiles(path: String = "."): Result<String> =
-        callMcpTool(
-            baseUrl = serenaBaseUrl ?: return Result.failure(Exception("Serena not configured")),
-            toolName = "list_files",
-            args = mapOf("path" to path)
-        )
+    suspend fun serenaListFiles(path: String = "."): Result<String> {
+        val baseUrl = serenaBaseUrl ?: return Result.failure(Exception("Serena not configured"))
+        return callMcpTool(baseUrl = baseUrl, toolName = "list_files", args = mapOf("path" to path))
+    }
 
-    suspend fun serenaReadFile(filePath: String): Result<String> =
-        callMcpTool(
-            baseUrl = serenaBaseUrl ?: return Result.failure(Exception("Serena not configured")),
-            toolName = "read_file",
-            args = mapOf("path" to filePath)
-        )
+    suspend fun serenaReadFile(filePath: String): Result<String> {
+        val baseUrl = serenaBaseUrl ?: return Result.failure(Exception("Serena not configured"))
+        return callMcpTool(baseUrl = baseUrl, toolName = "read_file", args = mapOf("path" to filePath))
+    }
 
-    suspend fun serenaFindSymbol(symbol: String): Result<String> =
-        callMcpTool(
-            baseUrl = serenaBaseUrl ?: return Result.failure(Exception("Serena not configured")),
-            toolName = "find_symbol",
-            args = mapOf("symbol" to symbol)
-        )
+    suspend fun serenaFindSymbol(symbol: String): Result<String> {
+        val baseUrl = serenaBaseUrl ?: return Result.failure(Exception("Serena not configured"))
+        return callMcpTool(baseUrl = baseUrl, toolName = "find_symbol", args = mapOf("symbol" to symbol))
+    }
 
-    suspend fun serenaDiagnostics(): Result<String> =
-        callMcpTool(
-            baseUrl = serenaBaseUrl ?: return Result.failure(Exception("Serena not configured")),
-            toolName = "get_diagnostics",
-            args = emptyMap()
-        )
+    suspend fun serenaDiagnostics(): Result<String> {
+        val baseUrl = serenaBaseUrl ?: return Result.failure(Exception("Serena not configured"))
+        return callMcpTool(baseUrl = baseUrl, toolName = "get_diagnostics", args = emptyMap())
+    }
 
     // ── Context7 tools ────────────────────────────────────────────────────
 

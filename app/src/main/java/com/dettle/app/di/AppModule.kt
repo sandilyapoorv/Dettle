@@ -69,8 +69,10 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideKeyPoolManager(factory: AIProviderFactory): KeyPoolManager =
-        KeyPoolManager(factory)
+    fun provideKeyPoolManager(
+        factory: AIProviderFactory,
+        agentLogger: com.dettle.app.orchestrator.telemetry.AgentLogger
+    ): KeyPoolManager = KeyPoolManager(factory, agentLogger)
 
     @Provides
     @Singleton
@@ -155,8 +157,10 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideMemoryInjector(memoryDao: MemoryDao): MemoryInjector =
-        MemoryInjector(memoryDao)
+    fun provideMemoryInjector(
+        memoryDao: MemoryDao,
+        embeddingEngine: com.dettle.app.orchestrator.memory.EmbeddingEngine
+    ): MemoryInjector = MemoryInjector(memoryDao, embeddingEngine)
 
     @Provides
     @Singleton
@@ -185,9 +189,12 @@ object AppModule {
     fun provideOvernightSummaryWriter(
         gitHubClient: com.dettle.app.data.github.GitHubClient,
         driveConnector: com.dettle.app.data.drive.GoogleDriveConnector,
-        keyStore: ApiKeyStore
+        keyStore: ApiKeyStore,
+        workspaceManager: com.dettle.app.data.workspace.LocalWorkspaceManager
     ): com.dettle.app.orchestrator.overnight.OvernightSummaryWriter =
-        com.dettle.app.orchestrator.overnight.OvernightSummaryWriter(gitHubClient, driveConnector, keyStore)
+        com.dettle.app.orchestrator.overnight.OvernightSummaryWriter(
+            gitHubClient, driveConnector, keyStore, workspaceManager
+        )
 
     // ─── Mode System ───────────────────────────────────────────────────────────
 

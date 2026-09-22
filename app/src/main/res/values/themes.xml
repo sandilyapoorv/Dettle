@@ -1,6 +1,6 @@
 <resources>
-    <!-- Base app theme -->
-    <style name="Theme.Dettle" parent="Theme.Material3.DayNight.NoActionBar">
+    <!-- Base app theme — uses android built-in shell; Compose handles M3 at runtime -->
+    <style name="Theme.Dettle" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">false</item>

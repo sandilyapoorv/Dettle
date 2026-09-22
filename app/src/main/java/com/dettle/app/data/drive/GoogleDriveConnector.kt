@@ -329,59 +329,6 @@ class GoogleDriveConnector @Inject constructor(
             }
         }
 
-    // ── Overnight summary ──────────────────────────────────────────────────
-
-    /** Returns true if the user is currently signed in to Drive. */
-    fun isConnected(): Boolean = keyStore.driveUserEmail?.isNotBlank() == true
-
-    /**
-     * Saves an overnight run summary Markdown to the Dettle Drive folder.
-     * Returns the file metadata on success.
-     */
-    suspend fun saveOvernightSummary(markdown: String): Result<DriveFile> {
-        val date = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
-        return uploadTextFile(
-            fileName = "overnight-summary-$date.md",
-            content = markdown,
-            mimeType = "text/markdown"
-        )
-    }
-
-    /**
-     * Uploads any text content as a file to the Dettle Drive folder.
-     */
-    suspend fun uploadTextFile(
-        fileName: String,
-        content: String,
-        mimeType: String = "text/plain"
-    ): Result<DriveFile> = withContext(Dispatchers.IO) {
-        try {
-            val drive = buildDriveService() ?: return@withContext Result.failure(Exception("Not connected"))
-            val folderId = getOrCreateDettleFolder(drive)
-
-            val metadata = File().apply {
-                name = fileName
-                parents = listOf(folderId)
-                this.mimeType = mimeType
-            }
-            val body = ByteArrayContent(mimeType, content.toByteArray(Charsets.UTF_8))
-            val file = drive.files().create(metadata, body)
-                .setFields("id,name,webViewLink,size,modifiedTime")
-                .execute()
-
-            Log.d(TAG, "Uploaded '$fileName' to Drive: ${file.webViewLink}")
-            Result.success(DriveFile(
-                id = file.id ?: "",
-                name = file.name ?: fileName,
-                webViewLink = file.webViewLink ?: "",
-                sizeBytes = file.getSize() ?: content.length.toLong(),
-                modifiedTime = file.modifiedTime?.value ?: System.currentTimeMillis()
-            ))
-        } catch (e: Exception) {
-            Log.e(TAG, "uploadTextFile failed", e)
-            Result.failure(e)
-        }
-    }
 }
 
 // ─── Data classes ──────────────────────────────────────────────────────────

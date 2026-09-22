@@ -86,7 +86,7 @@ Examples:
             messages = messages,
             systemPrompt = systemPrompt,
             maxTokens = 20,
-            preferredModelId = com.dettle.app.domain.model.FreeModels.GROQ_LLAMA_8B.modelId
+            preferModel = com.dettle.app.domain.model.FreeModels.GROQ_LLAMA_8B
         ).collect { chunk ->
             if (chunk is StreamChunk.Token) result += chunk.text
         }

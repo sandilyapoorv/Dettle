@@ -18,12 +18,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.coroutines.coroutineContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -121,7 +123,7 @@ class OvernightLoop @Inject constructor(
 
         val completedTasks = mutableListOf<OvernightTaskResult>()
 
-        while (isActive) {
+        while (coroutineContext.isActive) {
             // Max runtime guard
             if (System.currentTimeMillis() - startTime > maxRuntimeMs) {
                 log("Max runtime (${keyStore.overnightMaxHours}h) reached — stopping")
@@ -200,7 +202,7 @@ class OvernightLoop @Inject constructor(
         // Update skills based on what happened tonight
         skillUpdater.applyLearnings(completedTasks)
 
-        val donePhase = if (isActive) OvernightPhase.DONE else OvernightPhase.INTERRUPTED
+        val donePhase = if (coroutineContext.isActive) OvernightPhase.DONE else OvernightPhase.INTERRUPTED
         _state.update {
             it.copy(
                 phase = donePhase,

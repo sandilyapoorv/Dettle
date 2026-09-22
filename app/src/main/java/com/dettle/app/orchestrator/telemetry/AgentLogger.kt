@@ -38,7 +38,7 @@ data class AgentLogEntry(
  */
 @Singleton
 class AgentLogger @Inject constructor(
-    context: Context,
+    @dagger.hilt.android.qualifiers.ApplicationContext context: Context,
     private val json: Json
 ) {
     private val logDir = File(context.filesDir, "agent_telemetry").apply { mkdirs() }

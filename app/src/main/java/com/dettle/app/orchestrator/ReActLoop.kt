@@ -15,8 +15,15 @@ import com.dettle.app.domain.model.MessageType
 import com.dettle.app.domain.model.Tool
 import com.dettle.app.domain.model.ToolCall
 import com.dettle.app.domain.model.ToolResult
+import com.dettle.app.domain.model.TaskContext
+import com.dettle.app.domain.model.TaskType
+import com.dettle.app.orchestrator.mode.AgentMode
+import com.dettle.app.orchestrator.mode.Goal
 import com.dettle.app.orchestrator.policy.EvaluationResult
 import com.dettle.app.orchestrator.policy.PolicyEngine
+import com.dettle.app.orchestrator.policy.SalienceEvaluator
+import com.dettle.app.orchestrator.policy.SalienceType
+import com.dettle.app.orchestrator.reflex.ProceduralReflexEngine
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.Json
@@ -39,9 +46,6 @@ private const val MAX_STEPS = 8
  *
  * Emits [LoopEvent]s that the ViewModel collects and converts to UI messages.
  */
-import com.dettle.app.orchestrator.policy.SalienceEvaluator
-import com.dettle.app.orchestrator.policy.SalienceType
-import com.dettle.app.orchestrator.reflex.ProceduralReflexEngine
 
 @Singleton
 class ReActLoop @Inject constructor(
@@ -57,7 +61,9 @@ class ReActLoop @Inject constructor(
         userMessage: String,
         conversationHistory: List<ApiMessage>,
         tools: List<Tool> = AgentTools.ALL,
-        taskContext: TaskContext = TaskContext()
+        taskContext: TaskContext = TaskContext(),
+        mode: AgentMode? = null,
+        goal: Goal? = null
     ): Flow<LoopEvent> {
         
         // 1. Motor Cortex: Fast Reflex Intercept
@@ -233,7 +239,8 @@ class ReActLoop @Inject constructor(
                 history = history
             ))
         }
-    }
+    }   // end flow{}
+    }   // end fun run()
 
     /** Parse a structured JSON tool call from OpenAI-compatible providers */
     private fun parseToolCall(rawJson: String): ToolCall? {
@@ -295,17 +302,8 @@ class ReActLoop @Inject constructor(
 
 // ─── Context and Events ────────────────────────────────────────────────────
 
-data class TaskContext(
-    val isCodeTask: Boolean = false,
-    val isLongRunning: Boolean = false,
-    val isOvernightRun: Boolean = false,
-    val repoOwner: String? = null,
-    val repoName: String? = null,
-    val language: String = "kotlin",
-    val taskType: TaskType = TaskType.CHAT
-)
-
-enum class TaskType { CHAT, CODE_WRITE, CODE_REVIEW, DEPLOY, RESEARCH }
+typealias TaskContext = com.dettle.app.domain.model.TaskContext
+typealias TaskType = com.dettle.app.domain.model.TaskType
 
 sealed class LoopEvent {
     data class Thinking(val step: Int, val maxSteps: Int) : LoopEvent()

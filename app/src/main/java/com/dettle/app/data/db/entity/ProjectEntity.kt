@@ -25,25 +25,3 @@ data class ProjectEntity(
     @ColumnInfo(name = "created_at") val createdAt: Long = System.currentTimeMillis(),
     @ColumnInfo(name = "last_used_at") val lastUsedAt: Long = System.currentTimeMillis()
 )
-
-/**
- * Project-scoped memory entry.
- * Separate from global MemoryEntity — these are facts specific to ONE project.
- */
-@Entity(tableName = "project_memories", foreignKeys = [
-    androidx.room.ForeignKey(
-        entity = ProjectEntity::class,
-        parentColumns = ["id"],
-        childColumns = ["project_id"],
-        onDelete = androidx.room.ForeignKey.CASCADE
-    )
-])
-data class ProjectMemoryEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    @ColumnInfo(name = "project_id", index = true) val projectId: String,
-    @ColumnInfo(name = "key") val key: String,         // short label, e.g. "applicationId"
-    @ColumnInfo(name = "value") val value: String,     // the actual memory
-    @ColumnInfo(name = "confidence") val confidence: Float = 1.0f,  // 0-1, lower = uncertain
-    @ColumnInfo(name = "source") val source: String = "ai",  // "ai" | "user"
-    @ColumnInfo(name = "created_at") val createdAt: Long = System.currentTimeMillis()
-)

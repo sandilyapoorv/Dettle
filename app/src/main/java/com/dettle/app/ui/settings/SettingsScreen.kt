@@ -2,7 +2,9 @@ package com.dettle.app.ui.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -364,9 +366,6 @@ fun ProviderStatusRow(status: com.dettle.app.data.api.ProviderStatus) {
 }
 
 private val DettleOrange = Color(0xFFFF6B35)
-
-private fun androidx.compose.ui.Modifier.clickable(onClick: () -> Unit) =
-    this.then(androidx.compose.foundation.clickable(onClick = onClick))
 
 // ─── Google Drive Card ─────────────────────────────────────────────────────
 

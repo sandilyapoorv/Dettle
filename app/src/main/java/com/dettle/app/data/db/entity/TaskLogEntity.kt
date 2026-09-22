@@ -18,18 +18,3 @@ data class TaskLogEntity(
     val durationMs: Long = 0,
     val createdAt: Long = System.currentTimeMillis()
 )
-
-/** A Cloudflare Pages/Workers deployment record. */
-@Entity(tableName = "deployments")
-data class DeploymentEntity(
-    @PrimaryKey val id: String,
-    val projectName: String,
-    val type: String,               // PAGES or WORKER
-    val url: String,
-    val productionUrl: String,
-    val status: String = "active",
-    val fileCount: Int = 0,
-    val commitMessage: String = "",
-    val repoKey: String = "",
-    val createdAt: Long = System.currentTimeMillis()
-)

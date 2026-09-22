@@ -176,7 +176,6 @@ object AgentTools {
             ),
             required = listOf("summary")
         ),
-        ),
         safetyLevel = SafetyLevel.AUTO
     )
 

@@ -39,7 +39,7 @@ class ReposViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
-                val map = repoMapper.buildMap(owner, repo)
+                val map = repoMapper.buildRepoMap(owner, repo).getOrNull().orEmpty()
                 // Also get flat file list for the tree view
                 val files = gitHubClient.getRepoFileTree(owner, repo)
                 _uiState.update {

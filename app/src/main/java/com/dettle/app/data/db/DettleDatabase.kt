@@ -11,7 +11,6 @@ import android.content.Context
 import com.dettle.app.data.db.dao.DeploymentDao
 import com.dettle.app.data.db.dao.MemoryDao
 import com.dettle.app.data.db.dao.TaskLogDao
-import com.dettle.app.data.db.dao.GoalDao
 import com.dettle.app.data.db.dao.ProjectDao
 import com.dettle.app.data.db.dao.ConversationDao
 import com.dettle.app.data.db.dao.UserProfileDao
@@ -19,7 +18,6 @@ import com.dettle.app.data.db.dao.KnowledgeGraphDao
 import com.dettle.app.data.db.entity.DeploymentEntity
 import com.dettle.app.data.db.entity.MemoryEntity
 import com.dettle.app.data.db.entity.TaskLogEntity
-import com.dettle.app.data.db.entity.GoalEntity
 import com.dettle.app.data.db.entity.ProjectEntity
 import com.dettle.app.data.db.entity.ProjectMemoryEntity
 import com.dettle.app.data.db.entity.ConversationEntity
@@ -27,6 +25,8 @@ import com.dettle.app.data.db.entity.ConversationMessageEntity
 import com.dettle.app.data.db.entity.UserProfileEntity
 import com.dettle.app.data.db.entity.ConceptNodeEntity
 import com.dettle.app.data.db.entity.ConceptEdgeEntity
+import com.dettle.app.orchestrator.mode.GoalDao
+import com.dettle.app.orchestrator.mode.GoalEntity
 
 @Database(
     entities = [

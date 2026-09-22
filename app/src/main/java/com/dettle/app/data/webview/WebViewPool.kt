@@ -156,14 +156,14 @@ class WebViewPool @Inject constructor(
     private fun createSession(providerType: AIProviderType) {
         val selectors = selectorRegistry.get(providerType.name.lowercase())
         val model = AIModel(
-            id = "webview-${providerType.name.lowercase()}",
+            provider = providerType,
+            modelId = "webview-${providerType.name.lowercase()}",
             displayName = providerType.displayName,
-            providerType = providerType,
             contextWindow = 128_000,
-            dailyRequestLimit = -1,    // Unlimited (user's own subscription)
             dailyTokenLimit = -1,
-            costPerMToken = 0.0,
-            supportsTools = false      // Tools via XML injection, not native API
+            dailyRequestLimit = -1,
+            rpmLimit = -1,
+            supportsToolCalling = false
         )
 
         val session = WebViewSession(

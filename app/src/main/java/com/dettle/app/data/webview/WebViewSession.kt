@@ -46,7 +46,7 @@ private const val PAGE_LOAD_TIMEOUT_MS = 20_000L   // 20s for initial page load
 class WebViewSession(
     private val context: Context,
     val providerType: AIProviderType,
-    val model: AIModel,
+    override val model: AIModel,
     private val selectors: ProviderSelectors,
     val onNeedsReauth: (AIProviderType) -> Unit
 ) : AIProvider {
@@ -60,14 +60,7 @@ class WebViewSession(
     // Channel for coordinating responses (one at a time per session)
     private val responseChannel = Channel<BridgeEvent>(Channel.UNLIMITED)
 
-    fun destroy() {
-        _webView?.destroy()
-        _webView = null
-    }
-
     val webView: WebView get() = _webView ?: createWebView()
-
-    override val model: AIModel get() = this.model
 
     // ── AIProvider implementation ──────────────────────────────────────────
 

@@ -59,6 +59,10 @@ class ApiKeyStore @Inject constructor(
         get() = prefs.getString("github_owner", null)
         set(value) = prefs.edit().putString("github_owner", value?.trim()).apply()
 
+    var githubRepo: String?
+        get() = prefs.getString("github_repo", null)
+        set(value) = prefs.edit().putString("github_repo", value?.trim()).apply()
+
     // ─── Cloudflare ───────────────────────────────────────────────────────
 
     var cloudflareApiToken: String?

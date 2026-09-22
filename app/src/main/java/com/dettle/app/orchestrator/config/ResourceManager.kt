@@ -49,7 +49,7 @@ class ResourceManager @Inject constructor(
         CoroutineScope(Dispatchers.Main).launch {
             // WebViews are massive RAM hogs (Chromium instances). 
             // We must destroy them to stay under 250MB.
-            webViewPool.destroyAllHeadlessSessions()
+            webViewPool.destroy()
         }
         
         // Hint the JVM to GC (though not guaranteed, it's good practice for aggressive compacting)

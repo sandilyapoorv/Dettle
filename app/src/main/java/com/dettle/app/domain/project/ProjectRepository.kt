@@ -97,6 +97,15 @@ private fun ProjectEntity.toDomain() = Project(
     id, name, description, emoji, colorHex, systemInstructions, linkedRepo, isArchived, createdAt, lastUsedAt
 )
 private fun Project.toEntity() = ProjectEntity(
-    id, name, description, emoji, colorHex, systemInstructions, linkedRepo, isArchived, createdAt, lastUsedAt
+    id = id,
+    name = name,
+    description = description,
+    emoji = emoji,
+    colorHex = colorHex,
+    systemInstructions = systemInstructions,
+    linkedRepo = linkedRepo,
+    isArchived = isArchived,
+    createdAt = createdAt,
+    lastUsedAt = lastUsedAt
 )
 private fun ProjectMemoryEntity.toDomain() = ProjectMemory(id, projectId, key, value, confidence, source)

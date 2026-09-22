@@ -93,7 +93,9 @@ class OvernightViewModel @Inject constructor(
     fun updateAddTaskPriority(v: TaskPriority) = _addTaskState.update { it.copy(priority = v) }
     fun updateAddTaskRepo(v: String) = _addTaskState.update { it.copy(repoKey = v) }
     fun showAddTask() = _addTaskState.update { it.copy(showing = true) }
-    fun hideAddTask() = _addTaskState.value = AddTaskState()
+    fun hideAddTask() {
+        _addTaskState.value = AddTaskState()
+    }
 }
 
 data class OvernightUiState(

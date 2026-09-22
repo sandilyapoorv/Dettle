@@ -12,12 +12,14 @@ import androidx.core.app.NotificationCompat
 import com.dettle.app.MainActivity
 import com.dettle.app.data.settings.ApiKeyStore
 import com.dettle.app.data.webview.WebViewPool
+import com.dettle.app.orchestrator.overnight.OvernightLoop
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import com.dettle.app.orchestrator.learning.LearningEngine
-import com.dettle.app.service.ApiHeartbeat
+import javax.inject.Inject
 
 /**
  * Foreground service keeping the app, WebViewPool, and overnight loop alive.

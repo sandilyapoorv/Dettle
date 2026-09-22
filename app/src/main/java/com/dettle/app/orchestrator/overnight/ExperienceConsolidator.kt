@@ -7,7 +7,6 @@ import com.dettle.app.data.db.dao.MemoryDao
 import com.dettle.app.data.db.dao.TaskLogDao
 import com.dettle.app.data.db.entity.MemoryEntity
 import com.dettle.app.domain.model.ApiMessage
-import com.dettle.app.domain.model.Role
 import kotlinx.coroutines.flow.collect
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.Serializable
@@ -107,7 +106,7 @@ class ExperienceConsolidator @Inject constructor(
         var responseText = ""
         try {
             keyPoolManager.chat(
-                messages = listOf(ApiMessage(Role.USER, logsText)),
+                messages = listOf(ApiMessage(role = "user", content = logsText)),
                 systemPrompt = systemPrompt,
                 maxTokens = 2000
             ).collect { chunk ->

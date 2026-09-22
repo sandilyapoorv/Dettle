@@ -6,7 +6,7 @@ import com.dettle.app.data.api.StreamChunk
 import com.dettle.app.data.db.dao.UserProfileDao
 import com.dettle.app.data.db.entity.UserProfileEntity
 import com.dettle.app.orchestrator.MemoryInjector
-import com.dettle.app.domain.model.Message
+import com.dettle.app.domain.model.ApiMessage
 import com.dettle.app.domain.model.AIModel
 import com.dettle.app.domain.model.ALL_KNOWN_MODELS
 import kotlinx.coroutines.channels.Channel
@@ -92,10 +92,10 @@ AI responded: ${snapshot.aiResponse.take(500)}
 
         var response = ""
         keyPoolManager.chat(
-            messages = listOf(Message.User(content = userContent)),
+            messages = listOf(ApiMessage(role = "user", content = userContent)),
             systemPrompt = systemPrompt,
             maxTokens = 150,
-            preferredModelId = "groq_llama3_8b"
+            preferModel = ALL_KNOWN_MODELS.values.firstOrNull()
         ).collect { chunk ->
             if (chunk is StreamChunk.Token) response += chunk.text
         }

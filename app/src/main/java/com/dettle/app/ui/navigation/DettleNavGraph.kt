@@ -2,6 +2,8 @@ package com.dettle.app.ui.navigation
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Rocket
@@ -18,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -126,6 +129,3 @@ fun PlaceholderScreen(label: String) {
         Text(label, color = DettleTextSecondary)
     }
 }
-
-private val androidx.compose.ui.Modifier.Companion.fillMaxSize: () -> androidx.compose.ui.Modifier
-    get() = { androidx.compose.foundation.layout.fillMaxSize() }
