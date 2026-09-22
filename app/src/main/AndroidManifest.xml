@@ -18,6 +18,13 @@
     <!-- Audio / Voice Typing -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!-- Package Visibility for Speech Recognition Services on Android 11+ (API 30+) -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
+
     <application
         android:name=".DettleApplication"
         android:allowBackup="true"

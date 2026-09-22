@@ -1,7 +1,9 @@
 package com.dettle.app.ui.chat
 
 import android.Manifest
+import android.app.Activity
 import android.content.pm.PackageManager
+import android.speech.RecognizerIntent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -142,6 +144,19 @@ fun ChatScreen(
         }
     }
 
+    val systemSpeechLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val spokenText = result.data
+                ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                ?.firstOrNull()
+            if (!spokenText.isNullOrBlank()) {
+                inputText = if (inputText.isBlank()) spokenText else "$inputText $spokenText"
+            }
+        }
+    }
+
     fun startListeningInternal() {
         baseTextBeforeVoice = inputText
         voiceTypingManager.startListening(
@@ -153,6 +168,13 @@ fun ChatScreen(
             },
             onError = { error ->
                 Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
+            },
+            onFallbackToSystemPrompt = {
+                try {
+                    systemSpeechLauncher.launch(voiceTypingManager.createSystemSpeechIntent())
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Voice input is not available on this device", Toast.LENGTH_SHORT).show()
+                }
             }
         )
     }

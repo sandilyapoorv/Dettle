@@ -3,6 +3,8 @@ package com.dettle.app.audio
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -28,8 +30,12 @@ class VoiceTypingManager @Inject constructor(
 ) {
     companion object {
         private const val TAG = "VoiceTypingManager"
+        private const val ERROR_LANGUAGE_NOT_SUPPORTED = 12
+        private const val ERROR_LANGUAGE_UNAVAILABLE = 13
+        private const val ERROR_CANNOT_CHECK_SUPPORT = 14
     }
 
+    private val mainHandler = Handler(Looper.getMainLooper())
     private var speechRecognizer: SpeechRecognizer? = null
 
     private val _state = MutableStateFlow<VoiceTypingState>(VoiceTypingState.Idle)
@@ -43,54 +49,87 @@ class VoiceTypingManager @Inject constructor(
 
     private var onPartialResultCallback: ((String) -> Unit)? = null
     private var onFinalResultCallback: ((String) -> Unit)? = null
+    private var onErrorCallback: ((String) -> Unit)? = null
+    private var onFallbackToSystemPromptCallback: (() -> Unit)? = null
+
+    private var retryCount = 0
 
     val isRecognitionAvailable: Boolean
         get() = SpeechRecognizer.isRecognitionAvailable(context)
 
+    fun createSystemSpeechIntent(): Intent {
+        return Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now to type...")
+        }
+    }
+
     fun startListening(
         onPartial: (String) -> Unit,
         onFinal: (String) -> Unit,
-        onError: ((String) -> Unit)? = null
+        onError: ((String) -> Unit)? = null,
+        onFallbackToSystemPrompt: (() -> Unit)? = null
     ) {
-        if (!isRecognitionAvailable) {
-            val errorMsg = "Speech recognition is not supported or enabled on this device."
-            _state.value = VoiceTypingState.Error(errorMsg)
-            onError?.invoke(errorMsg)
-            return
+        mainHandler.post {
+            onPartialResultCallback = onPartial
+            onFinalResultCallback = onFinal
+            onErrorCallback = onError
+            onFallbackToSystemPromptCallback = onFallbackToSystemPrompt
+            retryCount = 0
+
+            if (!isRecognitionAvailable) {
+                Log.w(TAG, "Speech recognition service not found via SpeechRecognizer; falling back to system intent")
+                onFallbackToSystemPrompt?.invoke()
+                    ?: onError?.invoke("Speech recognition is not available on this device.")
+                return@post
+            }
+
+            startListeningInternal(fallbackMode = false)
         }
+    }
 
-        stopListening()
-
-        onPartialResultCallback = onPartial
-        onFinalResultCallback = onFinal
+    private fun startListeningInternal(fallbackMode: Boolean) {
+        stopListeningInternal()
 
         try {
             speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
-                setRecognitionListener(createListener(onError))
+                setRecognitionListener(createListener(fallbackMode))
             }
 
             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                 putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
-                // Prefer offline on-device processing if available on modern Android
-                putExtra("android.speech.extra.PREFER_OFFLINE", true)
+
+                if (!fallbackMode) {
+                    val langTag = Locale.getDefault().toLanguageTag()
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, langTag)
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, langTag)
+                }
             }
 
             speechRecognizer?.startListening(intent)
             _isListening.value = true
             _state.value = VoiceTypingState.Listening(0f)
-            Log.d(TAG, "SpeechRecognizer started listening")
+            Log.d(TAG, "SpeechRecognizer started listening (fallbackMode=$fallbackMode)")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to start speech recognizer: ${e.message}", e)
+            Log.e(TAG, "Exception starting SpeechRecognizer: ${e.message}", e)
             _isListening.value = false
-            _state.value = VoiceTypingState.Error(e.message ?: "Failed to start voice typing")
-            onError?.invoke(e.message ?: "Failed to start voice typing")
+            _state.value = VoiceTypingState.Error(e.message ?: "Failed to start speech recognition")
+            onFallbackToSystemPromptCallback?.invoke()
+                ?: onErrorCallback?.invoke(e.message ?: "Failed to start speech recognition")
         }
     }
 
     fun stopListening() {
+        mainHandler.post {
+            stopListeningInternal()
+        }
+    }
+
+    private fun stopListeningInternal() {
         try {
             speechRecognizer?.stopListening()
             speechRecognizer?.cancel()
@@ -105,7 +144,7 @@ class VoiceTypingManager @Inject constructor(
         }
     }
 
-    private fun createListener(onErrorCallback: ((String) -> Unit)?) = object : RecognitionListener {
+    private fun createListener(fallbackMode: Boolean) = object : RecognitionListener {
         override fun onReadyForSpeech(params: Bundle?) {
             _isListening.value = true
             _state.value = VoiceTypingState.Listening(0f)
@@ -130,30 +169,54 @@ class VoiceTypingManager @Inject constructor(
         }
 
         override fun onError(error: Int) {
+            Log.w(TAG, "SpeechRecognizer onError: code $error (fallbackMode=$fallbackMode, retryCount=$retryCount)")
+
+            // Handle Error 12 (ERROR_LANGUAGE_NOT_SUPPORTED) or Error 13 (ERROR_LANGUAGE_UNAVAILABLE)
+            if ((error == ERROR_LANGUAGE_UNAVAILABLE || error == ERROR_LANGUAGE_NOT_SUPPORTED || error == SpeechRecognizer.ERROR_CLIENT) && retryCount == 0 && !fallbackMode) {
+                retryCount++
+                Log.i(TAG, "Language pack not available offline (code $error). Automatically retrying with system default language...")
+                mainHandler.post {
+                    startListeningInternal(fallbackMode = true)
+                }
+                return
+            }
+
             val errorMessage = when (error) {
                 SpeechRecognizer.ERROR_AUDIO -> "Audio recording error"
-                SpeechRecognizer.ERROR_CLIENT -> "Client recognition error"
+                SpeechRecognizer.ERROR_CLIENT -> "Speech recognition client error"
                 SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Microphone permission required"
-                SpeechRecognizer.ERROR_NETWORK -> "Network communication error"
-                SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout"
+                SpeechRecognizer.ERROR_NETWORK -> "Network connection required for voice typing"
+                SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Voice network timeout"
                 SpeechRecognizer.ERROR_NO_MATCH -> "No speech recognized"
                 SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognition service busy"
                 SpeechRecognizer.ERROR_SERVER -> "Recognition server error"
                 SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech heard"
-                else -> "Speech recognition error code: $error"
+                ERROR_LANGUAGE_NOT_SUPPORTED -> "Language not supported"
+                ERROR_LANGUAGE_UNAVAILABLE -> "Language model not available on device"
+                ERROR_CANNOT_CHECK_SUPPORT -> "Cannot check speech support"
+                else -> "Speech recognition error (code $error)"
             }
 
-            Log.w(TAG, "SpeechRecognizer error: $errorMessage (code: $error)")
             _isListening.value = false
             _rmsDb.value = 0f
             _state.value = VoiceTypingState.Error(errorMessage)
 
-            // Do not report timeout/no-match as fatal, just reset to idle
+            // Non-fatal scenarios (timeout / silence) simply return to Idle
             if (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
                 _state.value = VoiceTypingState.Idle
-            } else {
-                onErrorCallback?.invoke(errorMessage)
+                return
             }
+
+            // If background SpeechRecognizer fails with language or client error even after retry, trigger the system dialog
+            if (error == ERROR_LANGUAGE_UNAVAILABLE || error == ERROR_LANGUAGE_NOT_SUPPORTED || error == SpeechRecognizer.ERROR_CLIENT || error == SpeechRecognizer.ERROR_SERVER) {
+                if (onFallbackToSystemPromptCallback != null) {
+                    Log.i(TAG, "Delegating to system speech input dialog due to error $error")
+                    onFallbackToSystemPromptCallback?.invoke()
+                    return
+                }
+            }
+
+            onErrorCallback?.invoke(errorMessage)
         }
 
         override fun onResults(results: Bundle?) {
