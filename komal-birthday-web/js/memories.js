@@ -4,7 +4,7 @@
  */
 
 const MemoriesEngine = (() => {
-  const STORAGE_KEY = 'komal_birthday_surprise_data_v1';
+  const STORAGE_KEY = 'komal_birthday_surprise_data_v5_chand_si_mehbooba';
 
   // Sweet Romantic Defaults
   const DEFAULT_DATA = {
@@ -48,6 +48,11 @@ I hope today showers you with all the warmth, joy, and peace you so effortlessly
   // Load from localStorage if present
   function loadSavedData() {
     try {
+      // Clear out legacy storage keys that might hold broken relative image paths
+      ['komal_birthday_surprise_data_v1', 'komal_birthday_surprise_data_v2', 'komal_birthday_surprise_data_v3', 'komal_birthday_surprise_data_v4'].forEach(k => {
+        try { localStorage.removeItem(k); } catch (e) {}
+      });
+
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
@@ -55,10 +60,6 @@ I hope today showers you with all the warmth, joy, and peace you so effortlessly
           ...DEFAULT_DATA,
           ...parsed
         };
-        // Ensure new real photos are used if previous storage had old templates
-        if (!activeData.photos || !activeData.photos[0] || !activeData.photos[0].url.startsWith('images/')) {
-          activeData.photos = DEFAULT_DATA.photos;
-        }
       }
     } catch (e) {
       console.warn('Could not load localStorage custom data', e);
@@ -108,15 +109,35 @@ I hope today showers you with all the warmth, joy, and peace you so effortlessly
     activeData.photos.forEach((photo, idx) => {
       const img = document.getElementById(`polaroid-img-${idx}`);
       const cap = document.getElementById(`polaroid-cap-${idx}`);
-      if (img && photo.url) img.src = photo.url;
+      if (img) {
+        // If image in DOM already has a working embedded data URI and photo.url is a default relative path, preserve embedded
+        if (photo.url && (photo.url.startsWith('data:') || photo.url.startsWith('blob:'))) {
+          img.src = photo.url;
+        } else if (img.src && img.src.startsWith('data:') && (!photo.url || photo.url.startsWith('images/'))) {
+          // Keep embedded data URI
+        } else if (photo.url) {
+          img.src = photo.url;
+        }
+
+        // Automatic fallback on phone if relative path produces 404/error
+        img.onerror = function() {
+          if (window.KOMAL_EMBEDDED_PHOTOS && window.KOMAL_EMBEDDED_PHOTOS[idx]) {
+            this.onerror = null;
+            this.src = window.KOMAL_EMBEDDED_PHOTOS[idx];
+          }
+        };
+      }
       if (cap) cap.textContent = photo.caption;
 
       // Also update modal input preview
       const previewImg = document.getElementById(`preview-photo-${idx}`);
       const capInput = document.getElementById(`cap-photo-${idx}`);
-      if (previewImg && photo.url) {
-        previewImg.src = photo.url;
-        previewImg.classList.remove('hidden');
+      if (previewImg) {
+        const previewSrc = (img && img.src) ? img.src : photo.url;
+        if (previewSrc) {
+          previewImg.src = previewSrc;
+          previewImg.classList.remove('hidden');
+        }
       }
       if (capInput) capInput.value = photo.caption || '';
     });

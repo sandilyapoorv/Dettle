@@ -179,15 +179,15 @@ const AudioEngine = (() => {
 
   function startBgm() {
     init();
-    if (isPlayingBgm) return Promise.resolve();
-    isPlayingBgm = true;
+    if (isPlayingBgm && bgmAudioEl && !bgmAudioEl.paused) return Promise.resolve();
 
-    // Try HTML5 audio first (e.g. if i-wanna-be-yours.mp3 exists or was uploaded)
     if (bgmAudioEl && bgmAudioEl.src && !bgmAudioEl.src.endsWith('/')) {
+      bgmAudioEl.loop = true;
       const playPromise = bgmAudioEl.play();
       if (playPromise !== undefined) {
         return playPromise
           .then(() => {
+            isPlayingBgm = true;
             usingCustomAudio = true;
             updateUi();
           })
@@ -200,9 +200,7 @@ const AudioEngine = (() => {
       }
     }
 
-    // Default to synthesized "I Wanna Be Yours"
-    usingCustomAudio = false;
-    scheduleIwbyLoop();
+    isPlayingBgm = false;
     updateUi();
     return Promise.resolve();
   }
@@ -247,17 +245,15 @@ const AudioEngine = (() => {
     if (btn) {
       if (isPlayingBgm) {
         btn.classList.add('playing');
-        btn.title = 'Pause Arctic Monkeys - I Wanna Be Yours';
+        btn.title = 'Pause Chand Si Mehbooba Ho Meri';
       } else {
         btn.classList.remove('playing');
-        btn.title = 'Play Arctic Monkeys - I Wanna Be Yours';
+        btn.title = 'Play Chand Si Mehbooba Ho Meri';
       }
     }
 
     if (statusDetail) {
-      statusDetail.textContent = usingCustomAudio 
-        ? 'Playing custom uploaded MP3 track' 
-        : 'Playing built-in Arctic Monkeys - I Wanna Be Yours arrangement';
+      statusDetail.textContent = 'Playing Chand Si Mehbooba Ho Meri 💕';
     }
   }
 
@@ -363,15 +359,18 @@ window.addEventListener('DOMContentLoaded', () => {
   const autoPlaySound = () => {
     AudioEngine.init();
     AudioEngine.startBgm().catch(() => {
-      // Browser autoplay policy blocked raw unprompted audio -> start on very first touch/click
+      // Browser autoplay policy blocked unprompted audio -> start on very first touch/click
       const startOnInteraction = () => {
-        AudioEngine.startBgm();
-        ['pointerdown', 'touchstart', 'touchend', 'click', 'scroll', 'keydown'].forEach(ev => {
-          document.removeEventListener(ev, startOnInteraction);
-        });
+        AudioEngine.startBgm().then(() => {
+          ['pointerdown', 'touchstart', 'touchend', 'click', 'scroll', 'keydown'].forEach(ev => {
+            window.removeEventListener(ev, startOnInteraction, true);
+            document.removeEventListener(ev, startOnInteraction, true);
+          });
+        }).catch(() => {});
       };
       ['pointerdown', 'touchstart', 'touchend', 'click', 'scroll', 'keydown'].forEach(ev => {
-        document.addEventListener(ev, startOnInteraction, { once: true, passive: true });
+        window.addEventListener(ev, startOnInteraction, { once: true, capture: true, passive: true });
+        document.addEventListener(ev, startOnInteraction, { once: true, capture: true, passive: true });
       });
     });
   };
