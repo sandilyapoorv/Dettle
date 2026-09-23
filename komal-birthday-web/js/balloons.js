@@ -29,6 +29,28 @@ const BalloonsEngine = (() => {
   function init() {
     setupEnvelope();
     renderBalloons();
+    setupPopAll();
+  }
+
+  function setupPopAll() {
+    const popAllBtn = document.getElementById('pop-all-btn');
+    if (popAllBtn) {
+      popAllBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        popAllBalloons();
+      });
+    }
+  }
+
+  function popAllBalloons() {
+    const unpopped = document.querySelectorAll('.balloon-item:not(.popped)');
+    unpopped.forEach((balloon, i) => {
+      setTimeout(() => {
+        const all = Array.from(document.querySelectorAll('.balloon-item'));
+        const idx = all.indexOf(balloon);
+        popBalloon(balloon, idx >= 0 ? idx : i);
+      }, i * 140);
+    });
   }
 
   // --- SCENE 1: WAX-SEALED ENVELOPE ---
