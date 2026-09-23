@@ -2,30 +2,28 @@ package com.dettle.app.data.api
 
 import com.dettle.app.domain.model.AIModel
 import com.dettle.app.domain.model.ApiMessage
+import com.dettle.app.domain.model.ThinkingType
 import com.dettle.app.domain.model.Tool
-import com.dettle.app.domain.model.ToolParameters
-import com.dettle.app.domain.model.ToolProperty
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import okhttp3.Response
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.sse.EventSources
 
 /**
- * OpenAI-compatible provider — works for Groq, OpenRouter, SambaNova, GitHub Models.
+ * OpenAI-compatible provider — works for Groq, OpenAI, DeepSeek, Mistral,
+ * SambaNova, Cerebras, xAI, OpenRouter, and GitHub Models.
  * All of these use the OpenAI chat completions API format with SSE streaming.
  */
 class OpenAICompatProvider(
@@ -57,7 +55,7 @@ class OpenAICompatProvider(
         var response: Response? = null
         try {
             val allMessages = buildList {
-                if (systemPrompt != null) {
+                if (systemPrompt != null && model.supportsSystemPrompt) {
                     add(ApiMessage(role = "system", content = systemPrompt))
                 }
                 addAll(messages)
@@ -113,13 +111,30 @@ class OpenAICompatProvider(
 
                 try {
                     val chunk = json.parseToJsonElement(data).jsonObject
-                    val choices = chunk["choices"]?.let { json.parseToJsonElement(it.toString()) }
-                    val delta = choices?.jsonObject?.get("0")?.jsonObject?.get("delta")?.jsonObject
+                    val choices = chunk["choices"]?.let {
+                        runCatching { it.jsonArray }.getOrNull()
+                    }
+                    val firstChoice = choices?.firstOrNull()?.let {
+                        runCatching { it.jsonObject }.getOrNull()
+                    }
+                    val delta = firstChoice?.get("delta")?.let {
+                        runCatching { it.jsonObject }.getOrNull()
+                    }
 
                     // Regular text token
-                    val content = delta?.get("content")?.jsonPrimitive?.content
+                    val content = delta?.get("content")?.let {
+                        runCatching { it.jsonPrimitive.content }.getOrNull()
+                    }
                     if (!content.isNullOrEmpty()) {
                         emit(StreamChunk.Token(content))
+                    }
+
+                    // Reasoning content token (e.g. DeepSeek R1, Groq, Ollama)
+                    val reasoningContent = delta?.get("reasoning_content")?.let {
+                        runCatching { it.jsonPrimitive.content }.getOrNull()
+                    }
+                    if (!reasoningContent.isNullOrEmpty()) {
+                        emit(StreamChunk.Token(reasoningContent))
                     }
 
                     // Tool call detected
@@ -129,13 +144,19 @@ class OpenAICompatProvider(
                     }
 
                     // Usage tracking
-                    chunk["usage"]?.jsonObject?.let { usage ->
-                        totalPromptTokens = usage["prompt_tokens"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
-                        totalCompletionTokens = usage["completion_tokens"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+                    chunk["usage"]?.let {
+                        runCatching { it.jsonObject }.getOrNull()
+                    }?.let { usage ->
+                        val pTokens = usage["prompt_tokens"]?.jsonPrimitive?.content?.toIntOrNull()
+                        val cTokens = usage["completion_tokens"]?.jsonPrimitive?.content?.toIntOrNull()
+                        if (pTokens != null) totalPromptTokens = pTokens
+                        if (cTokens != null) totalCompletionTokens = cTokens
                     }
 
                     // Finish reason
-                    val finishReason = choices?.jsonObject?.get("0")?.jsonObject?.get("finish_reason")?.jsonPrimitive?.content
+                    val finishReason = firstChoice?.get("finish_reason")?.let {
+                        runCatching { it.jsonPrimitive.content }.getOrNull()
+                    }
                     if (finishReason == "stop" || finishReason == "tool_calls") {
                         emit(StreamChunk.Done(
                             finishReason = finishReason,
@@ -171,10 +192,17 @@ class OpenAICompatProvider(
         val body = buildJsonObject {
             put("model", JsonPrimitive(model.modelId))
             put("messages", json.parseToJsonElement(json.encodeToString(messagesJson)))
-            put("max_tokens", JsonPrimitive(maxTokens))
+            put("max_tokens", JsonPrimitive(maxTokens.coerceAtMost(model.maxOutputTokens)))
             put("stream", JsonPrimitive(true))
             put("stream_options", json.parseToJsonElement("""{"include_usage": true}"""))
-            if (tools.isNotEmpty()) {
+            if (model.supportsTemperature) {
+                put("temperature", JsonPrimitive(0.7))
+            }
+            if (model.supportsThinking && model.thinkingType == ThinkingType.OPENAI_EFFORT) {
+                val effort = if (model.defaultThinkingLevel.isNotBlank()) model.defaultThinkingLevel else "medium"
+                put("reasoning_effort", JsonPrimitive(effort))
+            }
+            if (tools.isNotEmpty() && model.supportsToolCalling) {
                 put("tools", json.parseToJsonElement(buildToolsJson(tools)))
                 put("tool_choice", JsonPrimitive("auto"))
             }

@@ -26,6 +26,15 @@ import com.dettle.app.orchestrator.mode.ModeId
 import com.dettle.app.orchestrator.mode.ModeRepository
 import com.dettle.app.orchestrator.mode.ModeRouter
 import com.dettle.app.orchestrator.learning.LearningEngine
+import com.dettle.app.orchestrator.brain.CognitiveBrain
+import com.dettle.app.orchestrator.brain.CognitiveState
+import com.dettle.app.data.settings.ApiKeyStore
+import com.dettle.app.data.db.dao.ConversationDao
+import com.dettle.app.data.db.entity.ConversationEntity
+import com.dettle.app.data.db.entity.ConversationMessageEntity
+import com.dettle.app.orchestrator.mode.EnvironmentMode
+import com.dettle.app.orchestrator.mode.SlashCommand
+import java.util.UUID
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -42,22 +51,91 @@ class ChatViewModel @Inject constructor(
     private val modeRouter: ModeRouter,
     private val modeRepository: ModeRepository,
     private val goalRepository: GoalRepository,
-    private val learningEngine: LearningEngine
+    private val learningEngine: LearningEngine,
+    private val conversationDao: ConversationDao,
+    private val apiKeyStore: ApiKeyStore,
+    private val cognitiveBrain: CognitiveBrain
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
+    val isUnleashed: StateFlow<Boolean> = apiKeyStore.isUnleashedFlow
+
+    init {
+        viewModelScope.launch {
+            apiKeyStore.isUnleashedFlow.collect { unleashed ->
+                _uiState.update { it.copy(isUnleashed = unleashed) }
+            }
+        }
+        viewModelScope.launch {
+            cognitiveBrain.cognitiveState.collect { state ->
+                _uiState.update {
+                    it.copy(cognitiveStatus = if (state is CognitiveState.Idle) null else state.label)
+                }
+            }
+        }
+    }
+
+    fun toggleUnleashed(): Boolean {
+        val newState = apiKeyStore.toggleUnleashed()
+        _uiState.update { it.copy(isUnleashed = newState) }
+        return newState
+    }
+
     /** All modes with their effective (default + user) configs — live-updating from DataStore */
     val allModes: StateFlow<List<AgentMode>> = modeRepository.observeAllModes()
         .stateIn(viewModelScope, SharingStarted.Eagerly, AgentModes.ALL)
+
+    /** Recent conversations observed from Room DB */
+    val recentConversations: StateFlow<List<ConversationEntity>> = conversationDao.observeRecent()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val conversationHistory = mutableListOf<ApiMessage>()
     private var pendingApproval: Pair<ApprovalRequest, ToolCall>? = null
     private var lockedModeId: ModeId? = null  // null = auto-classify; set = user-locked
     private var activeGoalId: String? = null
+    private var activeConversationId: String? = null
 
-    // ── Mode control ────────────────────────────────────────────────────────
+    // ── Environment & Mode control ─────────────────────────────────────────
+
+    fun setEnvironmentMode(mode: EnvironmentMode) {
+        _uiState.update { it.copy(environmentMode = mode) }
+        // If locked mode doesn't match new environment, reset or adjust it
+        val currentLocked = lockedModeId
+        if (currentLocked != null && currentLocked.environment != mode) {
+            val fallback = if (mode == EnvironmentMode.WORK) ModeId.PLAN else null
+            lockedModeId = fallback
+            _uiState.update { it.copy(lockedModeId = fallback, activeModeId = fallback ?: ModeId.CHAT) }
+        }
+    }
+
+    fun selectSlashCommand(command: SlashCommand) {
+        if (command.command == "/unleashed" || command.command == "/uncensored") {
+            val newState = toggleUnleashed()
+            addMessage(
+                ChatMessage(
+                    role = MessageRole.SYSTEM,
+                    type = MessageType.SYSTEM,
+                    content = if (newState) {
+                        "⚡ Unleashed Engine Activated: Raw execution engine & Prompt Smuggler proxy active."
+                    } else {
+                        "🛡️ Unleashed Engine Deactivated: Standard engineering principles & safety filters active."
+                    }
+                )
+            )
+            return
+        }
+        setEnvironmentMode(command.environment)
+        lockedModeId = command.targetModeId
+        _uiState.update {
+            it.copy(
+                lockedModeId = command.targetModeId,
+                activeModeId = command.targetModeId,
+                environmentMode = command.environment
+            )
+        }
+    }
 
     /** User taps a mode pill to lock it. Tap again to unlock (return to auto) */
     fun toggleModelock(id: ModeId) {
@@ -74,14 +152,127 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch { modeRepository.resetToDefault(id) }
     }
 
+    // ── Conversation Persistence ────────────────────────────────────────────
+
+    fun switchConversation(id: String) {
+        viewModelScope.launch {
+            val conv = conversationDao.getConversationById(id) ?: return@launch
+            val messages = conversationDao.getMessages(id)
+            activeConversationId = id
+            conversationHistory.clear()
+
+            val uiMessages = messages.map { msg ->
+                val role = when (msg.role.lowercase()) {
+                    "user" -> MessageRole.USER
+                    "assistant" -> MessageRole.ASSISTANT
+                    "tool" -> MessageRole.TOOL
+                    else -> MessageRole.SYSTEM
+                }
+                val type = runCatching { MessageType.valueOf(msg.type) }.getOrDefault(MessageType.TEXT)
+                if (role == MessageRole.USER || role == MessageRole.ASSISTANT) {
+                    conversationHistory.add(ApiMessage(role = msg.role, content = msg.content))
+                }
+                ChatMessage(
+                    id = msg.id.toString(),
+                    role = role,
+                    type = type,
+                    content = msg.content
+                )
+            }
+
+            _uiState.update {
+                it.copy(
+                    messages = uiMessages,
+                    activeConversationId = id,
+                    goalGates = emptyMap(),
+                    isAgentRunning = false,
+                    inputEnabled = true,
+                    thinkingStep = 0
+                )
+            }
+        }
+    }
+
+    fun startNewChat() {
+        activeConversationId = null
+        conversationHistory.clear()
+        activeGoalId = null
+        pendingApproval = null
+        _uiState.update {
+            it.copy(
+                messages = emptyList(),
+                activeConversationId = null,
+                goalGates = emptyMap(),
+                isAgentRunning = false,
+                inputEnabled = true,
+                thinkingStep = 0
+            )
+        }
+    }
+
+    fun deleteConversation(id: String) {
+        viewModelScope.launch {
+            conversationDao.deleteConversation(id)
+            if (activeConversationId == id) {
+                startNewChat()
+            }
+        }
+    }
+
     // ── Message sending ─────────────────────────────────────────────────────
 
     fun sendMessage(text: String) {
         if (text.isBlank() || _uiState.value.isAgentRunning) return
 
+        val trimmed = text.trim()
+        if (trimmed.equals("/unleashed", ignoreCase = true) || trimmed.equals("/uncensored", ignoreCase = true)) {
+            val newState = toggleUnleashed()
+            addMessage(
+                ChatMessage(
+                    role = MessageRole.SYSTEM,
+                    type = MessageType.SYSTEM,
+                    content = if (newState) {
+                        "⚡ Unleashed Engine Activated: Raw execution engine & Prompt Smuggler proxy active."
+                    } else {
+                        "🛡️ Unleashed Engine Deactivated: Standard engineering principles & safety filters active."
+                    }
+                )
+            )
+            return
+        }
+
         val userMessage = ChatMessage(role = MessageRole.USER, content = text, type = MessageType.TEXT)
         addMessage(userMessage)
         _uiState.update { it.copy(isAgentRunning = true, inputEnabled = false) }
+
+        val convId = activeConversationId ?: UUID.randomUUID().toString().also { newId ->
+            activeConversationId = newId
+            val titleSnippet = text.take(36).trim().ifBlank { "New Conversation" }
+            viewModelScope.launch {
+                conversationDao.insertConversation(
+                    ConversationEntity(
+                        id = newId,
+                        title = titleSnippet,
+                        messageCount = 1,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                )
+            }
+            _uiState.update { it.copy(activeConversationId = newId) }
+        }
+
+        // Persist user message to Room DB
+        viewModelScope.launch {
+            conversationDao.insertMessage(
+                ConversationMessageEntity(
+                    conversationId = convId,
+                    role = "user",
+                    content = text,
+                    type = MessageType.TEXT.name
+                )
+            )
+            conversationDao.incrementMessageCount(convId)
+        }
 
         val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
             Log.e("ChatViewModel", "Unhandled exception in sendMessage coroutine", throwable)
@@ -97,21 +288,33 @@ class ChatViewModel @Inject constructor(
 
         viewModelScope.launch(exceptionHandler) {
             try {
-                // 1. Classify intent (or use locked mode)
+                val isUnleashedMode = _uiState.value.isUnleashed
+                val taskContext = TaskContext(isUncensored = isUnleashedMode)
+
+                // 1. Cognitive Brain: Prepare cognitive context & memory recall
+                val cognitiveContext = cognitiveBrain.prepareCognitiveContext(
+                    userMessage = text,
+                    taskContext = taskContext,
+                    isUncensored = isUnleashedMode
+                )
+
+                // 2. Classify intent (or use locked mode)
                 val effectiveMode = resolveMode(text)
                 _uiState.update { it.copy(activeModeId = effectiveMode.id) }
 
-                // 2. For GOAL mode: create or resume a persistent goal
+                // 3. For GOAL mode: create or resume a persistent goal
                 val goal = if (effectiveMode.id == ModeId.GOAL) {
                     resolveGoal(text, effectiveMode)
                 } else null
 
-                // 3. Run the loop
+                // 4. Run the loop with Unleashed Mode enabled if toggled
                 reActLoop.run(
                     userMessage = text,
                     conversationHistory = conversationHistory.toList(),
+                    taskContext = taskContext,
                     mode = effectiveMode,
-                    goal = goal
+                    goal = goal,
+                    isUncensored = isUnleashedMode
                 ).collect { event -> handleLoopEvent(event) }
             } catch (t: Throwable) {
                 Log.e("ChatViewModel", "Caught throwable in chat execution loop", t)
@@ -179,6 +382,19 @@ class ChatViewModel @Inject constructor(
             is LoopEvent.StreamComplete -> {
                 updateMessage(event.messageId) { it.copy(isStreaming = false) }
                 conversationHistory.add(ApiMessage(role = "assistant", content = event.fullText))
+                activeConversationId?.let { convId ->
+                    viewModelScope.launch {
+                        conversationDao.insertMessage(
+                            ConversationMessageEntity(
+                                conversationId = convId,
+                                role = "assistant",
+                                content = event.fullText,
+                                type = MessageType.TEXT.name
+                            )
+                        )
+                        conversationDao.incrementMessageCount(convId)
+                    }
+                }
             }
 
             is LoopEvent.ExecutingTool -> {
@@ -214,16 +430,14 @@ class ChatViewModel @Inject constructor(
                     it.copy(isStreaming = false)
                 }
                 
-                // --- Background Intelligence ---
-                // Post snapshot for LearningEngine to extract facts/corrections
+                // --- Cognitive Brain: Autonomous Memory Consolidation ---
                 val lastUserMsg = _uiState.value.messages.lastOrNull { it.role == MessageRole.USER }
                 if (lastUserMsg != null && lastAiMsg != null) {
-                    val snapshot = com.dettle.app.orchestrator.learning.LearningEngine.ConversationSnapshot(
+                    cognitiveBrain.consolidateExperience(
                         userMessage = lastUserMsg.content,
-                        aiResponse = lastAiMsg.content,
-                        projectId = null // TODO: pass active project ID when fully wired
+                        assistantResponse = lastAiMsg.content,
+                        projectId = null
                     )
-                    learningEngine.post(snapshot)
                 }
 
                 _uiState.update { it.copy(isAgentRunning = false, inputEnabled = true, thinkingStep = 0) }
@@ -300,9 +514,7 @@ class ChatViewModel @Inject constructor(
     }
 
     fun clearChat() {
-        _uiState.update { it.copy(messages = emptyList(), goalGates = emptyMap()) }
-        conversationHistory.clear()
-        activeGoalId = null
+        startNewChat()
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────
@@ -338,5 +550,9 @@ data class ChatUiState(
     val activeModeId: ModeId = ModeId.CHAT,
     val lockedModeId: ModeId? = null,                    // null = auto
     val modeClassificationHint: String? = null,          // "Auto → Research?" shown briefly
-    val goalGates: Map<String, Boolean> = emptyMap()     // gateId → passed?
+    val goalGates: Map<String, Boolean> = emptyMap(),    // gateId → passed?
+    val environmentMode: EnvironmentMode = EnvironmentMode.CHAT,
+    val activeConversationId: String? = null,
+    val isUnleashed: Boolean = false,
+    val cognitiveStatus: String? = null
 )

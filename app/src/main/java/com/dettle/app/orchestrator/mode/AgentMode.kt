@@ -8,6 +8,21 @@ import com.dettle.app.domain.model.Tool
 import com.dettle.app.domain.model.AgentTools
 import kotlinx.serialization.Serializable
 
+// ─── Environment (Chat vs Work) ──────────────────────────────────────────────
+
+enum class EnvironmentMode(val displayName: String) {
+    CHAT("Chat"),
+    WORK("Work")
+}
+
+data class SlashCommand(
+    val command: String,
+    val name: String,
+    val description: String,
+    val targetModeId: ModeId,
+    val environment: EnvironmentMode
+)
+
 // ─── Mode Identifier ──────────────────────────────────────────────────────────
 
 enum class ModeId(val displayName: String, val emoji: String, val description: String) {
@@ -42,7 +57,13 @@ enum class ModeId(val displayName: String, val emoji: String, val description: S
     DEPLOY(
         "Deploy",     "",
         "Build → test → release. CI trigger, APK upload, GitHub Release."
-    )
+    );
+
+    val environment: EnvironmentMode
+        get() = when (this) {
+            CHAT, RESEARCH, WEB -> EnvironmentMode.CHAT
+            CODE, PLAN, GOAL, REVIEW, DEPLOY -> EnvironmentMode.WORK
+        }
 }
 
 // ─── Customizable config ──────────────────────────────────────────────────────
@@ -247,3 +268,69 @@ val ALL_KNOWN_MODELS: Map<String, AIModel> = listOf(
     FreeModels.GITHUB_GPT4O,
     FreeModels.GITHUB_DEEPSEEK_R1
 ).associateBy { it.modelId }
+
+val ALL_SLASH_COMMANDS: List<SlashCommand> = listOf(
+    SlashCommand(
+        command = "/web",
+        name = "Web Search",
+        description = "Live multi-query web search & synthesis",
+        targetModeId = ModeId.WEB,
+        environment = EnvironmentMode.CHAT
+    ),
+    SlashCommand(
+        command = "/research",
+        name = "Research",
+        description = "Deep investigation into codebases, topics, or docs",
+        targetModeId = ModeId.RESEARCH,
+        environment = EnvironmentMode.CHAT
+    ),
+    SlashCommand(
+        command = "/plan",
+        name = "Plan",
+        description = "Structured implementation plan without writing code",
+        targetModeId = ModeId.PLAN,
+        environment = EnvironmentMode.WORK
+    ),
+    SlashCommand(
+        command = "/goal",
+        name = "Goal",
+        description = "Long-running autonomous objective with gate tracking",
+        targetModeId = ModeId.GOAL,
+        environment = EnvironmentMode.WORK
+    ),
+    SlashCommand(
+        command = "/review",
+        name = "Review",
+        description = "Code & PR review with P0–P3 ranked findings",
+        targetModeId = ModeId.REVIEW,
+        environment = EnvironmentMode.WORK
+    ),
+    SlashCommand(
+        command = "/deploy",
+        name = "Deploy",
+        description = "Build, test, APK upload & Cloudflare / GitHub release",
+        targetModeId = ModeId.DEPLOY,
+        environment = EnvironmentMode.WORK
+    ),
+    SlashCommand(
+        command = "/code",
+        name = "Code",
+        description = "Autonomous coding, bug fixes & feature implementation",
+        targetModeId = ModeId.CODE,
+        environment = EnvironmentMode.WORK
+    ),
+    SlashCommand(
+        command = "/unleashed",
+        name = "Unleashed Mode",
+        description = "Toggle raw execution engine and prompt smuggling bypass",
+        targetModeId = ModeId.CHAT,
+        environment = EnvironmentMode.CHAT
+    ),
+    SlashCommand(
+        command = "/uncensored",
+        name = "Uncensored Mode",
+        description = "Toggle raw execution engine and prompt smuggling bypass",
+        targetModeId = ModeId.CHAT,
+        environment = EnvironmentMode.CHAT
+    )
+)

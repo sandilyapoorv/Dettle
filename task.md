@@ -83,16 +83,25 @@
 - [x] The Amygdala (SalienceEvaluator & UI interrupts)
 - [x] Motor Cortex (Procedural Tool Reflexes)
 
-## Project totals
-- 68 Kotlin source files
-- 4 phases complete
-- Docs: docs/dom_selectors.json (Gist template), AGENTS.md, .github/workflows/android-ci.yml
+## Phase 6: Unified Multi-Provider AI Architecture ✅ COMPLETE
+- [x] Expanded AIProviderType with 6 direct official APIs (OPENAI, ANTHROPIC, DEEPSEEK, MISTRAL, CEREBRAS, XAI)
+- [x] Rich AIModel metadata (ThinkingType, ModelTier, maxOutputTokens, vision, temperature flags)
+- [x] Complete model catalogs: Gemini (3.8 Flash, 3.5 Flash-Lite, 3.1 Pro), Groq, OpenAI (o1/o3/gpt-5), Anthropic (Sonnet 5/extended thinking), DeepSeek (V4/R1), Mistral, OpenRouter, SambaNova, Cerebras, xAI, Ollama
+- [x] GeminiProvider upgraded: thinkingConfig (budget/level), native tools declarations, functionCall and thought stream handling
+- [x] OpenAICompatProvider upgraded: JsonArray choices parsing fix, delta.reasoning_content streaming, reasoning_effort support
+- [x] AnthropicProvider created: native /v1/messages API with SSE streaming, thinking budget, and tool use
+- [x] AIProviderFactory wired for all provider types
+- [x] KeyPoolManager enhanced with dynamic preferModel registration
+- [x] SettingsScreen updated with horizontal LazyRow for 12 direct API providers
+- [x] docs/AI_MODELS_AND_PROVIDERS.md reference documentation created
+- [x] Unit test suite updated and passing
 
 ## Remaining (not blocking)
 - [ ] gradlew wrapper — open in Android Studio to auto-generate OR run `gradle wrapper`
 - [ ] google-services.json — required for Credential Manager OAuth to work (from Google Cloud Console)
 - [ ] MCP settings in SettingsScreen (serenaBaseUrl, context7ApiKey fields)
 - [ ] WebViewPool integration into KeyPoolManager waterfall (Track B fallback)
-- [ ] PromptCacheManager (Gemini cachedContent API, Groq prefix caching) — Phase 5
+- [ ] PromptCacheManager (Gemini cachedContent API, Groq prefix caching)
 - [ ] Overnight auto-schedule via WorkManager (alarm at keyStore.overnightScheduledTime)
 - [ ] Polish: custom app icon, onboarding screen
+

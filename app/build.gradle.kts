@@ -15,8 +15,8 @@ android {
         applicationId = "com.dettle.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 9
-        versionName = "1.0.8"
+        versionCode = 10
+        versionName = "1.0.9"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -24,6 +24,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -85,6 +86,9 @@ android {
             val releaseSigningConfig = signingConfigs.findByName("release")
             if (releaseSigningConfig?.storeFile?.exists() == true) {
                 signingConfig = releaseSigningConfig
+            } else {
+                // Local fallback: auto-sign with local debug keystore for fast, private, 120 FPS local release APKs
+                signingConfig = signingConfigs.getByName("debug")
             }
         }
     }

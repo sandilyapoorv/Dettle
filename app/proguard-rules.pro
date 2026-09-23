@@ -37,3 +37,9 @@
 # Keep data classes for serialization
 -keep class com.dettle.app.domain.model.** { *; }
 -keep class com.dettle.app.data.api.** { *; }
+
+# Annotation processing & code generation dependencies referenced in transitives
+-dontwarn javax.lang.model.**
+-dontwarn com.google.auto.value.**
+-dontwarn autovalue.shaded.**
+

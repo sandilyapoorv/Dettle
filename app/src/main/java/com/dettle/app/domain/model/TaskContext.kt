@@ -7,7 +7,8 @@ data class TaskContext(
     val repoOwner: String? = null,
     val repoName: String? = null,
     val language: String = "kotlin",
-    val taskType: TaskType = TaskType.CHAT
+    val taskType: TaskType = TaskType.CHAT,
+    val isUncensored: Boolean = false
 )
 
 enum class TaskType { CHAT, CODE_WRITE, CODE_REVIEW, DEPLOY, RESEARCH }

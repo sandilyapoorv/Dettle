@@ -490,6 +490,26 @@ class ApiKeyStore @Inject constructor(
         get() = prefs.getString("openwhispr_server_url", "http://10.0.2.2:8080/v1/audio/transcriptions") ?: "http://10.0.2.2:8080/v1/audio/transcriptions"
         set(value) = prefs.edit().putString("openwhispr_server_url", value).apply()
 
+    // ─── Unleashed Engine / Uncensored Mode ─────────────────────────────────
+
+    private val _isUnleashedFlow = kotlinx.coroutines.flow.MutableStateFlow(
+        prefs.getBoolean("is_unleashed_enabled", false)
+    )
+    val isUnleashedFlow: kotlinx.coroutines.flow.StateFlow<Boolean> = _isUnleashedFlow
+
+    var isUnleashed: Boolean
+        get() = prefs.getBoolean("is_unleashed_enabled", false)
+        set(value) {
+            prefs.edit().putBoolean("is_unleashed_enabled", value).apply()
+            _isUnleashedFlow.value = value
+        }
+
+    fun toggleUnleashed(): Boolean {
+        val newState = !isUnleashed
+        isUnleashed = newState
+        return newState
+    }
+
     companion object {
         const val DEFAULT_SELECTOR_URL =
             "https://gist.githubusercontent.com/YOUR_GITHUB_USERNAME/GIST_ID/raw/dom_selectors.json"

@@ -38,6 +38,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -50,6 +51,8 @@ import com.dettle.app.ui.theme.DettleGreen
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+private val deploymentDateFormat = SimpleDateFormat("MMM dd, HH:mm", Locale.US)
 
 @Composable
 fun DeploymentsScreen(
@@ -222,7 +225,7 @@ fun DeploymentsScreen(
                         modifier = Modifier.padding(top = 4.dp)
                     )
                 }
-                items(deployments) { deployment ->
+                items(deployments, key = { it.id }) { deployment ->
                     DeploymentCard(
                         deployment = deployment,
                         onClick = {
@@ -317,7 +320,9 @@ fun CloudflareStatusBanner(status: String, isVerifying: Boolean) {
 
 @Composable
 fun DeploymentCard(deployment: DeploymentEntity, onClick: () -> Unit) {
-    val dateStr = SimpleDateFormat("MMM dd, HH:mm", Locale.US).format(Date(deployment.createdAt))
+    val dateStr = remember(deployment.createdAt) {
+        deploymentDateFormat.format(Date(deployment.createdAt))
+    }
 
     ElevatedCard(
         modifier = Modifier

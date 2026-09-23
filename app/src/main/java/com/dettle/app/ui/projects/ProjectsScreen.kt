@@ -3,6 +3,8 @@ package com.dettle.app.ui.projects
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -268,8 +270,12 @@ fun CreateProjectSheet(onDismiss: () -> Unit, onCreate: (String, String, String)
     ) {
         Column(
             modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .imePadding()
                 .padding(horizontal = 24.dp)
-                .padding(bottom = 36.dp)
+                .padding(bottom = 24.dp)
+                .verticalScroll(rememberScrollState())
         ) {
             Text(
                 "New Project Workspace",

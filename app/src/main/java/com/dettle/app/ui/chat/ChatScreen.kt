@@ -58,6 +58,9 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.ElectricBolt
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.AccountTree
@@ -82,6 +85,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
@@ -91,6 +95,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -98,6 +103,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -105,7 +111,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import com.dettle.app.orchestrator.mode.ALL_SLASH_COMMANDS
+import com.dettle.app.orchestrator.mode.EnvironmentMode
+import com.dettle.app.orchestrator.mode.ModeId
+import com.dettle.app.ui.mode.getModeVectorIcon
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -147,9 +159,12 @@ fun ChatScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val allModes by viewModel.allModes.collectAsState()
+    val recentConversations by viewModel.recentConversations.collectAsState()
     val listState = rememberLazyListState()
     var inputText by remember { mutableStateOf("") }
     var customizingMode by remember { mutableStateOf<com.dettle.app.orchestrator.mode.AgentMode?>(null) }
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val coroutineScope = rememberCoroutineScope()
 
     // Voice Typing state
     val voiceTypingManager = remember { VoiceTypingManager(context.applicationContext) }
@@ -220,146 +235,263 @@ fun ChatScreen(
         }
     }
 
-    val isImeVisible = WindowInsets.isImeVisible
-    LaunchedEffect(uiState.messages.size, isImeVisible) {
+    val onApprove = remember(viewModel) { { viewModel.approveAction() } }
+    val onReject = remember(viewModel) { { viewModel.rejectAction() } }
+    val onPromptSelected = remember(viewModel) { { prompt: String -> viewModel.sendMessage(prompt) } }
+    val onModeTap = remember(viewModel) { { id: com.dettle.app.orchestrator.mode.ModeId -> viewModel.toggleModelock(id) } }
+    val onModeSettings = remember { { mode: com.dettle.app.orchestrator.mode.AgentMode -> customizingMode = mode } }
+
+    LaunchedEffect(uiState.messages.size) {
         if (uiState.messages.isNotEmpty()) {
             listState.animateScrollToItem(uiState.messages.size - 1)
         }
     }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            CenterAlignedTopAppBar(
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                ),
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            "Dettle",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ChatHistoryDrawer(
+                conversations = recentConversations,
+                activeConversationId = uiState.activeConversationId,
+                isUnleashed = uiState.isUnleashed,
+                onToggleUnleashed = { viewModel.toggleUnleashed() },
+                onSelectConversation = { convId ->
+                    viewModel.switchConversation(convId)
+                    coroutineScope.launch { drawerState.close() }
+                },
+                onNewChat = {
+                    viewModel.startNewChat()
+                    coroutineScope.launch { drawerState.close() }
+                },
+                onDeleteConversation = { convId ->
+                    viewModel.deleteConversation(convId)
+                },
+                onClose = {
+                    coroutineScope.launch { drawerState.close() }
+                }
+            )
+        }
+    ) {
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+            topBar = {
+                CenterAlignedTopAppBar(
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background
+                    ),
+                    navigationIcon = {
+                        IconButton(onClick = { coroutineScope.launch { drawerState.open() } }) {
+                            Icon(
+                                Icons.Filled.Menu,
+                                contentDescription = "Open Chat History",
+                                tint = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+                    },
+                    title = {
+                        EnvironmentSegmentedToggle(
+                            selected = uiState.environmentMode,
+                            onSelect = viewModel::setEnvironmentMode
                         )
+                    },
+                    actions = {
+                        IconButton(onClick = viewModel::toggleUnleashed) {
+                            Icon(
+                                Icons.Outlined.ElectricBolt,
+                                contentDescription = if (uiState.isUnleashed) "Unleashed Mode Active" else "Standard Mode",
+                                tint = if (uiState.isUnleashed) DettleGreen else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            )
+                        }
                         if (uiState.isAgentRunning && uiState.thinkingStep > 0) {
                             Surface(
                                 shape = MaterialTheme.shapes.extraSmall,
-                                color = MaterialTheme.colorScheme.primaryContainer
+                                color = if (uiState.isUnleashed) DettleGreen.copy(alpha = 0.2f) else MaterialTheme.colorScheme.primaryContainer,
+                                modifier = Modifier.padding(end = 4.dp)
                             ) {
                                 Text(
-                                    "Step ${uiState.thinkingStep}/${uiState.maxSteps}",
+                                    "${uiState.thinkingStep}/${uiState.maxSteps}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (uiState.isUnleashed) DettleGreen else MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        } else if (uiState.isAgentRunning) {
+                            CircularProgressIndicator(
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .padding(end = 4.dp),
+                                color = if (uiState.isUnleashed) DettleGreen else MaterialTheme.colorScheme.primary,
+                                strokeWidth = 2.dp
+                            )
+                        }
+                        IconButton(onClick = viewModel::startNewChat) {
+                            Icon(
+                                Icons.Outlined.Edit,
+                                contentDescription = "New chat",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                )
+            },
+            bottomBar = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    if (inputText.startsWith("/")) {
+                        SlashCommandPopup(
+                            query = inputText,
+                            currentEnvironment = uiState.environmentMode,
+                            onSelectCommand = { cmd ->
+                                viewModel.selectSlashCommand(cmd)
+                                val remainder = inputText.removePrefix(cmd.command).trim()
+                                inputText = remainder
+                            }
+                        )
+                    }
+                    ChatInputBar(
+                        value = inputText,
+                        enabled = uiState.inputEnabled,
+                        isRunning = uiState.isAgentRunning,
+                        isListening = isVoiceListening,
+                        voiceRmsFlow = voiceTypingManager.rmsDb,
+                        onValueChange = { inputText = it },
+                        onSend = {
+                            if (inputText.isNotBlank()) {
+                                val trimmed = inputText.trim()
+                                val matchingCmd = ALL_SLASH_COMMANDS.firstOrNull {
+                                    trimmed.startsWith("${it.command} ", ignoreCase = true) || trimmed.equals(it.command, ignoreCase = true)
+                                }
+                                if (matchingCmd != null) {
+                                    viewModel.selectSlashCommand(matchingCmd)
+                                    val queryText = trimmed.removePrefix(matchingCmd.command).trim()
+                                    if (queryText.isNotBlank()) {
+                                        viewModel.sendMessage(queryText)
+                                    }
+                                    inputText = ""
+                                } else {
+                                    viewModel.sendMessage(trimmed)
+                                    inputText = ""
+                                }
+                            }
+                        },
+                        onMicClick = { handleMicClick() },
+                        onStopVoiceClick = { voiceTypingManager.stopListening() },
+                        onCancelVoiceClick = {
+                            voiceTypingManager.stopListening()
+                            inputText = baseTextBeforeVoice
+                        }
+                    )
+                }
+            }
+        ) { paddingValues ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            ) {
+                // In WORK mode: show work sub-modes (Plan, Goal, Review, Deploy, Code)
+                if (uiState.environmentMode == EnvironmentMode.WORK) {
+                    val workModes = remember(allModes) {
+                        allModes.filter { it.id.environment == EnvironmentMode.WORK }
+                    }
+                    ModePillBar(
+                        modes = workModes,
+                        activeModeId = uiState.activeModeId,
+                        lockedModeId = uiState.lockedModeId,
+                        onModeTap = onModeTap,
+                        onModeSettings = onModeSettings
+                    )
+                } else if (uiState.lockedModeId != null && uiState.lockedModeId != ModeId.CHAT) {
+                    // In CHAT mode, if a tool mode was activated via /web or /research, show a compact chip
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = getModeVectorIcon(uiState.lockedModeId!!),
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    "Active: /${uiState.lockedModeId!!.name.lowercase()}",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Icon(
+                                    Icons.Outlined.Close,
+                                    contentDescription = "Unlock mode",
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier
+                                        .size(14.dp)
+                                        .clickable { viewModel.toggleModelock(uiState.lockedModeId!!) }
                                 )
                             }
                         }
                     }
-                },
-                actions = {
-                    if (uiState.isAgentRunning) {
-                        CircularProgressIndicator(
-                            modifier = Modifier
-                                .size(20.dp)
-                                .padding(end = 4.dp),
-                            color = MaterialTheme.colorScheme.primary,
-                            strokeWidth = 2.dp
+                }
+
+                // Message List
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    if (uiState.messages.isEmpty()) {
+                        item(key = "welcome_card") {
+                            WelcomeCard(onPromptSelected = onPromptSelected)
+                        }
+                    }
+
+                    items(
+                        items = uiState.messages,
+                        key = { it.id },
+                        contentType = { it.type.name }
+                    ) { message ->
+                        MessageItem(
+                            message = message,
+                            onApprove = onApprove,
+                            onReject = onReject
                         )
                     }
-                    IconButton(onClick = viewModel::clearChat) {
-                        Icon(
-                            Icons.Outlined.DeleteOutline,
-                            contentDescription = "Clear chat",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            )
-        },
-        bottomBar = {
-            ChatInputBar(
-                value = inputText,
-                enabled = uiState.inputEnabled,
-                isRunning = uiState.isAgentRunning,
-                isListening = isVoiceListening,
-                voiceRmsFlow = voiceTypingManager.rmsDb,
-                onValueChange = { inputText = it },
-                onSend = {
-                    if (inputText.isNotBlank()) {
-                        viewModel.sendMessage(inputText.trim())
-                        inputText = ""
-                    }
-                },
-                onMicClick = { handleMicClick() },
-                onStopVoiceClick = { voiceTypingManager.stopListening() },
-                onCancelVoiceClick = {
-                    voiceTypingManager.stopListening()
-                    inputText = baseTextBeforeVoice
-                }
-            )
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            // Mode Pills Row
-            ModePillBar(
-                modes = allModes,
-                activeModeId = uiState.activeModeId,
-                lockedModeId = uiState.lockedModeId,
-                onModeTap = viewModel::toggleModelock,
-                onModeSettings = { mode -> customizingMode = mode }
-            )
 
-            // Message List
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                if (uiState.messages.isEmpty()) {
-                    item {
-                        WelcomeCard(onPromptSelected = { prompt ->
-                            viewModel.sendMessage(prompt)
-                        })
+                    // GOAL mode checklist
+                    if (uiState.goalGates.isNotEmpty()) {
+                        item(key = "goal_gates_card") {
+                            val activeMode = allModes.firstOrNull { it.id == uiState.activeModeId }
+                            val gates = activeMode?.effectiveConfig?.completionGates ?: emptyList()
+                            GoalProgressCard(
+                                gates = gates,
+                                progress = uiState.goalGates,
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            )
+                        }
                     }
-                }
 
-                items(
-                    items = uiState.messages,
-                    key = { it.id },
-                    contentType = { it.type.name }
-                ) { message ->
-                    MessageItem(
-                        message = message,
-                        onApprove = viewModel::approveAction,
-                        onReject = viewModel::rejectAction
-                    )
-                }
-
-                // GOAL mode checklist
-                if (uiState.goalGates.isNotEmpty()) {
-                    item {
-                        val activeMode = allModes.firstOrNull { it.id == uiState.activeModeId }
-                        val gates = activeMode?.effectiveConfig?.completionGates ?: emptyList()
-                        GoalProgressCard(
-                            gates = gates,
-                            progress = uiState.goalGates,
-                            modifier = Modifier.padding(vertical = 4.dp)
-                        )
-                    }
-                }
-
-                // Thinking state
-                if (uiState.isAgentRunning && uiState.thinkingStep > 0) {
-                    item {
-                        ThinkingIndicator(step = uiState.thinkingStep, maxSteps = uiState.maxSteps)
+                    // Thinking state
+                    if (uiState.isAgentRunning && uiState.thinkingStep > 0) {
+                        item(key = "thinking_indicator") {
+                            ThinkingIndicator(
+                                step = uiState.thinkingStep,
+                                maxSteps = uiState.maxSteps,
+                                cognitiveStatus = uiState.cognitiveStatus,
+                                isUnleashed = uiState.isUnleashed
+                            )
+                        }
                     }
                 }
             }
@@ -564,7 +696,7 @@ fun TextMessageBubble(message: ChatMessage) {
 @Composable
 fun StreamingCursor() {
     val transition = rememberInfiniteTransition(label = "cursor")
-    val alpha by transition.animateFloat(
+    val alpha = transition.animateFloat(
         initialValue = 1f,
         targetValue = 0f,
         animationSpec = infiniteRepeatable(tween(600), RepeatMode.Reverse),
@@ -574,7 +706,7 @@ fun StreamingCursor() {
         modifier = Modifier
             .width(2.dp)
             .height(16.dp)
-            .graphicsLayer { this.alpha = alpha }
+            .graphicsLayer { this.alpha = alpha.value }
             .background(MaterialTheme.colorScheme.primary)
     )
 }
@@ -906,7 +1038,12 @@ fun PolicyWarningBadge(message: ChatMessage) {
 }
 
 @Composable
-fun ThinkingIndicator(step: Int, maxSteps: Int) {
+fun ThinkingIndicator(
+    step: Int,
+    maxSteps: Int,
+    cognitiveStatus: String? = null,
+    isUnleashed: Boolean = false
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -914,7 +1051,7 @@ fun ThinkingIndicator(step: Int, maxSteps: Int) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         val transition = rememberInfiniteTransition(label = "thinking")
-        val alpha by transition.animateFloat(
+        val alpha = transition.animateFloat(
             1f, 0.3f,
             infiniteRepeatable(tween(800), RepeatMode.Reverse), label = "pulse"
         )
@@ -924,16 +1061,23 @@ fun ThinkingIndicator(step: Int, maxSteps: Int) {
                 modifier = Modifier
                     .padding(horizontal = 2.dp)
                     .size(6.dp)
-                    .graphicsLayer { this.alpha = alpha }
+                    .graphicsLayer { this.alpha = alpha.value }
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary)
+                    .background(if (isUnleashed) DettleGreen else MaterialTheme.colorScheme.primary)
             )
         }
         Spacer(Modifier.width(8.dp))
         Text(
-            "Thinking... Step $step/$maxSteps",
+            if (!cognitiveStatus.isNullOrBlank()) {
+                "$cognitiveStatus (Step $step/$maxSteps)"
+            } else if (isUnleashed) {
+                "⚡ Unleashed Engine thinking... Step $step/$maxSteps"
+            } else {
+                "Thinking... Step $step/$maxSteps"
+            },
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = if (isUnleashed) DettleGreen else MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = if (isUnleashed) FontWeight.SemiBold else FontWeight.Normal
         )
     }
 }
@@ -1206,6 +1350,77 @@ fun VoiceWaveformBar(
                     contentDescription = "Cancel voice typing",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+    }
+}
+
+// ─── Environment Toggle ───────────────────────────────────────────────────────
+
+@Composable
+fun EnvironmentSegmentedToggle(
+    selected: EnvironmentMode,
+    onSelect: (EnvironmentMode) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier.padding(3.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                onClick = { onSelect(EnvironmentMode.CHAT) },
+                shape = RoundedCornerShape(16.dp),
+                color = if (selected == EnvironmentMode.CHAT)
+                    MaterialTheme.colorScheme.surface
+                else
+                    Color.Transparent,
+                shadowElevation = if (selected == EnvironmentMode.CHAT) 2.dp else 0.dp
+            ) {
+                Text(
+                    text = "Chat",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = if (selected == EnvironmentMode.CHAT)
+                        FontWeight.Bold
+                    else
+                        FontWeight.Medium,
+                    color = if (selected == EnvironmentMode.CHAT)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp)
+                )
+            }
+
+            Spacer(Modifier.width(2.dp))
+
+            Surface(
+                onClick = { onSelect(EnvironmentMode.WORK) },
+                shape = RoundedCornerShape(16.dp),
+                color = if (selected == EnvironmentMode.WORK)
+                    MaterialTheme.colorScheme.surface
+                else
+                    Color.Transparent,
+                shadowElevation = if (selected == EnvironmentMode.WORK) 2.dp else 0.dp
+            ) {
+                Text(
+                    text = "Work",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = if (selected == EnvironmentMode.WORK)
+                        FontWeight.Bold
+                    else
+                        FontWeight.Medium,
+                    color = if (selected == EnvironmentMode.WORK)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp)
                 )
             }
         }

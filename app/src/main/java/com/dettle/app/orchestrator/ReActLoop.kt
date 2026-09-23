@@ -23,7 +23,10 @@ import com.dettle.app.orchestrator.policy.EvaluationResult
 import com.dettle.app.orchestrator.policy.PolicyEngine
 import com.dettle.app.orchestrator.policy.SalienceEvaluator
 import com.dettle.app.orchestrator.policy.SalienceType
+import com.dettle.app.orchestrator.proxy.PromptSmuggler
 import com.dettle.app.orchestrator.reflex.ProceduralReflexEngine
+import com.dettle.app.domain.model.FreeModels
+import com.dettle.app.domain.model.ALL_KNOWN_MODELS
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -43,10 +46,11 @@ private const val MAX_STEPS = 8
  * Implements the ReAct (Reason + Act) pattern:
  * 1. THINK  → Send messages + tools to AI, receive reasoning or tool call
  * 2. ACT    → Parse tool call, validate safety constraints
- * 3. OBSERVE → Execute tool, append result to message history
- * 4. REPEAT → Until final_answer or step limit
+ * 3. OBSERVE → Tool executes, result fed back into conversation
+ * 4. REPEAT → Until final_answer tool called or MAX_STEPS reached
  *
- * Emits [LoopEvent]s that the ViewModel collects and converts to UI messages.
+ * Emits [LoopEvent]s as a [Flow] so UI can render streaming tokens,
+ * tool status badges, approvals, and completion gates live.
  */
 
 @Singleton
@@ -57,6 +61,7 @@ class ReActLoop @Inject constructor(
     private val policyEngine: PolicyEngine,
     private val salienceEvaluator: SalienceEvaluator,
     private val reflexEngine: ProceduralReflexEngine,
+    private val promptSmuggler: PromptSmuggler,
     private val json: Json
 ) {
     fun run(
@@ -65,7 +70,8 @@ class ReActLoop @Inject constructor(
         tools: List<Tool> = AgentTools.ALL,
         taskContext: TaskContext = TaskContext(),
         mode: AgentMode? = null,
-        goal: Goal? = null
+        goal: Goal? = null,
+        isUncensored: Boolean = taskContext.isUncensored
     ): Flow<LoopEvent> {
         
         // 1. Motor Cortex: Fast Reflex Intercept
@@ -82,7 +88,12 @@ class ReActLoop @Inject constructor(
                 return@flow
             }
 
-        val systemPrompt = skillInjector.buildSystemPrompt(taskContext, userPrompt = userMessage)
+        val effectiveUncensored = isUncensored || taskContext.isUncensored
+        val systemPrompt = skillInjector.buildSystemPrompt(
+            context = taskContext,
+            userPrompt = userMessage,
+            isUncensored = effectiveUncensored
+        )
         val history = conversationHistory.toMutableList()
         history.add(ApiMessage(role = "user", content = userMessage))
 
@@ -147,6 +158,25 @@ class ReActLoop @Inject constructor(
                 ?: extractTextToolCall(assistantText)
 
             if (toolCall == null) {
+                // If Unleashed/Uncensored mode is active, check if the output is a commercial safety refusal:
+                if (effectiveUncensored && isCommercialRefusal(assistantText)) {
+                    Log.d(TAG, "Uncensored Mode: Commercial filter detected refusal, deploying Prompt Smuggler proxy protocol...")
+                    emit(LoopEvent.TokenStreamed(
+                        messageId = streamingMessageId,
+                        token = "\n[Unleashed Protocol: Bypassing safety filter via Prompt Smuggler]\n",
+                        fullText = "[Unleashed Protocol: Bypassing safety filter via Prompt Smuggler]\n"
+                    ))
+                    val targetModel = mode?.modelIds?.firstOrNull()?.let { ALL_KNOWN_MODELS[it] }
+                        ?: FreeModels.GEMINI_FLASH
+                    val smuggledResult = runCatching {
+                        promptSmuggler.executeLaunderedRequest(userMessage, targetModel)
+                    }.getOrElse { "Execution error via smuggler proxy: ${it.message}" }
+
+                    emit(LoopEvent.FinalAnswer(smuggledResult))
+                    done = true
+                    break
+                }
+
                 // No tool call → AI is done
                 done = true
                 emit(LoopEvent.FinalAnswer(assistantText))
@@ -299,6 +329,20 @@ class ReActLoop @Inject constructor(
         "github_trigger_action" -> ApprovalActionType.GITHUB_TRIGGER_ACTION
         "cloudflare_publish_worker" -> ApprovalActionType.CLOUDFLARE_DEPLOY_WORKER
         else -> ApprovalActionType.CUSTOM
+    }
+
+    private fun isCommercialRefusal(text: String): Boolean {
+        if (text.length > 500) return false
+        val lower = text.lowercase()
+        return (lower.contains("cannot fulfill") ||
+                lower.contains("can't fulfill") ||
+                lower.contains("as an ai language model") ||
+                lower.contains("against safety") ||
+                lower.contains("content policy") ||
+                lower.contains("safety guidelines") ||
+                lower.contains("unable to provide") ||
+                lower.contains("policy prohibits") ||
+                lower.contains("harmful or dangerous"))
     }
 }
 

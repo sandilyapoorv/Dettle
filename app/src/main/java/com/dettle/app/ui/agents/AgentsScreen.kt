@@ -52,8 +52,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -123,7 +123,7 @@ fun AgentsScreen(
                 )
             }
 
-            items(AgentRole.values()) { role ->
+            items(AgentRole.entries, key = { it.name }) { role ->
                 val agentState = state.agentStates[role] ?: AgentState(role = role)
                 AgentRoleCard(agentState)
             }
@@ -366,7 +366,7 @@ fun AgentEventRow(event: AgentEvent) {
 @Composable
 fun PulsingDot(color: Color, modifier: Modifier = Modifier.size(10.dp)) {
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val scale by infiniteTransition.animateFloat(
+    val scale = infiniteTransition.animateFloat(
         initialValue = 0.8f,
         targetValue = 1.3f,
         animationSpec = infiniteRepeatable(
@@ -377,7 +377,11 @@ fun PulsingDot(color: Color, modifier: Modifier = Modifier.size(10.dp)) {
     )
     Box(
         modifier = modifier
-            .scale(scale)
+            .graphicsLayer {
+                val s = scale.value
+                scaleX = s
+                scaleY = s
+            }
             .clip(CircleShape)
             .background(color)
     )

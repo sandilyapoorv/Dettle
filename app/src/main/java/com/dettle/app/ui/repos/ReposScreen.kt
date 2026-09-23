@@ -47,6 +47,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -269,7 +270,7 @@ fun ReposScreen(
                         fontWeight = FontWeight.SemiBold
                     )
                 }
-                items(state.files) { file ->
+                items(state.files, key = { it.path }) { file ->
                     RepoFileRow(
                         file = file,
                         onClick = { viewModel.openFile(state.currentOwner, state.currentRepo, file.path) }
@@ -410,11 +411,11 @@ fun FileViewerScreen(file: RepoFileView, onClose: () -> Unit) {
             color = MaterialTheme.colorScheme.surface,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
-            val lines = file.content.lines()
+            val lines = remember(file.content) { file.content.lines() }
             LazyColumn(
                 modifier = Modifier.padding(12.dp)
             ) {
-                items(lines.indices.toList()) { idx ->
+                items(count = lines.size, key = { it }) { idx ->
                     Row(modifier = Modifier.padding(vertical = 1.dp)) {
                         Text(
                             text = "%4d".format(idx + 1),

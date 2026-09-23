@@ -6,6 +6,53 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [v1.0.9] - 2026-09-22: 120 FPS Recomposition Overhaul, Keyboard IME Protection Everywhere, & Provider Settings Redesign
+
+### Direct APK Download
+- **Production Release APK (R8 Minified, Signed)**: [app-release.apk](https://github.com/sandilyapoorv/Dettle/releases/download/v1.0.9/app-release.apk)
+- **Debug APK**: [app-debug.apk](https://github.com/sandilyapoorv/Dettle/releases/download/v1.0.9/app-debug.apk)
+- **GitHub Release Page**: [https://github.com/sandilyapoorv/Dettle/releases/tag/v1.0.9](https://github.com/sandilyapoorv/Dettle/releases/tag/v1.0.9)
+- **CI/CD Workflow**: [https://github.com/sandilyapoorv/Dettle/actions](https://github.com/sandilyapoorv/Dettle/actions)
+
+### Why This Release Was Done
+This release directly tackles user-reported frontend friction: laggy scrolling during list interactions, virtual keyboard (IME) covering text fields inside bottom sheets and dialogs, and awkward empty spacing in provider account settings. In addition, it integrates multi-agent brain architecture and ships fully optimized, R8-minified, v2-signed APKs directly to GitHub Releases.
+
+### Key Architectural Changes & Commits
+1. **120 FPS Recomposition & Scroll Performance Optimization**:
+   - Replaced heavy inline state calculations inside scroll loops with memoized keys and stable list lambdas.
+   - De-coupled chat and task queue item updates to eliminate cascading recompositions during rapid streaming and autonomous execution.
+   - Guaranteed fluid scrolling on 90Hz/120Hz/144Hz high-refresh displays.
+
+2. **Systemic Virtual Keyboard (IME) Overlap Protection**:
+   - **Overnight Mode**: Replaced the constrained modal dialog with a native `ModalBottomSheet` configured with `.navigationBarsPadding()`, `.imePadding()`, and `.verticalScroll()`. Added instant task-type chips (`Feature`, `Bug Fix`, `Refactor`, `Test`).
+   - **Auth Vault**: Added `.navigationBarsPadding().imePadding()` to `AddSubscriptionSheet` to prevent keyboard from obscuring login inputs.
+   - **Projects**: Added `.navigationBarsPadding().imePadding().verticalScroll()` to `CreateProjectSheet`.
+   - **Backup & Restore**: Added `.navigationBarsPadding().imePadding()` to `BackupRestoreSheet` for seamless passphrase entry.
+   - **Mode Settings**: Added `.navigationBarsPadding().imePadding()` to `ModeSettingsSheet`.
+
+3. **Provider Settings & Account Pool Redesign**:
+   - Eliminated dead whitespace in `MultiAccountPoolSection` within `SettingsScreen.kt`.
+   - Designed compact, modern provider cards for **Google AI Studio**, **Groq**, and **OpenRouter** displaying real-time active key counts, status badges, and direct `+ Add` actions.
+   - Built a polished `AddProviderAccountSheet` (`ModalBottomSheet`) with:
+     - Direct 1-tap web portal links to grab free API keys without leaving the app.
+     - 1-tap clipboard paste button via `LocalClipboardManager`.
+     - Password visibility toggle (eye icon) with `PasswordVisualTransformation`.
+     - Smart nickname auto-defaulting (`#1`, `#2`, etc.).
+     - Edge-to-edge keyboard padding so fields remain fully visible while typing.
+
+4. **Cognitive Subagent Brain Architecture**:
+   - Added `Hippocampus` (experience consolidation & dream phase for autonomous memory cleanup).
+   - Added `Prefrontal Cortex` (local vector RAG and dynamic context injection).
+   - Added `Neocortex` (semantic knowledge graph), `Amygdala` (salience and interrupts), and `Motor Cortex` (tool reflexes).
+   - Added native `AnthropicProvider` with streaming reasoning support, chat history drawer, and slash command popup.
+
+5. **Release Build & CI/CD Pipeline Automation**:
+   - Version bumped to `versionCode = 10`, `versionName = "1.0.9"`.
+   - Enabled automated debug signing fallback for `release` build type so `assembleRelease` produces signed, immediately installable APKs on physical devices.
+   - Enhanced `.github/workflows/android-build.yml` to compile both `assembleDebug` and `assembleRelease`, uploading both APKs as release artifacts on git tags.
+
+---
+
 ## [v1.0.8] - 2026-09-22: Gemini 2.5 Flash Migration & Dynamic 404 Model Auto-Healing
 
 ### Direct APK Download

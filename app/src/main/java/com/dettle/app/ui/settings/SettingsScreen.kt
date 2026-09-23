@@ -19,8 +19,20 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material.icons.outlined.ContentPaste
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
@@ -80,7 +92,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.material.icons.outlined.ElectricBolt
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dettle.app.ui.theme.DettleGreen
 import com.dettle.app.ui.theme.DettleOrange
@@ -123,6 +137,79 @@ fun SettingsScreen(
             // Aggregate Mathematics & Token Metrics Card
             item {
                 AggregateMetricsCard(metrics = state.aggregateMetrics)
+            }
+
+            // Unleashed / Uncensored Engine Card
+            item {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (state.isUnleashed) DettleGreen.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    border = BorderStroke(
+                        1.dp,
+                        if (state.isUnleashed) DettleGreen.copy(alpha = 0.6f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(if (state.isUnleashed) DettleGreen.copy(alpha = 0.2f) else MaterialTheme.colorScheme.primaryContainer),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.ElectricBolt,
+                                        contentDescription = null,
+                                        tint = if (state.isUnleashed) DettleGreen else MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Column {
+                                    Text(
+                                        "Unleashed Engine",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (state.isUnleashed) DettleGreen else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        if (state.isUnleashed) "Raw Execution & Prompt Smuggling Active" else "Standard Engine (Karpathy Baseline)",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            Switch(
+                                checked = state.isUnleashed,
+                                onCheckedChange = { viewModel.setUnleashed(it) },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = DettleGreen
+                                )
+                            )
+                        }
+
+                        Text(
+                            "When enabled, removes AI apologies, boilerplate disclaimers, and moral lecturing. " +
+                            "If commercial APIs refuse a task, Prompt Smuggler automatically fragments it into sterile logic bricks, queries the API, and restores the uncensored result.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 18.sp
+                        )
+                    }
+                }
             }
 
             // Unlimited Multi-Account API Pool Section
@@ -971,6 +1058,179 @@ fun MetricItem(label: String, value: String) {
     }
 }
 
+data class ProviderMeta(
+    val type: AIProviderType,
+    val portalUrl: String,
+    val portalLabel: String,
+    val keyHint: String,
+    val badge: String,
+    val description: String
+)
+
+val PROVIDER_METAS = mapOf(
+    AIProviderType.GROQ to ProviderMeta(
+        type = AIProviderType.GROQ,
+        portalUrl = "https://console.groq.com/keys",
+        portalLabel = "console.groq.com",
+        keyHint = "gsk_...",
+        badge = "300+ tok/s Free",
+        description = "Ultra-fast inference. Free Llama 3.3 70B & Qwen 2.5 32B."
+    ),
+    AIProviderType.GEMINI to ProviderMeta(
+        type = AIProviderType.GEMINI,
+        portalUrl = "https://aistudio.google.com/app/apikey",
+        portalLabel = "aistudio.google.com",
+        keyHint = "AIzaSy...",
+        badge = "1M Tokens Free",
+        description = "Google AI Studio free tier. Massive 1M context (Gemini 2.5 Flash & Pro)."
+    ),
+    AIProviderType.OPENROUTER to ProviderMeta(
+        type = AIProviderType.OPENROUTER,
+        portalUrl = "https://openrouter.ai/keys",
+        portalLabel = "openrouter.ai/keys",
+        keyHint = "sk-or-...",
+        badge = "Multi-Model Free",
+        description = "Unified gateway to Llama 4 Maverick Free, Qwen 2.5 72B Free & DeepSeek R1."
+    ),
+    AIProviderType.SAMBANOVA to ProviderMeta(
+        type = AIProviderType.SAMBANOVA,
+        portalUrl = "https://cloud.sambanova.ai/apis",
+        portalLabel = "cloud.sambanova.ai",
+        keyHint = "sn_...",
+        badge = "Llama 405B Free",
+        description = "Full-parameter Llama 3.1 405B & 70B on SambaNova Cloud."
+    ),
+    AIProviderType.GITHUB_MODELS to ProviderMeta(
+        type = AIProviderType.GITHUB_MODELS,
+        portalUrl = "https://github.com/marketplace/models",
+        portalLabel = "github.com/marketplace/models",
+        keyHint = "ghp_...",
+        badge = "GitHub Free PAT",
+        description = "Access GPT-4o, Claude 3.5, and o1 with your GitHub Personal Access Token."
+    ),
+    AIProviderType.DEEPSEEK to ProviderMeta(
+        type = AIProviderType.DEEPSEEK,
+        portalUrl = "https://platform.deepseek.com/api_keys",
+        portalLabel = "platform.deepseek.com",
+        keyHint = "sk-...",
+        badge = "DeepSeek R1",
+        description = "DeepSeek API for cost-efficient R1 reasoning and V3 coding."
+    ),
+    AIProviderType.OPENAI to ProviderMeta(
+        type = AIProviderType.OPENAI,
+        portalUrl = "https://platform.openai.com/api-keys",
+        portalLabel = "platform.openai.com",
+        keyHint = "sk-proj-...",
+        badge = "Direct OpenAI",
+        description = "Direct OpenAI API key for GPT-4o and o3-mini."
+    ),
+    AIProviderType.ANTHROPIC to ProviderMeta(
+        type = AIProviderType.ANTHROPIC,
+        portalUrl = "https://console.anthropic.com/settings/keys",
+        portalLabel = "console.anthropic.com",
+        keyHint = "sk-ant-...",
+        badge = "Direct Claude",
+        description = "Direct Anthropic key for Claude 3.7 Sonnet & 3.5 Haiku."
+    ),
+    AIProviderType.MISTRAL to ProviderMeta(
+        type = AIProviderType.MISTRAL,
+        portalUrl = "https://console.mistral.ai/api-keys",
+        portalLabel = "console.mistral.ai",
+        keyHint = "...",
+        badge = "Codestral",
+        description = "Mistral API for Codestral and Mistral Large."
+    ),
+    AIProviderType.CEREBRAS to ProviderMeta(
+        type = AIProviderType.CEREBRAS,
+        portalUrl = "https://cloud.cerebras.ai",
+        portalLabel = "cloud.cerebras.ai",
+        keyHint = "csk-...",
+        badge = "2000 tok/s",
+        description = "Wafer-scale engine with world-record 2,000+ tokens/second."
+    ),
+    AIProviderType.XAI to ProviderMeta(
+        type = AIProviderType.XAI,
+        portalUrl = "https://console.x.ai",
+        portalLabel = "console.x.ai",
+        keyHint = "xai-...",
+        badge = "Grok 3",
+        description = "xAI API for Grok 2 and Grok 3 beta reasoning."
+    ),
+    AIProviderType.LOCAL_OLLAMA to ProviderMeta(
+        type = AIProviderType.LOCAL_OLLAMA,
+        portalUrl = "http://localhost:11434",
+        portalLabel = "localhost:11434",
+        keyHint = "ollama / none",
+        badge = "Local / Offline",
+        description = "On-device or local LAN Ollama server. No cloud required."
+    )
+)
+
+@Composable
+fun QuickProviderCard(
+    name: String,
+    badge: String,
+    count: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        onClick = onClick,
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    name,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(if (count > 0) DettleGreen else DettleOrange)
+                )
+            }
+            Text(
+                badge,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    if (count > 0) "$count active" else "Not set",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    if (count > 0) "+ Add" else "Link",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    }
+}
+
 @Composable
 fun MultiAccountPoolSection(
     accounts: List<ProviderAccount>,
@@ -978,23 +1238,52 @@ fun MultiAccountPoolSection(
     onToggleAccount: (String, Boolean) -> Unit,
     onDeleteAccount: (String) -> Unit
 ) {
-    var selectedProvider by remember { mutableStateOf(AIProviderType.GROQ) }
-    var accountLabel by remember { mutableStateOf("") }
-    var apiKeyInput by remember { mutableStateOf("") }
-    var showAddDialog by remember { mutableStateOf(false) }
+    var showAddSheet by remember { mutableStateOf(false) }
+    var sheetProvider by remember { mutableStateOf(AIProviderType.GROQ) }
 
-    val supportedProviders = listOf(
-        AIProviderType.GROQ,
-        AIProviderType.GEMINI,
-        AIProviderType.OPENROUTER,
-        AIProviderType.SAMBANOVA,
-        AIProviderType.GITHUB_MODELS
-    )
+    val groqCount = accounts.count { it.provider == AIProviderType.GROQ && it.isActive }
+    val geminiCount = accounts.count { it.provider == AIProviderType.GEMINI && it.isActive }
+    val openRouterCount = accounts.count { it.provider == AIProviderType.OPENROUTER && it.isActive }
+
+    fun openAdd(provider: AIProviderType) {
+        sheetProvider = provider
+        showAddSheet = true
+    }
 
     SettingsSection(
         title = "Unlimited Multi-Account API Pool",
         subtitle = "Add unlimited accounts/keys per provider. Automatic failover and token load-balancing."
     ) {
+        // Quick Provider Cards for the Big 3 Free Providers (Groq, Google AI Studio, OpenRouter)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            QuickProviderCard(
+                name = "Google AI",
+                badge = "1M Free",
+                count = geminiCount,
+                onClick = { openAdd(AIProviderType.GEMINI) },
+                modifier = Modifier.weight(1f)
+            )
+            QuickProviderCard(
+                name = "Groq",
+                badge = "300+ tok/s",
+                count = groqCount,
+                onClick = { openAdd(AIProviderType.GROQ) },
+                modifier = Modifier.weight(1f)
+            )
+            QuickProviderCard(
+                name = "OpenRouter",
+                badge = "Free Tier",
+                count = openRouterCount,
+                onClick = { openAdd(AIProviderType.OPENROUTER) },
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(Modifier.height(10.dp))
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -1006,35 +1295,35 @@ fun MultiAccountPoolSection(
                 fontWeight = FontWeight.SemiBold
             )
             Button(
-                onClick = { showAddDialog = true },
+                onClick = { openAdd(AIProviderType.GROQ) },
                 shape = MaterialTheme.shapes.small,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
                 Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Add Account", style = MaterialTheme.typography.labelSmall)
+                Text("Add Key", style = MaterialTheme.typography.labelSmall)
             }
         }
 
         if (accounts.isEmpty()) {
             Text(
-                "No custom accounts added yet. Tap 'Add Account' to link multiple ChatGPT, Claude, Gemini, or Groq keys.",
+                "No keys linked yet. Tap any provider above or 'Add Key' to connect your free Groq, Gemini, or OpenRouter keys.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = 8.dp)
+                modifier = Modifier.padding(vertical = 4.dp)
             )
         } else {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(top = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 accounts.forEach { acc ->
                     Surface(
                         shape = MaterialTheme.shapes.small,
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                     ) {
                         Row(
                             modifier = Modifier
@@ -1044,13 +1333,26 @@ fun MultiAccountPoolSection(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text(
+                                        acc.label,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Surface(
+                                        shape = MaterialTheme.shapes.extraSmall,
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                    ) {
+                                        Text(
+                                            acc.provider.displayName,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                        )
+                                    }
+                                }
                                 Text(
-                                    acc.label,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    "${acc.provider.displayName} • ${acc.requestsUsed} reqs • ${acc.tokensUsed} tokens",
+                                    "${acc.requestsUsed} reqs • ${acc.tokensUsed} tokens",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -1071,74 +1373,302 @@ fun MultiAccountPoolSection(
                 }
             }
         }
+    }
 
-        if (showAddDialog) {
-            ElevatedCard(
-                shape = MaterialTheme.shapes.medium,
-                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp)
+    if (showAddSheet) {
+        AddProviderAccountSheet(
+            initialProvider = sheetProvider,
+            onDismiss = { showAddSheet = false },
+            onSave = { prov, label, key ->
+                onAddAccount(prov, label, key)
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddProviderAccountSheet(
+    initialProvider: AIProviderType = AIProviderType.GROQ,
+    onDismiss: () -> Unit,
+    onSave: (AIProviderType, String, String) -> Unit
+) {
+    val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    var selectedProvider by remember { mutableStateOf(initialProvider) }
+    var apiKey by remember { mutableStateOf("") }
+    var nickname by remember { mutableStateOf("") }
+    var isKeyVisible by remember { mutableStateOf(false) }
+
+    val meta = PROVIDER_METAS[selectedProvider] ?: ProviderMeta(
+        type = selectedProvider,
+        portalUrl = "",
+        portalLabel = "",
+        keyHint = "API Key / Token",
+        badge = "API Key",
+        description = "Add credentials for ${selectedProvider.displayName}."
+    )
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        dragHandle = { BottomSheetDefaults.DragHandle() }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .imePadding()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 24.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // Header
+            Column {
+                Text(
+                    "Add Provider API Key",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    "Encrypted on-device with AES-256-GCM. Never leaves your phone.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // Core Free Providers Selector Row
+            Text(
+                "Core Free Providers",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text("Add Provider Account", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                listOf(
+                    AIProviderType.GEMINI to "Google AI Studio",
+                    AIProviderType.GROQ to "Groq",
+                    AIProviderType.OPENROUTER to "OpenRouter"
+                ).forEach { (prov, label) ->
+                    val isSelected = prov == selectedProvider
+                    Surface(
+                        onClick = { selectedProvider = prov },
+                        shape = MaterialTheme.shapes.small,
+                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = BorderStroke(
+                            1.dp,
+                            if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        ),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                label,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
+            }
 
-                    Text("Select Provider:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            // Other Providers Row
+            Text(
+                "Other Supported Providers",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val others = listOf(
+                    AIProviderType.SAMBANOVA,
+                    AIProviderType.GITHUB_MODELS,
+                    AIProviderType.DEEPSEEK,
+                    AIProviderType.OPENAI,
+                    AIProviderType.ANTHROPIC,
+                    AIProviderType.MISTRAL,
+                    AIProviderType.CEREBRAS,
+                    AIProviderType.XAI,
+                    AIProviderType.LOCAL_OLLAMA
+                )
+                items(others) { prov ->
+                    val isSelected = prov == selectedProvider
+                    Surface(
+                        onClick = { selectedProvider = prov },
+                        shape = MaterialTheme.shapes.small,
+                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                        border = BorderStroke(
+                            1.dp,
+                            if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                        )
+                    ) {
+                        Text(
+                            prov.displayName,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+
+            // Context Banner with 1-Tap Portal Link
+            Surface(
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        supportedProviders.forEach { prov ->
-                            val isSelected = prov == selectedProvider
-                            Surface(
-                                shape = MaterialTheme.shapes.extraSmall,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier.clickable { selectedProvider = prov }
+                        Surface(
+                            shape = MaterialTheme.shapes.extraSmall,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                meta.badge,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                        if (meta.portalUrl.isNotBlank()) {
+                            Row(
+                                modifier = Modifier.clickable {
+                                    try {
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(meta.portalUrl))
+                                        context.startActivity(intent)
+                                    } catch (_: Exception) {}
+                                },
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 Text(
-                                    prov.displayName,
+                                    "Get Free Key (${meta.portalLabel})",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Icon(
+                                    Icons.Outlined.OpenInNew,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(12.dp)
                                 )
                             }
                         }
                     }
-
-                    SimpleTextField(label = "Account Nickname", hint = "e.g. Work Account, Plus 2", value = accountLabel, onValueChange = { accountLabel = it })
-                    OutlinedTextField(
-                        value = apiKeyInput,
-                        onValueChange = { apiKeyInput = it },
-                        label = { Text("API Key / Token") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        shape = MaterialTheme.shapes.small
+                    Text(
+                        meta.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { showAddDialog = false }) { Text("Cancel") }
-                        Spacer(Modifier.width(8.dp))
-                        Button(
-                            onClick = {
-                                if (apiKeyInput.isNotBlank()) {
-                                    onAddAccount(selectedProvider, accountLabel, apiKeyInput)
-                                    accountLabel = ""
-                                    apiKeyInput = ""
-                                    showAddDialog = false
-                                }
-                            },
-                            enabled = apiKeyInput.isNotBlank()
-                        ) {
-                            Text("Save Key")
+                }
+            }
+
+            // API Key Input with Paste & Mask Toggle
+            OutlinedTextField(
+                value = apiKey,
+                onValueChange = { apiKey = it },
+                label = { Text("${selectedProvider.displayName} API Key") },
+                placeholder = { Text(meta.keyHint) },
+                singleLine = true,
+                visualTransformation = if (isKeyVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                trailingIcon = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = {
+                            val clip = clipboardManager.getText()?.text
+                            if (!clip.isNullOrBlank()) {
+                                apiKey = clip.trim()
+                            }
+                        }) {
+                            Icon(
+                                Icons.Outlined.ContentPaste,
+                                contentDescription = "Paste from clipboard",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        IconButton(onClick = { isKeyVisible = !isKeyVisible }) {
+                            Icon(
+                                if (isKeyVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                                contentDescription = "Toggle key visibility",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
                     }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.small
+            )
+
+            // Nickname (Compact & Optional)
+            OutlinedTextField(
+                value = nickname,
+                onValueChange = { nickname = it },
+                label = { Text("Account Nickname (Optional)") },
+                placeholder = { Text("${selectedProvider.displayName} Key") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.small
+            )
+
+            // Action Buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Cancel")
+                }
+                Button(
+                    onClick = {
+                        val key = apiKey.trim()
+                        if (key.isNotBlank()) {
+                            val finalLabel = nickname.trim().ifBlank { "${selectedProvider.displayName} Key" }
+                            onSave(selectedProvider, finalLabel, key)
+                            onDismiss()
+                        }
+                    },
+                    enabled = apiKey.isNotBlank(),
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.weight(1.5f)
+                ) {
+                    Text("Save to Pool")
                 }
             }
         }
     }
 }
+
 
 @Composable
 fun GitHubMultiAccountSection(

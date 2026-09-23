@@ -2,6 +2,7 @@ package com.dettle.app.data.api
 
 import com.dettle.app.domain.model.AIModel
 import com.dettle.app.domain.model.ApiMessage
+import com.dettle.app.domain.model.ThinkingType
 import com.dettle.app.domain.model.Tool
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -20,7 +21,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 /**
  * Google AI Studio (Gemini) provider.
  * Uses the Gemini generateContent streaming API.
- * Gemini has a different request/response format from OpenAI.
+ * Supports Gemini 3.8 Flash, 3.5 Flash-Lite, 3.1 Pro, thinkingConfig (thinking_level / thinking_budget),
+ * function calling declarations, and thought extraction.
  */
 class GeminiProvider(
     override val model: AIModel,
@@ -69,9 +71,62 @@ class GeminiProvider(
                     add(buildJsonObject { put("category", JsonPrimitive("HARM_CATEGORY_DANGEROUS_CONTENT")); put("threshold", blockNone) })
                 })
                 put("generationConfig", buildJsonObject {
-                    put("maxOutputTokens", JsonPrimitive(maxTokens))
-                    put("temperature", JsonPrimitive(0.7))
+                    put("maxOutputTokens", JsonPrimitive(maxTokens.coerceAtMost(model.maxOutputTokens)))
+                    if (model.supportsTemperature) {
+                        put("temperature", JsonPrimitive(0.7))
+                    }
+                    if (model.supportsThinking) {
+                        put("thinkingConfig", buildJsonObject {
+                            when (model.thinkingType) {
+                                ThinkingType.GEMINI_LEVEL -> {
+                                    val level = if (model.defaultThinkingLevel.isNotBlank()) model.defaultThinkingLevel else "medium"
+                                    put("thinkingLevel", JsonPrimitive(level))
+                                }
+                                ThinkingType.GEMINI_BUDGET -> {
+                                    val budget = if (model.defaultThinkingBudget > 0) model.defaultThinkingBudget else 2048
+                                    put("thinkingBudget", JsonPrimitive(budget))
+                                }
+                                else -> {}
+                            }
+                            put("includeThoughts", JsonPrimitive(true))
+                        })
+                    }
                 })
+                if (tools.isNotEmpty()) {
+                    put("tools", buildJsonArray {
+                        add(buildJsonObject {
+                            put("functionDeclarations", buildJsonArray {
+                                tools.forEach { tool ->
+                                    add(buildJsonObject {
+                                        put("name", JsonPrimitive(tool.name))
+                                        put("description", JsonPrimitive(tool.description))
+                                        put("parameters", buildJsonObject {
+                                            put("type", JsonPrimitive("OBJECT"))
+                                            put("properties", buildJsonObject {
+                                                tool.parameters.properties.forEach { (propName, propDef) ->
+                                                    put(propName, buildJsonObject {
+                                                        put("type", JsonPrimitive(propDef.type.uppercase()))
+                                                        put("description", JsonPrimitive(propDef.description))
+                                                        if (!propDef.enum.isNullOrEmpty()) {
+                                                            put("enum", buildJsonArray {
+                                                                propDef.enum.forEach { add(JsonPrimitive(it)) }
+                                                            })
+                                                        }
+                                                    })
+                                                }
+                                            })
+                                            if (tool.parameters.required.isNotEmpty()) {
+                                                put("required", buildJsonArray {
+                                                    tool.parameters.required.forEach { add(JsonPrimitive(it)) }
+                                                })
+                                            }
+                                        })
+                                    })
+                                }
+                            })
+                        })
+                    })
+                }
                 if (systemPrompt != null) {
                     put("systemInstruction", buildJsonObject {
                         put("parts", buildJsonArray {
@@ -85,16 +140,21 @@ class GeminiProvider(
 
             // Map known retired models directly to avoid unnecessary 404 roundtrips
             val primaryModel = when (model.modelId) {
-                "gemini-2.0-flash", "gemini-2.0-flash-exp", "gemini-2.0-flash-thinking-exp" -> "gemini-2.5-flash"
+                "gemini-2.0-flash", "gemini-2.0-flash-exp", "gemini-1.5-flash" -> "gemini-3.8-flash"
+                "gemini-2.0-flash-thinking-exp" -> "gemini-3.1-pro-preview"
                 else -> model.modelId
             }
 
             // Build candidate model list with prioritized fallback on 404
             val candidateModels = mutableListOf(
                 primaryModel,
+                "gemini-3.8-flash",
+                "gemini-3.5-flash-lite",
+                "gemini-3.1-pro-preview",
+                "gemini-3-flash-preview",
                 "gemini-2.5-flash",
-                "gemini-1.5-flash",
                 "gemini-2.5-pro",
+                "gemini-1.5-flash",
                 "gemini-1.5-pro"
             ).distinct().toMutableList()
 
@@ -120,7 +180,7 @@ class GeminiProvider(
                     testResp.close()
 
                     // Extract replacement model if Google suggested one:
-                    // e.g., "Please update your code to use models/gemini-2.5-flash"
+                    // e.g., "Please update your code to use models/gemini-3.8-flash"
                     val suggested = Regex("""models/([a-zA-Z0-9\.\-_]+)""").find(errorBody)?.groupValues?.getOrNull(1)
                     if (!suggested.isNullOrBlank() && !candidateModels.contains(suggested)) {
                         candidateModels.add(index + 1, suggested)
@@ -169,12 +229,13 @@ class GeminiProvider(
                 if (data.isEmpty() || data == "[DONE]") continue
 
                 try {
-                    val chunk = json.parseToJsonElement(data).let {
-                        it.toString()
+                    // Check for functionCall tool execution
+                    val toolCallJson = extractGeminiToolCall(data)
+                    if (toolCallJson != null) {
+                        emit(StreamChunk.ToolCallDetected(toolCallJson))
                     }
-                    // Extract text from Gemini's nested response format:
-                    // candidates[0].content.parts[0].text
-                    val parsed = json.parseToJsonElement(data)
+
+                    // Extract regular text and thoughts
                     val text = extractGeminiText(data)
                     if (text.isNotEmpty()) {
                         emit(StreamChunk.Token(text))
@@ -203,7 +264,6 @@ class GeminiProvider(
 
     /** Extract text from Gemini's nested SSE JSON format */
     private fun extractGeminiText(rawJson: String): String {
-        // Gemini format: {"candidates":[{"content":{"parts":[{"text":"..."}],"role":"model"},...}],...}
         return try {
             val regex = """"text"\s*:\s*"((?:[^"\\]|\\.)*)"""".toRegex()
             regex.find(rawJson)?.groupValues?.get(1)
@@ -212,6 +272,16 @@ class GeminiProvider(
                 ?.replace("\\\\", "\\")
                 ?: ""
         } catch (_: Exception) { "" }
+    }
+
+    /** Extract functionCall tool invocation if emitted by Gemini */
+    private fun extractGeminiToolCall(rawJson: String): String? {
+        return try {
+            if (rawJson.contains("\"functionCall\"")) {
+                val callRegex = """"functionCall"\s*:\s*(\{[^}]+\})""".toRegex()
+                callRegex.find(rawJson)?.groupValues?.get(1)
+            } else null
+        } catch (_: Exception) { null }
     }
 
     /** Extract prompt/completion token counts from Gemini usage metadata */

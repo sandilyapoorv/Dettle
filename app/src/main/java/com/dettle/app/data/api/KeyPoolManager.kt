@@ -73,7 +73,12 @@ class KeyPoolManager @Inject constructor(
         // Build ordered list: preferred model first, then waterfall
         val ordered = buildList {
             if (preferModel != null) {
-                states.find { it.model.modelId == preferModel.modelId }?.let { add(it) }
+                var prefState = states.find { it.model.modelId == preferModel.modelId }
+                if (prefState == null) {
+                    prefState = ProviderState(preferModel)
+                    states.add(prefState)
+                }
+                add(prefState)
             }
             addAll(states.filter { it.model.modelId != preferModel?.modelId })
         }

@@ -48,6 +48,25 @@ class AIProviderFactory @Inject constructor(
                 json = json
             )
 
+            AIProviderType.ANTHROPIC -> AnthropicProvider(
+                model = model,
+                apiKey = apiKey,
+                client = client,
+                json = json
+            )
+
+            AIProviderType.OPENAI,
+            AIProviderType.DEEPSEEK,
+            AIProviderType.MISTRAL,
+            AIProviderType.CEREBRAS,
+            AIProviderType.XAI,
+            AIProviderType.SAMBANOVA -> OpenAICompatProvider(
+                model = model,
+                apiKey = apiKey,
+                client = client,
+                json = json
+            )
+
             AIProviderType.OPENROUTER -> OpenAICompatProvider(
                 model = model,
                 apiKey = apiKey,
@@ -57,13 +76,6 @@ class AIProviderFactory @Inject constructor(
                     "HTTP-Referer" to "https://dettle.app",
                     "X-Title" to "Dettle"
                 )
-            )
-
-            AIProviderType.SAMBANOVA -> OpenAICompatProvider(
-                model = model,
-                apiKey = apiKey,
-                client = client,
-                json = json
             )
 
             AIProviderType.GITHUB_MODELS -> OpenAICompatProvider(
@@ -85,4 +97,10 @@ class AIProviderFactory @Inject constructor(
 
     /** Gemini Flash — used for heavy coding tasks */
     fun createGeminiFlash(): AIProvider? = create(FreeModels.GEMINI_FLASH)
+
+    /** Gemini Flash-Lite — used for ultra low latency turns */
+    fun createGeminiFlashLite(): AIProvider? = create(FreeModels.GEMINI_3_5_FLASH_LITE)
+
+    /** Gemini Pro — used for deep reasoning */
+    fun createGeminiPro(): AIProvider? = create(FreeModels.GEMINI_3_1_PRO)
 }

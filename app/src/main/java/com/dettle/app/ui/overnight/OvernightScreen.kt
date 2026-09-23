@@ -18,11 +18,20 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AutoAwesome
@@ -183,7 +192,7 @@ fun OvernightScreen(
                     }
                 }
 
-                items(state.tasks) { task ->
+                items(state.tasks, key = { it.id }) { task ->
                     TaskQueueCard(
                         task = task,
                         isCurrentTask = state.loopState.currentTask?.id == task.id,
@@ -205,11 +214,23 @@ fun OvernightScreen(
                     )
                 }
                 item {
-                    val logState = rememberLazyListState()
-                    val logs = state.loopState.log.takeLast(40)
-
-                    LaunchedEffect(logs.size) {
-                        logState.animateScrollToItem(logs.size.coerceAtLeast(1) - 1)
+                    val logs = remember(state.loopState.log) {
+                        state.loopState.log.takeLast(40).map { entry ->
+                            val cleanMsg = entry.message
+                                .replace("✅", "")
+                                .replace("❌", "")
+                                .replace("⚠️", "")
+                                .replace("▶", "")
+                                .replace("🌅", "")
+                                .trim()
+                            val colorType = when {
+                                entry.message.contains("succeeded", ignoreCase = true) || entry.message.contains("complete", ignoreCase = true) -> 1
+                                entry.message.contains("failed", ignoreCase = true) || entry.message.contains("error", ignoreCase = true) -> 2
+                                entry.message.contains("warning", ignoreCase = true) -> 3
+                                else -> 0
+                            }
+                            cleanMsg to colorType
+                        }
                     }
 
                     Surface(
@@ -222,23 +243,16 @@ fun OvernightScreen(
                             modifier = Modifier.padding(14.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            logs.forEach { entry ->
-                                val cleanMsg = entry.message
-                                    .replace("✅", "")
-                                    .replace("❌", "")
-                                    .replace("⚠️", "")
-                                    .replace("▶", "")
-                                    .replace("🌅", "")
-                                    .trim()
+                            logs.forEach { (cleanMsg, colorType) ->
                                 Text(
                                     "> $cleanMsg",
                                     style = MaterialTheme.typography.bodySmall.copy(
                                         fontFamily = FontFamily.Monospace
                                     ),
-                                    color = when {
-                                        entry.message.contains("succeeded", ignoreCase = true) || entry.message.contains("complete", ignoreCase = true) -> DettleGreen
-                                        entry.message.contains("failed", ignoreCase = true) || entry.message.contains("error", ignoreCase = true) -> MaterialTheme.colorScheme.error
-                                        entry.message.contains("warning", ignoreCase = true) -> DettleOrange
+                                    color = when (colorType) {
+                                        1 -> DettleGreen
+                                        2 -> MaterialTheme.colorScheme.error
+                                        3 -> DettleOrange
                                         else -> MaterialTheme.colorScheme.onSurfaceVariant
                                     }
                                 )
@@ -508,6 +522,7 @@ fun EmptyQueueCard() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddTaskSheet(
     state: AddTaskState,
@@ -519,75 +534,118 @@ fun AddTaskSheet(
     onAdd: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    Surface(
-        modifier = Modifier
-            .fillMaxSize()
-            .clickable(onClick = onDismiss),
-        color = Color.Black.copy(alpha = 0.5f)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.BottomCenter
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .imePadding()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 24.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(enabled = false) {},
-                shape = MaterialTheme.shapes.large,
-                color = MaterialTheme.colorScheme.surface
+            Text(
+                "Add Overnight Task",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Text(
+                "Queue an autonomous task for overnight execution.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            OutlinedTextField(
+                value = state.title,
+                onValueChange = onTitleChange,
+                label = { Text("Task Title") },
+                placeholder = { Text("e.g. Implement user profile screen") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.small
+            )
+
+            OutlinedTextField(
+                value = state.description,
+                onValueChange = onDescChange,
+                label = { Text("Description & Constraints") },
+                placeholder = { Text("Details, requirements, or acceptance criteria...") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.small,
+                maxLines = 4
+            )
+
+            // Task Type Chips
+            Text(
+                "Task Type",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    Text(
-                        "Add Overnight Task",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-
-                    OutlinedTextField(
-                        value = state.title,
-                        onValueChange = onTitleChange,
-                        label = { Text("Task Title") },
-                        placeholder = { Text("e.g. Implement auth flow") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = MaterialTheme.shapes.small
-                    )
-
-                    OutlinedTextField(
-                        value = state.description,
-                        onValueChange = onDescChange,
-                        label = { Text("Description") },
-                        placeholder = { Text("Details or constraints") },
-                        modifier = Modifier.fillMaxWidth(),
+                listOf(
+                    OvernightTaskType.CODE_FEATURE to "Feature",
+                    OvernightTaskType.CODE_FIX to "Bug Fix",
+                    OvernightTaskType.CODE_REFACTOR to "Refactor",
+                    OvernightTaskType.WRITE_TESTS to "Test"
+                ).forEach { (type, label) ->
+                    val isSelected = state.type == type
+                    Surface(
+                        onClick = { onTypeChange(type) },
                         shape = MaterialTheme.shapes.small,
-                        maxLines = 3
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = BorderStroke(
+                            1.dp,
+                            if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
                     ) {
-                        TextButton(
-                            onClick = onDismiss,
-                            shape = MaterialTheme.shapes.small,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Cancel")
-                        }
-                        Button(
-                            onClick = onAdd,
-                            enabled = state.title.isNotBlank(),
-                            shape = MaterialTheme.shapes.small,
-                            modifier = Modifier.weight(1.5f)
-                        ) {
-                            Text("Add Task")
-                        }
+                        Text(
+                            label,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
                     }
+                }
+            }
+
+            Spacer(Modifier.height(4.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Cancel")
+                }
+                Button(
+                    onClick = onAdd,
+                    enabled = state.title.isNotBlank(),
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.weight(1.5f)
+                ) {
+                    Text("Add to Queue")
                 }
             }
         }
     }
 }
+

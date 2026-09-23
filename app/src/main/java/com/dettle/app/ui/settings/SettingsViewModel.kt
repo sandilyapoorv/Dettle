@@ -93,8 +93,15 @@ class SettingsViewModel @Inject constructor(
             driveUserEmail = keyStore.driveUserEmail ?: "",
             // Voice Typing
             voiceTypingEngine = keyStore.voiceTypingEngine,
-            openWhisprUrl = keyStore.openWhisprServerUrl
+            openWhisprUrl = keyStore.openWhisprServerUrl,
+            // Unleashed / Uncensored Engine
+            isUnleashed = keyStore.isUnleashed
         )
+    }
+
+    fun setUnleashed(enabled: Boolean) {
+        keyStore.isUnleashed = enabled
+        state = state.copy(isUnleashed = enabled)
     }
 
     // ─── Multi-Account API Pool Actions ───────────────────────────────────
@@ -259,5 +266,7 @@ data class SettingsState(
     val driveUserEmail: String = "",
     // Voice Typing (OpenWhispr)
     val voiceTypingEngine: String = "ON_DEVICE_DSP",
-    val openWhisprUrl: String = "http://10.0.2.2:8080/v1/audio/transcriptions"
+    val openWhisprUrl: String = "http://10.0.2.2:8080/v1/audio/transcriptions",
+    // Unleashed Engine
+    val isUnleashed: Boolean = false
 )
