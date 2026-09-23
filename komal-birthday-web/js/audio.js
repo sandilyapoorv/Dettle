@@ -179,25 +179,24 @@ const AudioEngine = (() => {
 
   function startBgm() {
     init();
-    if (isPlayingBgm) return;
+    if (isPlayingBgm) return Promise.resolve();
     isPlayingBgm = true;
 
     // Try HTML5 audio first (e.g. if i-wanna-be-yours.mp3 exists or was uploaded)
     if (bgmAudioEl && bgmAudioEl.src && !bgmAudioEl.src.endsWith('/')) {
       const playPromise = bgmAudioEl.play();
       if (playPromise !== undefined) {
-        playPromise
+        return playPromise
           .then(() => {
             usingCustomAudio = true;
             updateUi();
           })
-          .catch(() => {
-            // HTML5 audio blocked or file missing -> use synthesized IWBY
-            usingCustomAudio = false;
-            scheduleIwbyLoop();
+          .catch((err) => {
+            console.warn('Autoplay restricted by browser, waiting for first interaction', err);
+            isPlayingBgm = false;
             updateUi();
+            throw err;
           });
-        return;
       }
     }
 
@@ -205,6 +204,7 @@ const AudioEngine = (() => {
     usingCustomAudio = false;
     scheduleIwbyLoop();
     updateUi();
+    return Promise.resolve();
   }
 
   function stopBgm() {
@@ -359,12 +359,24 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Auto-init audio context on first user tap/click
-  const unlockAudio = () => {
+  // Auto-start music as soon as website is opened
+  const autoPlaySound = () => {
     AudioEngine.init();
-    document.removeEventListener('click', unlockAudio);
-    document.removeEventListener('touchstart', unlockAudio);
+    AudioEngine.startBgm().catch(() => {
+      // Browser autoplay policy blocked raw unprompted audio -> start on very first touch/click
+      const startOnInteraction = () => {
+        AudioEngine.startBgm();
+        ['pointerdown', 'touchstart', 'touchend', 'click', 'scroll', 'keydown'].forEach(ev => {
+          document.removeEventListener(ev, startOnInteraction);
+        });
+      };
+      ['pointerdown', 'touchstart', 'touchend', 'click', 'scroll', 'keydown'].forEach(ev => {
+        document.addEventListener(ev, startOnInteraction, { once: true, passive: true });
+      });
+    });
   };
-  document.addEventListener('click', unlockAudio, { once: true });
-  document.addEventListener('touchstart', unlockAudio, { once: true });
+
+  // Attempt immediately on load
+  autoPlaySound();
+  window.addEventListener('load', autoPlaySound, { once: true });
 });
