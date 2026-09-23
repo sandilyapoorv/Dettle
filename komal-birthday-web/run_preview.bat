@@ -1,8 +1,11 @@
 @echo off
-title Opening Komal's Birthday Surprise Web Experience...
+title Komal's Birthday Surprise Web Experience
 echo ========================================================
 echo   Happy Birthday Komal! 🌸✨
-echo   Launching the interactive birthday surprise in your browser...
+echo   Starting local server at http://localhost:8080/ ...
 echo ========================================================
-start "" "%~dp0index.html"
-exit
+powershell -ExecutionPolicy Bypass -File "%~dp0serve.ps1"
+if errorlevel 1 (
+    echo Starting direct browser preview...
+    start "" "%~dp0index.html"
+)
