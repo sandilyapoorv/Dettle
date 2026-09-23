@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Happy Birthday Komal! 🌸✨</title>
+  <meta name="description" content="A magical, interactive birthday surprise website made with love for Komal.">
+  <meta name="theme-color" content="#FFE4E1">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Comfortaa:wght@400;600;700&family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Ambient Particle Canvas for Sparkles and Hearts -->
+  <canvas id="ambient-canvas"></canvas>
+  <canvas id="confetti-canvas"></canvas>
+
+  <!-- App Header & Navigation Bar -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="recipient-tag">
+        <span class="sparkle-icon">✨</span>
+        <span class="tag-text">For My Komal</span>
+        <span class="heart-pulse">💖</span>
+      </div>
+    </div>
+
+    <!-- Scene Progress Indicator -->
+    <nav class="scene-stepper" aria-label="Progress">
+      <button class="step-dot active" data-scene="1" title="Surprise Gate"><span class="step-num">1</span></button>
+      <div class="step-line"></div>
+      <button class="step-dot" data-scene="2" title="Balloons"><span class="step-num">2</span></button>
+      <div class="step-line"></div>
+      <button class="step-dot" data-scene="3" title="Birthday Cake"><span class="step-num">3</span></button>
+      <div class="step-line"></div>
+      <button class="step-dot" data-scene="4" title="Love Letter"><span class="step-num">4</span></button>
+      <div class="step-line"></div>
+      <button class="step-dot" data-scene="5" title="Gift Box"><span class="step-num">5</span></button>
+    </nav>
+
+    <div class="header-right">
+      <!-- Music Control: Arctic Monkeys - I Wanna Be Yours -->
+      <button id="music-btn" class="icon-btn music-track-btn" title="Arctic Monkeys - I Wanna Be Yours" aria-label="Music Toggle">
+        <span class="music-icon">🎵</span>
+        <span class="music-title">I Wanna Be Yours</span>
+        <span class="sound-wave">
+          <span class="bar"></span>
+          <span class="bar"></span>
+          <span class="bar"></span>
+        </span>
+      </button>
+
+      <!-- Personalize / Add Photos Drawer Trigger -->
+      <button id="open-settings-btn" class="icon-btn settings-btn" title="Personalize Photos & Letter" aria-label="Settings">
+        <span>⚙️</span>
+      </button>
+    </div>
+    <!-- Hidden HTML5 Audio Element for custom MP3 -->
+    <audio id="bgm-audio" loop preload="auto" src="audio/i-wanna-be-yours.mp3"></audio>
+  </header>
+
+  <!-- Main Tablet Container -->
+  <main class="viewport-stage">
+    
+    <!-- ==================== SCENE 1: THE SURPRISE GATE ==================== -->
+    <section id="scene-1" class="scene active">
+      <div class="scene-content gate-container">
+        <div class="scene-badge">Special Birthday Delivery 💌</div>
+        <h1 class="main-title">Happy Birthday, <span class="highlight-name name-target">Komal</span>! 🌸</h1>
+        <p class="subtitle">A little magical world created just for you to celebrate your special day.</p>
+
+        <!-- 3D Wax-Sealed Envelope -->
+        <div class="envelope-wrapper" id="envelope-trigger" role="button" tabindex="0" aria-label="Open Birthday Envelope">
+          <div class="envelope-glow"></div>
+          <div class="envelope">
+            <div class="envelope-back"></div>
+            <div class="envelope-letter">
+              <div class="mini-letter-content">
+                <span class="mini-heart">🍓</span>
+                <h3>To the sweetest girl in the universe...</h3>
+                <p>Today is all about YOU! ✨</p>
+              </div>
+            </div>
+            <div class="envelope-front"></div>
+            <div class="envelope-flap"></div>
+            <div class="wax-seal">
+              <span class="seal-letter">K</span>
+              <span class="seal-sparkle">💖</span>
+            </div>
+          </div>
+          <div class="tap-hint">
+            <span class="hand-icon">👆</span>
+            <span>Tap the envelope to unseal your surprise</span>
+          </div>
+        </div>
+
+        <button class="btn btn-primary start-journey-btn" id="start-btn">
+          <span>Unwrap Your Surprise</span>
+          <span class="btn-arrow">✨</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ==================== SCENE 2: BALLOON POP EXTRAVAGANZA ==================== -->
+    <section id="scene-2" class="scene">
+      <div class="scene-content balloons-stage">
+        <div class="scene-badge">Mini Game • Tap & Pop 🎈</div>
+        <h2 class="scene-heading">Pop Every Balloon, <span class="name-target">Komal</span>!</h2>
+        <p class="scene-subheading">Each floating balloon holds a sweet reason why you are so special.</p>
+
+        <div class="balloon-counter-badge">
+          <span>Balloons Popped: </span>
+          <strong id="popped-count">0</strong> / <strong>6</strong>
+          <button class="pill-btn mini-pop-btn" id="pop-all-btn" style="margin-left: 10px; padding: 3px 12px; font-size: 0.78rem;" title="Pop all balloons at once">
+            <span>✨ Pop All</span>
+          </button>
+        </div>
+
+        <!-- Floating Balloons Playground -->
+        <div class="balloons-arena" id="balloons-arena">
+          <!-- Injected via JavaScript with pastel colors -->
+        </div>
+
+        <!-- Compliment Popup Card -->
+        <div class="compliment-card" id="compliment-display">
+          <span class="quote-icon">🌸</span>
+          <p id="compliment-text">Tap any balloon above to discover what's inside!</p>
+        </div>
+
+        <div class="scene-actions">
+          <button class="btn btn-secondary nav-btn" data-target="1">
+            <span>← Back</span>
+          </button>
+          <button class="btn btn-primary nav-btn disabled" id="balloons-next-btn" data-target="3">
+            <span>Make a Birthday Wish 🎂</span>
+            <span class="btn-arrow">➔</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== SCENE 3: CAKE & CANDLE RITUAL ==================== -->
+    <section id="scene-3" class="scene">
+      <div class="scene-content cake-stage">
+        <div class="scene-badge">The Birthday Ritual 🎂</div>
+        <h2 class="scene-heading">Make a Wish, <span class="name-target">Komal</span>!</h2>
+        <p class="scene-subheading" id="blow-instruction">
+          Close your eyes, make your deepest wish, and <strong>blow gently into your mic</strong> or <strong>tap each candle flame</strong>!
+        </p>
+
+        <!-- Mic Access Button / Status -->
+        <div class="mic-status-bar">
+          <button id="enable-mic-btn" class="pill-btn">
+            <span>🎙️ Enable Mic to Blow Out Candles</span>
+          </button>
+          <span id="mic-feedback" class="mic-meter"></span>
+        </div>
+
+        <!-- 3D Birthday Cake Container -->
+        <div class="cake-container" id="cake-interactive">
+          <div class="cake-topper">
+            <span class="topper-text">Happy Birthday Komal 💕</span>
+          </div>
+
+          <!-- Candles Container -->
+          <div class="candles-row" id="candles-row">
+            <div class="candle" data-candle="1">
+              <div class="flame-wrapper">
+                <div class="flame"></div>
+                <div class="flame-glow"></div>
+                <div class="smoke"></div>
+              </div>
+              <div class="wick"></div>
+              <div class="candle-stick candle-pink"></div>
+            </div>
+            <div class="candle center-candle" data-candle="2">
+              <div class="flame-wrapper">
+                <div class="flame"></div>
+                <div class="flame-glow"></div>
+                <div class="smoke"></div>
+              </div>
+              <div class="wick"></div>
+              <div class="candle-stick candle-yellow"></div>
+            </div>
+            <div class="candle" data-candle="3">
+              <div class="flame-wrapper">
+                <div class="flame"></div>
+                <div class="flame-glow"></div>
+                <div class="smoke"></div>
+              </div>
+              <div class="wick"></div>
+              <div class="candle-stick candle-mint"></div>
+            </div>
+          </div>
+
+          <!-- Multi-tier Cake -->
+          <div class="cake-tiers">
+            <!-- Top Tier -->
+            <div class="cake-tier tier-top">
+              <div class="frosting-layer">
+                <span class="strawberry">🍓</span>
+                <span class="strawberry">🍓</span>
+                <span class="strawberry">🍓</span>
+              </div>
+              <div class="cake-body">
+                <div class="cream-drips"></div>
+                <div class="sprinkles"></div>
+              </div>
+            </div>
+
+            <!-- Bottom Tier -->
+            <div class="cake-tier tier-bottom">
+              <div class="frosting-layer">
+                <span class="macaron">🌸</span>
+                <span class="macaron">💖</span>
+                <span class="macaron">🌸</span>
+              </div>
+              <div class="cake-body">
+                <div class="cream-drips"></div>
+                <div class="sprinkles"></div>
+              </div>
+            </div>
+
+            <!-- Cake Plate Stand -->
+            <div class="cake-plate"></div>
+          </div>
+        </div>
+
+        <!-- Post-Blow Wish Revealed Message -->
+        <div class="wish-success-card" id="wish-success">
+          <div class="sparkle-badge">🎉 May all your wishes come true! 🎉</div>
+          <p>Your smile is the sweetest celebration in the world.</p>
+        </div>
+
+        <div class="scene-actions">
+          <button class="btn btn-secondary nav-btn" data-target="2">
+            <span>← Back</span>
+          </button>
+          <button class="btn btn-primary nav-btn disabled" id="cake-next-btn" data-target="4">
+            <span>Open Your Love Letter 💌</span>
+            <span class="btn-arrow">➔</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== SCENE 4: LOVE LETTER & POLAROIDS ==================== -->
+    <section id="scene-4" class="scene">
+      <div class="scene-content letter-stage">
+        <div class="scene-badge">From The Bottom Of My Heart 💌</div>
+        
+        <!-- Two-column Tablet Layout -->
+        <div class="letter-polaroids-grid">
+          
+          <!-- Column 1: The Stationery Love Letter -->
+          <div class="letter-column">
+            <div class="stationery-card">
+              <div class="stationery-header">
+                <div class="stationery-date" id="letter-date">September 23, 2026 • For Komal</div>
+                <div class="stationery-seal">🌸</div>
+              </div>
+              <h2 class="letter-salutation">My Dearest <span class="name-target">Komal</span>,</h2>
+              <div class="letter-body" id="letter-content-display">
+                <p>Happy Birthday to the girl who walked into my life and made everything brighter, gentler, and infinitely more beautiful.</p>
+                <p>Every time you laugh, my whole day lights up. Your kindness, your sweet stubbornness, the way your eyes sparkle when you're happy — there are a million little things about you that I fall in love with over and over again.</p>
+                <p>I hope today showers you with all the warmth, joy, and peace you so effortlessly give to everyone around you. You deserve the entire universe and every sweet dream your heart is holding.</p>
+                <p class="letter-closing">Always yours,<br><em id="sender-display" class="sender-name">Your Favorite Person 💕</em></p>
+              </div>
+              <div class="letter-footer">
+                <span class="stationery-doodle">🎀 🍓 🍰 🌸 ✨</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Column 2: Vintage Polaroid Memories Stack -->
+          <div class="polaroids-column">
+            <div class="polaroids-shelf-header">
+              <h3>Our Favorite Moments 📷</h3>
+              <p>Swipe or tap each memory card</p>
+            </div>
+
+            <div class="polaroid-stack" id="polaroid-stack">
+              <!-- Memory 1 -->
+              <div class="polaroid-card" data-index="0" style="--rotation: -4deg;">
+                <div class="tape-strip"></div>
+                <div class="photo-frame">
+                  <img id="polaroid-img-0" src="images/photo1.jpg" alt="Little Komal">
+                </div>
+                <p class="caption" id="polaroid-cap-0">Little Komal • Born a Princess 👑</p>
+              </div>
+
+              <!-- Memory 2 -->
+              <div class="polaroid-card" data-index="1" style="--rotation: 3deg;">
+                <div class="tape-strip"></div>
+                <div class="photo-frame">
+                  <img id="polaroid-img-1" src="images/photo2.jpg" alt="Sweet Smile">
+                </div>
+                <p class="caption" id="polaroid-cap-1">That radiant smile & cute ribbons 🎀</p>
+              </div>
+
+              <!-- Memory 3 -->
+              <div class="polaroid-card" data-index="2" style="--rotation: -2deg;">
+                <div class="tape-strip"></div>
+                <div class="photo-frame">
+                  <img id="polaroid-img-2" src="images/photo3.jpg" alt="Favorite Person">
+                </div>
+                <p class="caption" id="polaroid-cap-2">My favorite person in the world 🌸</p>
+              </div>
+
+              <!-- Memory 4 -->
+              <div class="polaroid-card" data-index="3" style="--rotation: 5deg;">
+                <div class="tape-strip"></div>
+                <div class="photo-frame">
+                  <img id="polaroid-img-3" src="images/photo4.jpg" alt="Prettiest Eyes">
+                </div>
+                <p class="caption" id="polaroid-cap-3">The prettiest eyes in the universe ✨</p>
+              </div>
+            </div>
+
+            <!-- Quick Add Photos Banner -->
+            <button class="add-photos-inline-btn" id="open-uploader-shortcut">
+              <span>📷 Drop Your Real Photos Here</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="scene-actions">
+          <button class="btn btn-secondary nav-btn" data-target="3">
+            <span>← Back</span>
+          </button>
+          <button class="btn btn-primary nav-btn" data-target="5">
+            <span>One More Surprise! 🎁</span>
+            <span class="btn-arrow">➔</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== SCENE 5: MYSTERY GIFT BOX FINALE ==================== -->
+    <section id="scene-5" class="scene">
+      <div class="scene-content gift-stage">
+        <div class="scene-badge">The Final Surprise 🎁</div>
+        <h2 class="scene-heading">A Special Gift For <span class="name-target">Komal</span>!</h2>
+        <p class="scene-subheading" id="gift-instruction">Tap the golden ribbon to untie the gift box...</p>
+
+        <!-- 3D Interactive Gift Box -->
+        <div class="gift-box-wrapper" id="gift-box-trigger" role="button" tabindex="0" aria-label="Open Birthday Gift Box">
+          <div class="gift-box-glow"></div>
+          
+          <div class="gift-box" id="gift-box">
+            <!-- Box Lid -->
+            <div class="box-lid" id="box-lid">
+              <div class="lid-top"></div>
+              <div class="ribbon-bow">
+                <div class="bow-loop left"></div>
+                <div class="bow-loop right"></div>
+                <div class="bow-center"></div>
+              </div>
+              <div class="ribbon-vertical"></div>
+              <div class="ribbon-horizontal"></div>
+            </div>
+
+            <!-- Box Base -->
+            <div class="box-body">
+              <div class="ribbon-vertical-body"></div>
+              <div class="ribbon-horizontal-body"></div>
+            </div>
+          </div>
+
+          <div class="gift-tap-hint">
+            <span class="pulse-hand">👆</span>
+            <span>Tap to open!</span>
+          </div>
+        </div>
+
+        <!-- Climax Keepsake Card (Pops out of Box) -->
+        <div class="grand-finale-card hidden" id="finale-card">
+          <div class="finale-crown">👑</div>
+          <h3 class="finale-title">Happy Birthday, My Queen Komal! 💖</h3>
+          <p class="finale-quote">
+            "You are loved today, tomorrow, and every single day that follows."
+          </p>
+          <div class="finale-wishes-grid">
+            <div class="wish-item">
+              <span class="wish-emoji">🌟</span>
+              <span>Endless Happiness</span>
+            </div>
+            <div class="wish-item">
+              <span class="wish-emoji">🌸</span>
+              <span>Peace & Good Health</span>
+            </div>
+            <div class="wish-item">
+              <span class="wish-emoji">🍰</span>
+              <span>Sweetest Adventures</span>
+            </div>
+            <div class="wish-item">
+              <span class="wish-emoji">💝</span>
+              <span>Unconditional Love</span>
+            </div>
+          </div>
+          
+          <div class="finale-actions">
+            <button class="btn btn-primary" id="replay-btn">
+              <span>🔄 Replay The Magic</span>
+            </button>
+            <button class="btn btn-secondary" id="open-share-btn">
+              <span>💌 Re-read Love Letter</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="scene-actions finale-nav">
+          <button class="btn btn-secondary nav-btn" data-target="4">
+            <span>← Back to Letter</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==================== PERSONALIZATION MODAL DRAWER ==================== -->
+  <aside class="modal-overlay" id="personalize-modal" aria-hidden="true">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <div class="modal-title-row">
+          <span class="modal-icon">⚙️</span>
+          <h3>Personalize Komal's Surprise</h3>
+        </div>
+        <button class="modal-close-btn" id="close-settings-btn" aria-label="Close settings">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="modal-intro">Easily replace photos and adjust the love letter anytime. All changes are saved automatically on this device!</p>
+
+        <!-- Recipient & Sender Names -->
+        <div class="form-group">
+          <label for="input-recipient-name">Recipient Name:</label>
+          <input type="text" id="input-recipient-name" value="Komal" placeholder="e.g. Komal">
+        </div>
+
+        <div class="form-group">
+          <label for="input-sender-name">Your Sign-off / Nickname:</label>
+          <input type="text" id="input-sender-name" value="Your Favorite Person 💕" placeholder="e.g. With all my love, Ritesh">
+        </div>
+
+        <!-- Custom Love Letter Text -->
+        <div class="form-group">
+          <label for="input-letter-text">Love Letter Message:</label>
+          <textarea id="input-letter-text" rows="5" placeholder="Write your heartfelt birthday letter here..."></textarea>
+        </div>
+
+        <!-- Polaroid Photos Uploader (4 slots) -->
+        <div class="form-group">
+          <label>Memory Photos (Upload 4 Photos):</label>
+          <div class="photo-upload-grid">
+            <div class="photo-slot">
+              <span class="slot-num">Photo 1</span>
+              <label class="upload-box" for="file-photo-0">
+                <img id="preview-photo-0" src="" alt="Photo 1 Preview" class="slot-preview hidden">
+                <span class="upload-placeholder">+ Add</span>
+              </label>
+              <input type="file" id="file-photo-0" accept="image/*" class="file-input">
+              <input type="text" id="cap-photo-0" class="cap-input" placeholder="Caption 1">
+            </div>
+
+            <div class="photo-slot">
+              <span class="slot-num">Photo 2</span>
+              <label class="upload-box" for="file-photo-1">
+                <img id="preview-photo-1" src="" alt="Photo 2 Preview" class="slot-preview hidden">
+                <span class="upload-placeholder">+ Add</span>
+              </label>
+              <input type="file" id="file-photo-1" accept="image/*" class="file-input">
+              <input type="text" id="cap-photo-1" class="cap-input" placeholder="Caption 2">
+            </div>
+
+            <div class="photo-slot">
+              <span class="slot-num">Photo 3</span>
+              <label class="upload-box" for="file-photo-2">
+                <img id="preview-photo-2" src="" alt="Photo 3 Preview" class="slot-preview hidden">
+                <span class="upload-placeholder">+ Add</span>
+              </label>
+              <input type="file" id="file-photo-2" accept="image/*" class="file-input">
+              <input type="text" id="cap-photo-2" class="cap-input" placeholder="Caption 3">
+            </div>
+
+            <div class="photo-slot">
+              <span class="slot-num">Photo 4</span>
+              <label class="upload-box" for="file-photo-3">
+                <img id="preview-photo-3" src="" alt="Photo 4 Preview" class="slot-preview hidden">
+                <span class="upload-placeholder">+ Add</span>
+              </label>
+              <input type="file" id="file-photo-3" accept="image/*" class="file-input">
+              <input type="text" id="cap-photo-3" class="cap-input" placeholder="Caption 4">
+            </div>
+          </div>
+        </div>
+
+        <!-- Background Music Selector -->
+        <div class="form-group">
+          <label>Background Music:</label>
+          <div class="music-config-box">
+            <div class="music-info-row">
+              <span class="music-icon-badge">🎵</span>
+              <div>
+                <strong>Arctic Monkeys — I Wanna Be Yours</strong>
+                <p id="music-status-detail">Playing built-in romantic ambient arrangement</p>
+              </div>
+            </div>
+            <label for="music-file-input" class="pill-btn upload-audio-btn">
+              <span>📁 Upload Your Own MP3 File</span>
+            </label>
+            <input type="file" id="music-file-input" accept="audio/*" class="file-input">
+          </div>
+        </div>
+
+        <div class="modal-footer-actions">
+          <button class="btn btn-secondary" id="reset-defaults-btn">Reset to Sweet Defaults</button>
+          <button class="btn btn-primary" id="save-settings-btn">Save Changes ✨</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Canvas Confetti Library (loaded via CDN with local fallback support) -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+  <script src="js/confetti-local.js"></script>
+
+  <!-- Application Modules -->
+  <script src="js/audio.js"></script>
+  <script src="js/balloons.js"></script>
+  <script src="js/cake.js"></script>
+  <script src="js/memories.js"></script>
+  <script src="js/gift.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
