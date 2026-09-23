@@ -43,9 +43,10 @@
     </nav>
 
     <div class="header-right">
-      <!-- Music Control -->
-      <button id="music-btn" class="icon-btn" title="Toggle Romantic Melody" aria-label="Music Toggle">
+      <!-- Music Control: Arctic Monkeys - I Wanna Be Yours -->
+      <button id="music-btn" class="icon-btn music-track-btn" title="Arctic Monkeys - I Wanna Be Yours" aria-label="Music Toggle">
         <span class="music-icon">🎵</span>
+        <span class="music-title">I Wanna Be Yours</span>
         <span class="sound-wave">
           <span class="bar"></span>
           <span class="bar"></span>
@@ -58,6 +59,8 @@
         <span>⚙️</span>
       </button>
     </div>
+    <!-- Hidden HTML5 Audio Element for custom MP3 -->
+    <audio id="bgm-audio" loop preload="auto" src="audio/i-wanna-be-yours.mp3"></audio>
   </header>
 
   <!-- Main Tablet Container -->
@@ -491,6 +494,22 @@
               <input type="file" id="file-photo-3" accept="image/*" class="file-input">
               <input type="text" id="cap-photo-3" class="cap-input" placeholder="Caption 4">
             </div>
+          </div>
+        <!-- Background Music Selector -->
+        <div class="form-group">
+          <label>Background Music:</label>
+          <div class="music-config-box">
+            <div class="music-info-row">
+              <span class="music-icon-badge">🎵</span>
+              <div>
+                <strong>Arctic Monkeys — I Wanna Be Yours</strong>
+                <p id="music-status-detail">Playing built-in romantic ambient arrangement</p>
+              </div>
+            </div>
+            <label for="music-file-input" class="pill-btn upload-audio-btn">
+              <span>📁 Upload Your Own MP3 File</span>
+            </label>
+            <input type="file" id="music-file-input" accept="audio/*" class="file-input">
           </div>
         </div>
 
