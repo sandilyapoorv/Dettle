@@ -27,8 +27,17 @@ class SettingsViewModel @Inject constructor(
     private val keyStore: ApiKeyStore,
     private val keyPoolManager: KeyPoolManager,
     private val driveConnector: GoogleDriveConnector,
-    val backupManager: BackupManager
+    val backupManager: BackupManager,
+    val themeManager: com.dettle.app.ui.theme.ThemeManager
 ) : ViewModel() {
+
+    val themeConfig = themeManager.themeConfig
+
+    fun setTheme(theme: com.dettle.app.ui.theme.AppTheme) = themeManager.setTheme(theme)
+    fun setThemeMode(mode: com.dettle.app.ui.theme.ThemeMode) = themeManager.setMode(mode)
+    fun setPureOled(enabled: Boolean) = themeManager.setPureOled(enabled)
+    fun setCustomAccent(colorHex: Long?) = themeManager.setCustomAccent(colorHex)
+    fun resetTheme() = themeManager.resetToDefaults()
 
     var state by mutableStateOf(SettingsState())
         private set

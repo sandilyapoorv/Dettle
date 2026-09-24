@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Check
@@ -81,7 +82,8 @@ import com.dettle.app.ui.theme.DettleOrange
 
 @Composable
 fun AuthVaultScreen(
-    viewModel: AuthVaultViewModel = hiltViewModel()
+    viewModel: AuthVaultViewModel = hiltViewModel(),
+    onBack: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val activeAccount = uiState.activeLoginAccount
@@ -103,7 +105,8 @@ fun AuthVaultScreen(
             statuses = uiState.providerStatuses,
             onLogin = viewModel::startLogin,
             onDelete = viewModel::deleteSubscriptionAccount,
-            onAddAccount = viewModel::addSubscriptionAccount
+            onAddAccount = viewModel::addSubscriptionAccount,
+            onBack = onBack
         )
     }
 }
@@ -116,7 +119,8 @@ fun ProviderOverview(
     statuses: List<WebViewPool.PoolStatus>,
     onLogin: (WebViewAccount) -> Unit,
     onDelete: (String) -> Unit,
-    onAddAccount: (AIProviderType, String, String?, String?) -> Unit
+    onAddAccount: (AIProviderType, String, String?, String?) -> Unit,
+    onBack: () -> Unit = {}
 ) {
     var showAddSheet by remember { mutableStateOf(false) }
     var accountToDelete by remember { mutableStateOf<WebViewAccount?>(null) }
@@ -128,6 +132,15 @@ fun ProviderOverview(
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background
                 ),
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+                },
                 title = {
                     Text(
                         "Auth Vault",

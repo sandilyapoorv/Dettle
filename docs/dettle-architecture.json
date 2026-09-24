@@ -1,0 +1,279 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Dettle Autonomous Agent Architecture",
+    "output": "docs/dettle-architecture.html",
+    "quality_profile": "showcase",
+    "viewBox": [1240, 640],
+    "views": [
+      {
+        "id": "core-loop",
+        "label": "Core Execution Loop",
+        "focus": ["ui", "service", "orchestrator", "agentbus", "aiprovider"],
+        "note": "Follow user prompts through foreground dispatch to multi-role agent reasoning."
+      },
+      {
+        "id": "cognitive-memory",
+        "label": "Cognitive & Memory Layer",
+        "focus": ["orchestrator", "cognitive", "db", "keystore"],
+        "note": "Observe RAG vector recall, Hippocampus consolidation, and encrypted credential storage."
+      },
+      {
+        "id": "integrations-edge",
+        "label": "Edge & External Integrations",
+        "focus": ["agentbus", "github", "cloudflare", "drive", "webview"],
+        "note": "Inspect code commits, cloud deployments, web automation, and Drive backup."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "keystore",
+      "type": "security",
+      "label": "Auth & Keystore Vault",
+      "sublabel": "EncryptedSharedPreferences",
+      "pos": [60, 140],
+      "size": [150, 64],
+      "tag": "AES-256 GCM"
+    },
+    {
+      "id": "ui",
+      "type": "frontend",
+      "label": "Jetpack Compose UI",
+      "sublabel": "Chat, Agents & Overnight",
+      "pos": [60, 320],
+      "size": [150, 64],
+      "tag": "Material 3"
+    },
+    {
+      "id": "service",
+      "type": "backend",
+      "label": "Foreground Service",
+      "sublabel": "Worker & WakeLock Guard",
+      "pos": [290, 140],
+      "size": [150, 64]
+    },
+    {
+      "id": "orchestrator",
+      "type": "backend",
+      "label": "ReAct Orchestrator",
+      "sublabel": "ToolExecutor & Skills",
+      "pos": [290, 320],
+      "size": [150, 64],
+      "tag": "Core Loop"
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "Room Database",
+      "sublabel": "Memories, Logs & Deploys",
+      "brand": "sqlite",
+      "pos": [290, 500],
+      "size": [150, 64]
+    },
+    {
+      "id": "webview",
+      "type": "backend",
+      "label": "WebView Bridge",
+      "sublabel": "8 Headless Session Pools",
+      "pos": [520, 140],
+      "size": [150, 64]
+    },
+    {
+      "id": "agentbus",
+      "type": "messagebus",
+      "label": "Agent Fleet Bus",
+      "sublabel": "Coder & Reviewer Debate",
+      "pos": [520, 320],
+      "size": [150, 64]
+    },
+    {
+      "id": "cognitive",
+      "type": "backend",
+      "label": "Cognitive Engine",
+      "sublabel": "Hippocampus & Vector RAG",
+      "pos": [520, 500],
+      "size": [150, 64],
+      "tag": "Brain"
+    },
+    {
+      "id": "aiprovider",
+      "type": "cloud",
+      "label": "Multi-Provider AI",
+      "sublabel": "12 Direct Official APIs",
+      "pos": [760, 140],
+      "size": [150, 64],
+      "tag": "Waterfall"
+    },
+    {
+      "id": "github",
+      "type": "external",
+      "label": "GitHub Platform",
+      "sublabel": "GraphQL, PRs & CI Actions",
+      "brand": "github",
+      "pos": [760, 320],
+      "size": [150, 64]
+    },
+    {
+      "id": "cloudflare",
+      "type": "cloud",
+      "label": "Cloudflare Edge",
+      "sublabel": "Pages & Workers Deploy",
+      "brand": "cloudflare",
+      "pos": [760, 500],
+      "size": [150, 64]
+    },
+    {
+      "id": "drive",
+      "type": "external",
+      "label": "Google Drive",
+      "sublabel": "Overnight Summaries & Logs",
+      "pos": [1000, 320],
+      "size": [150, 64],
+      "tag": "OAuth 2.0"
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Android Client Runtime",
+      "wraps": ["keystore", "ui", "service", "orchestrator", "db", "webview", "agentbus", "cognitive"],
+      "pad": 20
+    },
+    {
+      "kind": "region",
+      "label": "External Cloud Services",
+      "wraps": ["aiprovider", "github", "cloudflare", "drive"],
+      "pad": 20
+    }
+  ],
+  "connections": [
+    {
+      "id": "ui-to-keystore",
+      "from": "ui",
+      "to": "keystore",
+      "label": "credentials",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "ui-to-service",
+      "from": "ui",
+      "to": "service",
+      "label": "user intent",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "service-to-orchestrator",
+      "from": "service",
+      "to": "orchestrator",
+      "label": "dispatches",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 24
+    },
+    {
+      "id": "orchestrator-to-db",
+      "from": "orchestrator",
+      "to": "db",
+      "label": "task logs",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDx": -32,
+      "labelDy": 24
+    },
+    {
+      "id": "orchestrator-to-webview",
+      "from": "orchestrator",
+      "to": "webview",
+      "label": "web session",
+      "fromSide": "top",
+      "toSide": "left"
+    },
+    {
+      "id": "orchestrator-to-agentbus",
+      "from": "orchestrator",
+      "to": "agentbus",
+      "label": "subagents",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "orchestrator-to-cognitive",
+      "from": "orchestrator",
+      "to": "cognitive",
+      "label": "context & recall",
+      "fromSide": "bottom",
+      "toSide": "left"
+    },
+    {
+      "id": "agentbus-to-aiprovider",
+      "from": "agentbus",
+      "to": "aiprovider",
+      "label": "stream tokens",
+      "variant": "emphasis",
+      "fromSide": "top",
+      "toSide": "left"
+    },
+    {
+      "id": "agentbus-to-github",
+      "from": "agentbus",
+      "to": "github",
+      "label": "tree & commit",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "agentbus-to-cloudflare",
+      "from": "agentbus",
+      "to": "cloudflare",
+      "label": "deployments",
+      "fromSide": "bottom",
+      "toSide": "left"
+    },
+    {
+      "id": "github-to-drive",
+      "from": "github",
+      "to": "drive",
+      "label": "backup archive",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "left"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Android Engine",
+      "items": [
+        "Jetpack Compose 6-screen UI with real-time streaming",
+        "AgentForegroundService with WakeLock maintains overnight autonomy",
+        "Room DB stores persistent memories, task logs, and deployments"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Orchestration & Brain",
+      "items": [
+        "ReAct loop drives multi-role Coder-Reviewer debate rounds",
+        "Cognitive Engine integrates local vector RAG and Hippocampus consolidation",
+        "Self-improving skill updates dynamically learn from execution patterns"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "AI & Cloud Integrations",
+      "items": [
+        "12 direct official API providers with key pooling and automatic fallback",
+        "WebView automation bridge maintains 8 headless provider sessions",
+        "Direct GitHub PR generation, Cloudflare edge hosting, and Google Drive backup"
+      ]
+    }
+  ]
+}

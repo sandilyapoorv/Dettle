@@ -21,7 +21,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -42,6 +44,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -64,6 +67,7 @@ import androidx.compose.material.icons.outlined.ElectricBolt
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.AccountTree
+import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material.icons.outlined.Check
@@ -71,6 +75,7 @@ import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material.icons.outlined.Construction
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.FolderCopy
 import androidx.compose.material.icons.outlined.Psychology
@@ -141,9 +146,11 @@ import com.dettle.app.audio.VoiceTypingManager
 import com.dettle.app.domain.model.ChatMessage
 import com.dettle.app.domain.model.MessageRole
 import com.dettle.app.domain.model.MessageType
+import com.dettle.app.ui.mode.AppleModePillToggle
 import com.dettle.app.ui.mode.GoalProgressCard
 import com.dettle.app.ui.mode.ModeCustomizationSheet
 import com.dettle.app.ui.mode.ModePillBar
+import com.dettle.app.ui.mode.VerticalModeToggle
 import com.dettle.app.ui.theme.DettleGreen
 import com.dettle.app.ui.theme.DettleOrange
 import com.dettle.app.ui.theme.DettleRed
@@ -154,7 +161,9 @@ import kotlinx.coroutines.isActive
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ChatScreen(
-    viewModel: ChatViewModel = hiltViewModel()
+    viewModel: ChatViewModel = hiltViewModel(),
+    onNavigateToVault: () -> Unit = {},
+    onNavigateToSettings: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
@@ -266,6 +275,14 @@ fun ChatScreen(
                 onDeleteConversation = { convId ->
                     viewModel.deleteConversation(convId)
                 },
+                onOpenVault = {
+                    coroutineScope.launch { drawerState.close() }
+                    onNavigateToVault()
+                },
+                onOpenSettings = {
+                    coroutineScope.launch { drawerState.close() }
+                    onNavigateToSettings()
+                },
                 onClose = {
                     coroutineScope.launch { drawerState.close() }
                 }
@@ -274,34 +291,39 @@ fun ChatScreen(
     ) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
             topBar = {
-                CenterAlignedTopAppBar(
-                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background
-                    ),
-                    navigationIcon = {
-                        IconButton(onClick = { coroutineScope.launch { drawerState.open() } }) {
+                Surface(
+                    color = MaterialTheme.colorScheme.background,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .statusBarsPadding()
+                            .padding(top = 2.dp, bottom = 4.dp, start = 8.dp, end = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = { coroutineScope.launch { drawerState.open() } },
+                            modifier = Modifier.size(40.dp)
+                        ) {
                             Icon(
                                 Icons.Filled.Menu,
                                 contentDescription = "Open Chat History",
                                 tint = MaterialTheme.colorScheme.onBackground
                             )
                         }
-                    },
-                    title = {
-                        EnvironmentSegmentedToggle(
+
+                        Spacer(Modifier.weight(1f))
+
+                        AppleModePillToggle(
                             selected = uiState.environmentMode,
                             onSelect = viewModel::setEnvironmentMode
                         )
-                    },
-                    actions = {
-                        IconButton(onClick = viewModel::toggleUnleashed) {
-                            Icon(
-                                Icons.Outlined.ElectricBolt,
-                                contentDescription = if (uiState.isUnleashed) "Unleashed Mode Active" else "Standard Mode",
-                                tint = if (uiState.isUnleashed) DettleGreen else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                            )
-                        }
+
+                        Spacer(Modifier.weight(1f))
+
                         if (uiState.isAgentRunning && uiState.thinkingStep > 0) {
                             Surface(
                                 shape = MaterialTheme.shapes.extraSmall,
@@ -318,13 +340,17 @@ fun ChatScreen(
                         } else if (uiState.isAgentRunning) {
                             CircularProgressIndicator(
                                 modifier = Modifier
-                                    .size(20.dp)
+                                    .size(18.dp)
                                     .padding(end = 4.dp),
                                 color = if (uiState.isUnleashed) DettleGreen else MaterialTheme.colorScheme.primary,
                                 strokeWidth = 2.dp
                             )
                         }
-                        IconButton(onClick = viewModel::startNewChat) {
+
+                        IconButton(
+                            onClick = viewModel::startNewChat,
+                            modifier = Modifier.size(40.dp)
+                        ) {
                             Icon(
                                 Icons.Outlined.Edit,
                                 contentDescription = "New chat",
@@ -332,10 +358,15 @@ fun ChatScreen(
                             )
                         }
                     }
-                )
+                }
             },
             bottomBar = {
-                Column(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .imePadding()
+                ) {
                     if (inputText.startsWith("/")) {
                         SlashCommandPopup(
                             query = inputText,
@@ -383,117 +414,207 @@ fun ChatScreen(
                 }
             }
         ) { paddingValues ->
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
             ) {
-                // In WORK mode: show work sub-modes (Plan, Goal, Review, Deploy, Code)
-                if (uiState.environmentMode == EnvironmentMode.WORK) {
-                    val workModes = remember(allModes) {
-                        allModes.filter { it.id.environment == EnvironmentMode.WORK }
-                    }
-                    ModePillBar(
-                        modes = workModes,
-                        activeModeId = uiState.activeModeId,
-                        lockedModeId = uiState.lockedModeId,
-                        onModeTap = onModeTap,
-                        onModeSettings = onModeSettings
-                    )
-                } else if (uiState.lockedModeId != null && uiState.lockedModeId != ModeId.CHAT) {
-                    // In CHAT mode, if a tool mode was activated via /web or /research, show a compact chip
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = getModeVectorIcon(uiState.lockedModeId!!),
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.size(14.dp)
+                AnimatedContent(
+                    targetState = uiState.environmentMode,
+                    transitionSpec = {
+                        if (targetState == EnvironmentMode.BUILD) {
+                            (slideInHorizontally(
+                                initialOffsetX = { (it * 0.35f).toInt() },
+                                animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
+                            ) + fadeIn(animationSpec = tween(220)))
+                                .togetherWith(
+                                    slideOutHorizontally(
+                                        targetOffsetX = { -(it * 0.35f).toInt() },
+                                        animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
+                                    ) + fadeOut(animationSpec = tween(180))
                                 )
-                                Spacer(Modifier.width(6.dp))
-                                Text(
-                                    "Active: /${uiState.lockedModeId!!.name.lowercase()}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    fontWeight = FontWeight.SemiBold
+                        } else {
+                            (slideInHorizontally(
+                                initialOffsetX = { -(it * 0.35f).toInt() },
+                                animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
+                            ) + fadeIn(animationSpec = tween(220)))
+                                .togetherWith(
+                                    slideOutHorizontally(
+                                        targetOffsetX = { (it * 0.35f).toInt() },
+                                        animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
+                                    ) + fadeOut(animationSpec = tween(180))
                                 )
-                                Spacer(Modifier.width(6.dp))
-                                Icon(
-                                    Icons.Outlined.Close,
-                                    contentDescription = "Unlock mode",
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        }
+                    },
+                    label = "ChatBuildModeTransition"
+                ) { mode ->
+                    if (mode == EnvironmentMode.CHAT) {
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            if (uiState.lockedModeId != null && uiState.lockedModeId != ModeId.CHAT) {
+                                Row(
                                     modifier = Modifier
-                                        .size(14.dp)
-                                        .clickable { viewModel.toggleModelock(uiState.lockedModeId!!) }
-                                )
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f),
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = getModeVectorIcon(uiState.lockedModeId!!),
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Spacer(Modifier.width(6.dp))
+                                            Text(
+                                                "Active: /${uiState.lockedModeId!!.name.lowercase()}",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            Spacer(Modifier.width(6.dp))
+                                            Icon(
+                                                Icons.Outlined.Close,
+                                                contentDescription = "Unlock mode",
+                                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                modifier = Modifier
+                                                    .size(14.dp)
+                                                    .clickable { viewModel.toggleModelock(uiState.lockedModeId!!) }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Message List
+                            LazyColumn(
+                                state = listState,
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(start = 20.dp, end = 68.dp, top = 8.dp, bottom = 12.dp),
+                                verticalArrangement = Arrangement.spacedBy(14.dp)
+                            ) {
+                                if (uiState.messages.isEmpty()) {
+                                    item(key = "welcome_card_chat") {
+                                        ChatWelcomeHero(onPromptSelected = onPromptSelected)
+                                    }
+                                }
+
+                                items(
+                                    items = uiState.messages,
+                                    key = { it.id },
+                                    contentType = { it.type.name }
+                                ) { message ->
+                                    MessageItem(
+                                        message = message,
+                                        onApprove = onApprove,
+                                        onReject = onReject
+                                    )
+                                }
+
+                                if (uiState.goalGates.isNotEmpty()) {
+                                    item(key = "goal_gates_card") {
+                                        val activeMode = allModes.firstOrNull { it.id == uiState.activeModeId }
+                                        val gates = activeMode?.effectiveConfig?.completionGates ?: emptyList()
+                                        GoalProgressCard(
+                                            gates = gates,
+                                            progress = uiState.goalGates,
+                                            modifier = Modifier.padding(vertical = 4.dp)
+                                        )
+                                    }
+                                }
+
+                                if (uiState.isAgentRunning && uiState.thinkingStep > 0) {
+                                    item(key = "thinking_indicator") {
+                                        ThinkingIndicator(
+                                            step = uiState.thinkingStep,
+                                            maxSteps = uiState.maxSteps,
+                                            cognitiveStatus = uiState.cognitiveStatus,
+                                            isUnleashed = uiState.isUnleashed
+                                        )
+                                    }
+                                }
                             }
                         }
-                    }
-                }
-
-                // Message List
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    if (uiState.messages.isEmpty()) {
-                        item(key = "welcome_card") {
-                            WelcomeCard(onPromptSelected = onPromptSelected)
+                    } else {
+                        // BUILD mode
+                        val workModes = remember(allModes) {
+                            allModes.filter { it.id.environment == EnvironmentMode.BUILD }
                         }
-                    }
+                        BuildWorkspaceView(
+                            hasActiveMessages = uiState.messages.isNotEmpty(),
+                            workModes = workModes,
+                            activeModeId = uiState.activeModeId,
+                            lockedModeId = uiState.lockedModeId,
+                            onModeTap = onModeTap,
+                            onModeSettings = onModeSettings,
+                            messageStreamContent = {
+                                LazyColumn(
+                                    state = listState,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(start = 20.dp, end = 68.dp, top = 8.dp, bottom = 12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                                ) {
+                                    if (uiState.messages.isEmpty()) {
+                                        item(key = "welcome_card_build") {
+                                            BuildWelcomeHero(onPromptSelected = onPromptSelected)
+                                        }
+                                    }
 
-                    items(
-                        items = uiState.messages,
-                        key = { it.id },
-                        contentType = { it.type.name }
-                    ) { message ->
-                        MessageItem(
-                            message = message,
-                            onApprove = onApprove,
-                            onReject = onReject
+                                    items(
+                                        items = uiState.messages,
+                                        key = { it.id },
+                                        contentType = { it.type.name }
+                                    ) { message ->
+                                        MessageItem(
+                                            message = message,
+                                            onApprove = onApprove,
+                                            onReject = onReject
+                                        )
+                                    }
+
+                                    if (uiState.goalGates.isNotEmpty()) {
+                                        item(key = "goal_gates_card_build") {
+                                            val activeMode = allModes.firstOrNull { it.id == uiState.activeModeId }
+                                            val gates = activeMode?.effectiveConfig?.completionGates ?: emptyList()
+                                            GoalProgressCard(
+                                                gates = gates,
+                                                progress = uiState.goalGates,
+                                                modifier = Modifier.padding(vertical = 4.dp)
+                                            )
+                                        }
+                                    }
+
+                                    if (uiState.isAgentRunning && uiState.thinkingStep > 0) {
+                                        item(key = "thinking_indicator_build") {
+                                            ThinkingIndicator(
+                                                step = uiState.thinkingStep,
+                                                maxSteps = uiState.maxSteps,
+                                                cognitiveStatus = uiState.cognitiveStatus,
+                                                isUnleashed = uiState.isUnleashed
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         )
                     }
-
-                    // GOAL mode checklist
-                    if (uiState.goalGates.isNotEmpty()) {
-                        item(key = "goal_gates_card") {
-                            val activeMode = allModes.firstOrNull { it.id == uiState.activeModeId }
-                            val gates = activeMode?.effectiveConfig?.completionGates ?: emptyList()
-                            GoalProgressCard(
-                                gates = gates,
-                                progress = uiState.goalGates,
-                                modifier = Modifier.padding(vertical = 4.dp)
-                            )
-                        }
-                    }
-
-                    // Thinking state
-                    if (uiState.isAgentRunning && uiState.thinkingStep > 0) {
-                        item(key = "thinking_indicator") {
-                            ThinkingIndicator(
-                                step = uiState.thinkingStep,
-                                maxSteps = uiState.maxSteps,
-                                cognitiveStatus = uiState.cognitiveStatus,
-                                isUnleashed = uiState.isUnleashed
-                            )
-                        }
-                    }
                 }
+
+                // Apple Design Vertical Toggle docked on the right
+                VerticalModeToggle(
+                    selected = uiState.environmentMode,
+                    onSelect = viewModel::setEnvironmentMode,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 10.dp, end = 10.dp)
+                )
             }
         }
     }
@@ -508,38 +629,40 @@ fun ChatScreen(
     }
 }
 
-// ─── Welcome Hero Card ───────────────────────────────────────────────────────
+// ─── Welcome Hero Cards ───────────────────────────────────────────────────────
 
 @Composable
 fun WelcomeCard(onPromptSelected: (String) -> Unit) {
+    ChatWelcomeHero(onPromptSelected = onPromptSelected)
+}
+
+@Composable
+fun ChatWelcomeHero(onPromptSelected: (String) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 12.dp),
+            .padding(vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                "Autonomous pair programming on your phone.",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Text(
-                "Dettle explores codebases, drafts implementation plans, runs multi-turn tool loops, and deploys directly from your device.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        Text(
+            text = "what would you like to chat about Shri",
+            style = MaterialTheme.typography.headlineSmall.copy(
+                fontSize = 24.sp,
+                lineHeight = 30.sp,
+                letterSpacing = (-0.02).sp
+            ),
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
 
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
         ) {
             Column(
-                modifier = Modifier.padding(18.dp),
+                modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Row(
@@ -553,17 +676,76 @@ fun WelcomeCard(onPromptSelected: (String) -> Unit) {
                         modifier = Modifier.size(18.dp)
                     )
                     Text(
-                        "Suggested actions",
+                        "Quick Prompts",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
 
                 listOf(
-                    Pair(Icons.Outlined.FolderCopy, "Map my GitHub repository"),
-                    Pair(Icons.Outlined.BugReport, "Fix an issue and open a pull request"),
-                    Pair(Icons.Outlined.CloudUpload, "Deploy project to Cloudflare"),
-                    Pair(Icons.Outlined.RateReview, "Review latest changes against best practices")
+                    Pair(Icons.Outlined.RateReview, "Explain this architecture and recent changes"),
+                    Pair(Icons.Outlined.BugReport, "Debug a tricky issue in the project"),
+                    Pair(Icons.Outlined.Code, "Draft a new feature or implementation plan"),
+                    Pair(Icons.Outlined.Security, "Review security rules and credentials")
+                ).forEach { (icon, text) ->
+                    QuickActionCard(icon = icon, text = text, onClick = { onPromptSelected(text) })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun BuildWelcomeHero(onPromptSelected: (String) -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text(
+            text = "what would you like to put in your wiener sir today",
+            style = MaterialTheme.typography.headlineSmall.copy(
+                fontSize = 24.sp,
+                lineHeight = 30.sp,
+                letterSpacing = (-0.02).sp
+            ),
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        Icons.Outlined.Construction,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        "Workspace Quick Actions",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                listOf(
+                    Pair(Icons.Outlined.FolderCopy, "Map repository codebase and start a project"),
+                    Pair(Icons.Outlined.Terminal, "Run autonomous task and create a PR"),
+                    Pair(Icons.Outlined.CloudUpload, "Deploy current build to Cloudflare"),
+                    Pair(Icons.Outlined.Bedtime, "Configure an overnight autonomous run")
                 ).forEach { (icon, text) ->
                     QuickActionCard(icon = icon, text = text, onClick = { onPromptSelected(text) })
                 }
@@ -576,13 +758,13 @@ fun WelcomeCard(onPromptSelected: (String) -> Unit) {
 fun QuickActionCard(icon: ImageVector, text: String, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        shape = MaterialTheme.shapes.small,
+        shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
@@ -590,13 +772,12 @@ fun QuickActionCard(icon: ImageVector, text: String, onClick: () -> Unit) {
                 icon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(18.dp)
             )
             Text(
-                text,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Medium
+                text = text,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
     }
@@ -1105,9 +1286,7 @@ fun ChatInputBar(
     onCancelVoiceClick: () -> Unit
 ) {
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .imePadding(),
+        modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 3.dp,
         border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
@@ -1365,65 +1544,9 @@ fun EnvironmentSegmentedToggle(
     onSelect: (EnvironmentMode) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+    AppleModePillToggle(
+        selected = selected,
+        onSelect = onSelect,
         modifier = modifier
-    ) {
-        Row(
-            modifier = Modifier.padding(3.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                onClick = { onSelect(EnvironmentMode.CHAT) },
-                shape = RoundedCornerShape(16.dp),
-                color = if (selected == EnvironmentMode.CHAT)
-                    MaterialTheme.colorScheme.surface
-                else
-                    Color.Transparent,
-                shadowElevation = if (selected == EnvironmentMode.CHAT) 2.dp else 0.dp
-            ) {
-                Text(
-                    text = "Chat",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = if (selected == EnvironmentMode.CHAT)
-                        FontWeight.Bold
-                    else
-                        FontWeight.Medium,
-                    color = if (selected == EnvironmentMode.CHAT)
-                        MaterialTheme.colorScheme.primary
-                    else
-                        MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp)
-                )
-            }
-
-            Spacer(Modifier.width(2.dp))
-
-            Surface(
-                onClick = { onSelect(EnvironmentMode.WORK) },
-                shape = RoundedCornerShape(16.dp),
-                color = if (selected == EnvironmentMode.WORK)
-                    MaterialTheme.colorScheme.surface
-                else
-                    Color.Transparent,
-                shadowElevation = if (selected == EnvironmentMode.WORK) 2.dp else 0.dp
-            ) {
-                Text(
-                    text = "Work",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = if (selected == EnvironmentMode.WORK)
-                        FontWeight.Bold
-                    else
-                        FontWeight.Medium,
-                    color = if (selected == EnvironmentMode.WORK)
-                        MaterialTheme.colorScheme.primary
-                    else
-                        MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp)
-                )
-            }
-        }
-    }
+    )
 }

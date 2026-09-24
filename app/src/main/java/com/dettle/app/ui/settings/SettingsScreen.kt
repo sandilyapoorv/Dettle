@@ -92,23 +92,58 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.ElectricBolt
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.RestartAlt
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.dettle.app.ui.theme.AppTheme
 import com.dettle.app.ui.theme.DettleGreen
 import com.dettle.app.ui.theme.DettleOrange
+import com.dettle.app.ui.theme.ThemeConfig
+import com.dettle.app.ui.theme.ThemeMode
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    viewModel: SettingsViewModel = hiltViewModel()
+    viewModel: SettingsViewModel = hiltViewModel(),
+    onBack: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val state = viewModel.state
+    val themeConfig by viewModel.themeConfig.collectAsState(initial = ThemeConfig())
     var showBackupSheet by remember { mutableStateOf(false) }
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            CenterAlignedTopAppBar(
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                ),
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+                },
+                title = {
+                    Text(
+                        "Settings",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            )
+        }
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
@@ -117,21 +152,16 @@ fun SettingsScreen(
             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Header
+            // Theme & Appearance Customization Card
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        "Settings",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Text(
-                        "Configure encrypted on-device API credentials, providers, and storage.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                ThemeAppearanceCard(
+                    config = themeConfig,
+                    onSelectTheme = viewModel::setTheme,
+                    onSelectMode = viewModel::setThemeMode,
+                    onToggleOled = viewModel::setPureOled,
+                    onSelectAccent = viewModel::setCustomAccent,
+                    onReset = viewModel::resetTheme
+                )
             }
 
             // Aggregate Mathematics & Token Metrics Card
@@ -1823,4 +1853,285 @@ fun GitHubMultiAccountSection(
         }
     }
 }
+
+@Composable
+fun ThemeAppearanceCard(
+    config: ThemeConfig,
+    onSelectTheme: (AppTheme) -> Unit,
+    onSelectMode: (ThemeMode) -> Unit,
+    onToggleOled: (Boolean) -> Unit,
+    onSelectAccent: (Long?) -> Unit,
+    onReset: () -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Outlined.Palette,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            "Appearance & Themes",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            "Choose an aesthetic and customize accents",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                IconButton(onClick = onReset, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        Icons.Outlined.RestartAlt,
+                        contentDescription = "Reset theme",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            // Theme selector horizontal list
+            Text(
+                "THEMES (${AppTheme.values().size})",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(AppTheme.values().toList(), key = { it.id }) { theme ->
+                    val isSelected = config.theme == theme
+                    Surface(
+                        onClick = { onSelectTheme(theme) },
+                        shape = RoundedCornerShape(14.dp),
+                        color = theme.previewBackground,
+                        border = BorderStroke(
+                            if (isSelected) 2.dp else 1.dp,
+                            if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+                        ),
+                        modifier = Modifier
+                            .width(135.dp)
+                            .height(86.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(10.dp),
+                            verticalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(14.dp)
+                                        .clip(CircleShape)
+                                        .background(theme.previewPrimary)
+                                )
+                                if (isSelected) {
+                                    Icon(
+                                        Icons.Outlined.CheckCircle,
+                                        contentDescription = "Selected",
+                                        tint = theme.previewPrimary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                            Column {
+                                Text(
+                                    theme.displayName,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (theme == AppTheme.APPLE_LIGHT) Color(0xFF1D1D1F) else Color(0xFFF3F4F6),
+                                    maxLines = 1
+                                )
+                                Text(
+                                    theme.description,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                                    color = if (theme == AppTheme.APPLE_LIGHT) Color(0xFF6E6E73) else Color(0xFF8E95A2),
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+            // Mode Selector: System / Dark / Light
+            Text(
+                "COLOR MODE",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ThemeMode.values().forEach { mode ->
+                    val isSelected = config.mode == mode
+                    Surface(
+                        onClick = { onSelectMode(mode) },
+                        shape = RoundedCornerShape(10.dp),
+                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = BorderStroke(
+                            1.dp,
+                            if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        ),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.padding(vertical = 10.dp)
+                        ) {
+                            Text(
+                                mode.displayName,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Custom Accent Color
+            Text(
+                "CUSTOM ACCENT COLOR",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            val accents = listOf(
+                Pair("Default", null),
+                Pair("Indigo", 0xFF5E6AD2L),
+                Pair("Apple Blue", 0xFF0071E3L),
+                Pair("Cyan", 0xFF06B6D4L),
+                Pair("Emerald", 0xFF10B981L),
+                Pair("Amber", 0xFFF59E0BL),
+                Pair("Crimson", 0xFFEF4444L),
+                Pair("Violet", 0xFF8B5CF6L),
+                Pair("Titanium", 0xFF949AA4L)
+            )
+
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(accents) { (name, hex) ->
+                    val isSelected = config.customAccentHex == hex
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.clickable { onSelectAccent(hex) }
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(if (hex != null) Color(hex) else MaterialTheme.colorScheme.outlineVariant)
+                                .border(
+                                    width = if (isSelected) 2.5.dp else 1.dp,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                    shape = CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isSelected) {
+                                Icon(
+                                    Icons.Outlined.Check,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            name,
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            // Pure OLED AMOLED Black Switch
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Pure OLED AMOLED Black",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            "Sets backgrounds to absolute #000000 to maximize OLED battery efficiency",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Switch(
+                        checked = config.isPureOled,
+                        onCheckedChange = onToggleOled,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = MaterialTheme.colorScheme.primary
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
 

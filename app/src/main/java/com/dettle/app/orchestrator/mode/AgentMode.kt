@@ -8,11 +8,15 @@ import com.dettle.app.domain.model.Tool
 import com.dettle.app.domain.model.AgentTools
 import kotlinx.serialization.Serializable
 
-// ─── Environment (Chat vs Work) ──────────────────────────────────────────────
+// ─── Environment (Chat vs Build) ─────────────────────────────────────────────
 
 enum class EnvironmentMode(val displayName: String) {
     CHAT("Chat"),
-    WORK("Work")
+    BUILD("Build");
+
+    companion object {
+        val WORK = BUILD
+    }
 }
 
 data class SlashCommand(
@@ -62,7 +66,7 @@ enum class ModeId(val displayName: String, val emoji: String, val description: S
     val environment: EnvironmentMode
         get() = when (this) {
             CHAT, RESEARCH, WEB -> EnvironmentMode.CHAT
-            CODE, PLAN, GOAL, REVIEW, DEPLOY -> EnvironmentMode.WORK
+            CODE, PLAN, GOAL, REVIEW, DEPLOY -> EnvironmentMode.BUILD
         }
 }
 
