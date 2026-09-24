@@ -6,6 +6,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [v1.1.0] - 2026-09-24: Linear / Raycast Obsidian Theme Overhaul, Precision Geometry, & Dock Navigation
+
+### Direct APK Download
+- **Production Release APK (R8 Minified, Signed)**: [app-release.apk](https://github.com/sandilyapoorv/Dettle/releases/download/v1.1.0/app-release.apk)
+- **Debug APK**: [app-debug.apk](https://github.com/sandilyapoorv/Dettle/releases/download/v1.1.0/app-debug.apk)
+- **GitHub Release Page**: [https://github.com/sandilyapoorv/Dettle/releases/tag/v1.1.0](https://github.com/sandilyapoorv/Dettle/releases/tag/v1.1.0)
+- **CI/CD Workflow**: [https://github.com/sandilyapoorv/Dettle/actions](https://github.com/sandilyapoorv/Dettle/actions)
+
+### Why This Release Was Done
+Elevated Dettle from a project/prototype visual style to a production-grade developer tool inspired by Linear and Raycast. Replaced murky, warm-yellow tones with deep obsidian slate, razor-sharp hairline borders, high-precision geometry, and Linear's electric indigo accent.
+
+### Key Architectural Changes & Commits
+1. **Design System & Color Tokens**:
+   - Replaced YRB warm palette with Dark Obsidian Slate (`#0C0D10` background, `#13151A` surface cards, `#191C23` surface variants).
+   - Added Linear Electric Indigo (`#5E6AD2`) as primary brand accent with deep indigo container tinting (`#1F2338`).
+   - Calibrated status colors (Emerald `#10B981`, Amber `#F59E0B`, Crimson `#EF4444`, Cyan `#38BDF8`).
+   - Replaced heavy borders with 1dp hairline outlines (`#2E333F` and `#1E212A`).
+
+2. **Precision Geometry (Corner Radii)**:
+   - Replaced bubbly 20–36dp curves with crisp engineering radii (6dp pills, 8dp inputs/buttons, 12dp cards/bubbles, 16dp sheets).
+
+3. **Typography Hierarchy**:
+   - Optimized headline tracking (-0.75sp to -0.2sp) and line heights for clean, dense information display.
+
+4. **Console Dock Navigation**:
+   - Added 1dp top hairline divider with flat 0dp tonal elevation to `NavigationBar` for a floating console dock experience.
+
+5. **Component Harmonization**:
+   - Updated the voice visualizer waveform in `ChatScreen` to pulse in electric indigo accent.
+
+---
+
 ## [v1.0.9] - 2026-09-22: 120 FPS Recomposition Overhaul, Keyboard IME Protection Everywhere, & Provider Settings Redesign
 
 ### Direct APK Download

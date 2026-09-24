@@ -16,50 +16,65 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 
 private val LightColors = lightColorScheme(
-    primary = YrbLightPrimary,
-    onPrimary = YrbLightOnPrimary,
-    primaryContainer = YrbLightPrimaryContainer,
-    onPrimaryContainer = YrbLightOnPrimaryContainer,
-    secondary = YrbLightSecondary,
-    onSecondary = YrbLightOnSecondary,
-    background = YrbLightBackground,
-    onBackground = YrbLightOnBackground,
-    surface = YrbLightSurface,
-    onSurface = YrbLightOnSurface,
-    surfaceVariant = YrbLightSurfaceVariant,
-    onSurfaceVariant = YrbLightOnSurfaceVariant,
-    outline = YrbLightOutline,
-    outlineVariant = YrbLightOutlineVariant,
-    error = YrbLightError,
-    onError = YrbLightOnError
+    primary = DettleLightPrimary,
+    onPrimary = DettleLightOnPrimary,
+    primaryContainer = DettleLightPrimaryContainer,
+    onPrimaryContainer = DettleLightOnPrimaryContainer,
+    secondary = DettleLightSecondary,
+    onSecondary = DettleLightOnSecondary,
+    secondaryContainer = DettleLightSecondaryContainer,
+    onSecondaryContainer = DettleLightOnSecondaryContainer,
+    tertiary = DettleLightTertiary,
+    onTertiary = DettleLightOnTertiary,
+    background = DettleLightBackground,
+    onBackground = DettleLightOnBackground,
+    surface = DettleLightSurface,
+    onSurface = DettleLightOnSurface,
+    surfaceVariant = DettleLightSurfaceVariant,
+    onSurfaceVariant = DettleLightOnSurfaceVariant,
+    outline = DettleLightOutline,
+    outlineVariant = DettleLightOutlineVariant,
+    error = DettleLightError,
+    onError = DettleLightOnError,
+    errorContainer = DettleLightErrorContainer,
+    onErrorContainer = DettleLightOnErrorContainer
 )
 
 private val DarkColors = darkColorScheme(
-    primary = YrbDarkPrimary,
-    onPrimary = YrbDarkOnPrimary,
-    primaryContainer = YrbDarkPrimaryContainer,
-    onPrimaryContainer = YrbDarkOnPrimaryContainer,
-    secondary = YrbDarkSecondary,
-    onSecondary = YrbDarkOnSecondary,
-    background = YrbDarkBackground,
-    onBackground = YrbDarkOnBackground,
-    surface = YrbDarkSurface,
-    onSurface = YrbDarkOnSurface,
-    surfaceVariant = YrbDarkSurfaceVariant,
-    onSurfaceVariant = YrbDarkOnSurfaceVariant,
-    outline = YrbDarkOutline,
-    outlineVariant = YrbDarkOutlineVariant,
-    error = YrbDarkError,
-    onError = YrbDarkOnError
+    primary = DettleDarkPrimary,
+    onPrimary = DettleDarkOnPrimary,
+    primaryContainer = DettleDarkPrimaryContainer,
+    onPrimaryContainer = DettleDarkOnPrimaryContainer,
+    secondary = DettleDarkSecondary,
+    onSecondary = DettleDarkOnSecondary,
+    secondaryContainer = DettleDarkSecondaryContainer,
+    onSecondaryContainer = DettleDarkOnSecondaryContainer,
+    tertiary = DettleDarkTertiary,
+    onTertiary = DettleDarkOnTertiary,
+    background = DettleDarkBackground,
+    onBackground = DettleDarkOnBackground,
+    surface = DettleDarkSurface,
+    onSurface = DettleDarkOnSurface,
+    surfaceVariant = DettleDarkSurfaceVariant,
+    onSurfaceVariant = DettleDarkOnSurfaceVariant,
+    outline = DettleDarkOutline,
+    outlineVariant = DettleDarkOutlineVariant,
+    error = DettleDarkError,
+    onError = DettleDarkOnError,
+    errorContainer = DettleDarkErrorContainer,
+    onErrorContainer = DettleDarkOnErrorContainer
 )
 
-val YrbShapes = Shapes(
-    extraSmall = RoundedCornerShape(10.dp),
-    small = RoundedCornerShape(14.dp),
-    medium = RoundedCornerShape(20.dp),
-    large = RoundedCornerShape(28.dp),
-    extraLarge = RoundedCornerShape(36.dp)
+val DettleShapes = Shapes(
+    extraSmall = RoundedCornerShape(6.dp),
+    small = RoundedCornerShape(8.dp),
+    medium = RoundedCornerShape(12.dp),
+    large = RoundedCornerShape(16.dp),
+    extraLarge = RoundedCornerShape(22.dp)
 )
+
+// Backward-compatible alias
+val YrbShapes = DettleShapes
 
 @Composable
 fun DettleTheme(
@@ -82,7 +97,7 @@ fun DettleTheme(
     MaterialTheme(
         colorScheme = colors,
         typography = DettleTypography,
-        shapes = YrbShapes,
+        shapes = DettleShapes,
         content = content
     )
 }

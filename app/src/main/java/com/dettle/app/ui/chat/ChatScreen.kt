@@ -1308,6 +1308,7 @@ fun VoiceWaveformBar(
 
             Spacer(Modifier.width(12.dp))
 
+            val waveColor = MaterialTheme.colorScheme.primary
             // Live Waveform Visualizer
             Canvas(
                 modifier = Modifier
@@ -1330,7 +1331,7 @@ fun VoiceWaveformBar(
                     val y = (maxHeight - modulatedHeight) / 2f
 
                     drawRoundRect(
-                        color = Color(0xFF6B6661),
+                        color = waveColor,
                         topLeft = Offset(x, y),
                         size = Size(barWidth, modulatedHeight),
                         cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx())
