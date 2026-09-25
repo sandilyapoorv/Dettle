@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [v1.5.0] - 2026-09-25: Universal Full-State Backup & Restore Engine (APIs, Cookies, Cognitive Memories, Preferences)
+
+### Direct APK Download
+- **Production Release APK (R8 Minified, Signed)**: [app-release.apk](https://github.com/sandilyapoorv/Dettle/releases/download/v1.5.0/app-release.apk)
+- **Debug APK**: [app-debug.apk](https://github.com/sandilyapoorv/Dettle/releases/download/v1.5.0/app-debug.apk)
+- **GitHub Release Page**: [https://github.com/sandilyapoorv/Dettle/releases/tag/v1.5.0](https://github.com/sandilyapoorv/Dettle/releases/tag/v1.5.0)
+- **CI/CD Workflow**: [https://github.com/sandilyapoorv/Dettle/actions](https://github.com/sandilyapoorv/Dettle/actions)
+
+### Why This Release Was Done
+Major overhaul of Dettle's Backup & Restore architecture into an exhaustive, robust engine capturing 100% of application state, credentials, sessions, memories, and preferences:
+1. **APIs & Cloud Credentials**: Full backup and restore of all multi-account AI providers, GitHub accounts with granular scopes, Cloudflare tokens, Google Drive OAuth tokens (`driveIdToken`, `driveRefreshToken`, `driveUserEmail`, `driveFolderId`), and a raw `EncryptedSharedPreferences` entry backup ensuring zero credential loss.
+2. **Browser Sessions & Cookies**: Live cookie extraction and injection using Android `CookieManager` across all AI provider domains (ChatGPT, Claude, Grok, DeepSeek, Perplexity, GitHub, and custom domains), enabling seamless session survival without repeated browser logins.
+3. **Cognitive Memories & Knowledge Graph**: Complete episodic memories (`MemoryEntity`), project-scoped memory facts (`ProjectMemoryEntity`), knowledge graph concepts and relationship edges (`ConceptNodeEntity`, `ConceptEdgeEntity`), and the personalized `UserProfileEntity`.
+4. **Projects & Workspaces**: Full `ProjectEntity` records with system instructions, enforced protocols, unleashed toggles, and linked git repos.
+5. **Chats, Logs, Goals & Deployments**: All conversation threads, message bubbles with tool calls, autonomous task logs, persistent goals (`GoalEntity`), and Cloudflare deployments (`DeploymentEntity`).
+6. **User Preferences & Themes**: Theme configuration (Oat Light vs Obsidian Dark), mode overrides, pure OLED toggles, custom accent hexes, Unleashed engine toggle, voice typing settings, overnight schedules, and all raw `DataStore` key-value pairs.
+7. **Granular 7-Module UI**: Redesigned `BackupRestoreSheet` and `BackupRestoreCard` with granular module toggles, live count chips, and resilient per-module error boundary handling during restore.
+
+---
+
 ## [v1.4.0] - 2026-09-25: System-Wide Oat, Plum & Tangerine Theme Lock, Luxury Typography & UI Refinements
 
 ### Direct APK Download

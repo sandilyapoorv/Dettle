@@ -37,4 +37,16 @@ interface KnowledgeGraphDao {
             context = context
         ))
     }
+
+    @Query("SELECT * FROM concept_nodes")
+    suspend fun getAllNodes(): List<ConceptNodeEntity>
+
+    @Query("SELECT * FROM concept_edges")
+    suspend fun getAllEdges(): List<ConceptEdgeEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertNodes(nodes: List<ConceptNodeEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertEdges(edges: List<ConceptEdgeEntity>)
 }

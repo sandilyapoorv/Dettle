@@ -36,4 +36,10 @@ interface DeploymentDao {
 
     @Query("DELETE FROM deployments WHERE createdAt < :beforeMs")
     suspend fun deleteOlderThan(beforeMs: Long)
+
+    @Query("SELECT * FROM deployments")
+    suspend fun getAllDeploymentsList(): List<DeploymentEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDeployments(deployments: List<DeploymentEntity>)
 }

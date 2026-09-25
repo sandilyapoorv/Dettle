@@ -31,9 +31,11 @@ import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.ElectricBolt
 import androidx.compose.material.icons.outlined.FileOpen
 import androidx.compose.material.icons.outlined.FolderCopy
 import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Share
@@ -98,17 +100,24 @@ fun BackupRestoreSheet(
 
     var selectedTab by remember { mutableIntStateOf(0) } // 0 = Backup, 1 = Restore
 
-    // Granular checkboxes
+    // Granular checkboxes across 100% of app state
     var includeApis by remember { mutableStateOf(true) }
     var includeSubscriptions by remember { mutableStateOf(true) }
+    var includeCookies by remember { mutableStateOf(true) }
+    var includeMemories by remember { mutableStateOf(true) }
     var includeProjects by remember { mutableStateOf(true) }
     var includeChatsAndLogs by remember { mutableStateOf(true) }
     var includeAppSettings by remember { mutableStateOf(true) }
 
-    val options = remember(includeApis, includeSubscriptions, includeProjects, includeChatsAndLogs, includeAppSettings) {
+    val options = remember(
+        includeApis, includeSubscriptions, includeCookies,
+        includeMemories, includeProjects, includeChatsAndLogs, includeAppSettings
+    ) {
         BackupOptions(
             includeApis = includeApis,
             includeSubscriptions = includeSubscriptions,
+            includeCookies = includeCookies,
+            includeMemories = includeMemories,
             includeProjects = includeProjects,
             includeChatsAndLogs = includeChatsAndLogs,
             includeAppSettings = includeAppSettings
@@ -229,6 +238,8 @@ fun BackupRestoreSheet(
                                 val target = !allSelected
                                 includeApis = target
                                 includeSubscriptions = target
+                                includeCookies = target
+                                includeMemories = target
                                 includeProjects = target
                                 includeChatsAndLogs = target
                                 includeAppSettings = target
@@ -242,8 +253,8 @@ fun BackupRestoreSheet(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
                     ModuleCheckRow(
-                        label = "API Keys & Accounts",
-                        subtitle = "${summary?.apiCount ?: 0} accounts configured",
+                        label = "API Keys & Cloud Credentials",
+                        subtitle = "${summary?.apiCount ?: 0} accounts, Cloudflare, Drive OAuth",
                         icon = Icons.Outlined.Key,
                         checked = includeApis,
                         onCheckedChange = { includeApis = it }
@@ -251,10 +262,26 @@ fun BackupRestoreSheet(
 
                     ModuleCheckRow(
                         label = "Subscription Providers",
-                        subtitle = "${summary?.subscriptionCount ?: 0} ChatGPT / Claude / Web accounts",
+                        subtitle = "${summary?.subscriptionCount ?: 0} ChatGPT, Claude, Grok, DeepSeek accounts",
                         icon = Icons.Outlined.Refresh,
                         checked = includeSubscriptions,
                         onCheckedChange = { includeSubscriptions = it }
+                    )
+
+                    ModuleCheckRow(
+                        label = "Browser Sessions & Cookies",
+                        subtitle = "${summary?.cookieDomainCount ?: 0} active web login sessions & cookies",
+                        icon = Icons.Outlined.OpenInNew,
+                        checked = includeCookies,
+                        onCheckedChange = { includeCookies = it }
+                    )
+
+                    ModuleCheckRow(
+                        label = "Cognitive Memories & Knowledge",
+                        subtitle = "${summary?.memoryCount ?: 0} episodic memories, facts & concepts",
+                        icon = Icons.Outlined.ElectricBolt,
+                        checked = includeMemories,
+                        onCheckedChange = { includeMemories = it }
                     )
 
                     ModuleCheckRow(
@@ -267,15 +294,15 @@ fun BackupRestoreSheet(
 
                     ModuleCheckRow(
                         label = "Chat Histories & Task Logs",
-                        subtitle = "${summary?.chatCount ?: 0} conversations, ${summary?.logCount ?: 0} task logs",
+                        subtitle = "${summary?.chatCount ?: 0} conversations, ${summary?.logCount ?: 0} task logs & goals",
                         icon = Icons.Outlined.Description,
                         checked = includeChatsAndLogs,
                         onCheckedChange = { includeChatsAndLogs = it }
                     )
 
                     ModuleCheckRow(
-                        label = "App Settings & Endpoints",
-                        subtitle = "GitHub repo, custom selector endpoints",
+                        label = "App Preferences & Themes",
+                        subtitle = "Theme, Oat/Obsidian modes, Unleashed engine, DataStore",
                         icon = Icons.Outlined.Settings,
                         checked = includeAppSettings,
                         onCheckedChange = { includeAppSettings = it }
@@ -478,7 +505,7 @@ fun BackupRestoreSheet(
                                 if (res.success) {
                                     Spacer(Modifier.height(8.dp))
                                     Text(
-                                        "Restored: ${res.apisRestored} APIs, ${res.subscriptionsRestored} subscriptions, ${res.projectsRestored} projects, ${res.chatsRestored} chats, ${res.logsRestored} logs",
+                                        "Restored: ${res.apisRestored} APIs, ${res.subscriptionsRestored} subs, ${res.cookiesRestored} cookies, ${res.memoriesRestored} memories, ${res.projectsRestored} projects, ${res.chatsRestored} chats, ${res.logsRestored} logs, ${res.preferencesRestored} prefs",
                                         style = MaterialTheme.typography.labelSmall,
                                         fontFamily = FontFamily.Monospace,
                                         color = MaterialTheme.colorScheme.onSurface

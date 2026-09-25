@@ -1,6 +1,8 @@
 package com.dettle.app.di
 
 import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import com.dettle.app.data.api.AIProviderFactory
 import com.dettle.app.data.api.KeyPoolManager
 import com.dettle.app.data.cloudflare.CloudflareClient
@@ -151,11 +153,10 @@ object AppModule {
     fun provideBackupManager(
         @ApplicationContext context: Context,
         apiKeyStore: ApiKeyStore,
-        conversationDao: com.dettle.app.data.db.dao.ConversationDao,
-        projectDao: com.dettle.app.data.db.dao.ProjectDao,
-        taskLogDao: TaskLogDao
+        database: DettleDatabase,
+        dataStore: DataStore<Preferences>
     ): com.dettle.app.data.backup.BackupManager =
-        com.dettle.app.data.backup.BackupManager(context, apiKeyStore, conversationDao, projectDao, taskLogDao)
+        com.dettle.app.data.backup.BackupManager(context, apiKeyStore, database, dataStore)
 
     @Provides
     @Singleton

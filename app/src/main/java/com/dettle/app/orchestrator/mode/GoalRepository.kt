@@ -91,6 +91,12 @@ interface GoalDao {
 
     @Query("DELETE FROM goals WHERE is_completed = 1")
     suspend fun clearCompleted()
+
+    @Query("SELECT * FROM goals")
+    suspend fun getAllGoals(): List<GoalEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertGoals(goals: List<GoalEntity>)
 }
 
 // ─── Repository ───────────────────────────────────────────────────────────────

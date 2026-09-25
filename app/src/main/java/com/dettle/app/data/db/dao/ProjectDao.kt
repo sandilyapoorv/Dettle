@@ -50,4 +50,10 @@ interface ProjectDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertProjects(projects: List<ProjectEntity>)
+
+    @Query("SELECT * FROM project_memories")
+    suspend fun getAllProjectMemories(): List<ProjectMemoryEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertProjectMemories(memories: List<ProjectMemoryEntity>)
 }

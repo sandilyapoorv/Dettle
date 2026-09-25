@@ -510,6 +510,35 @@ class ApiKeyStore @Inject constructor(
         return newState
     }
 
+    /**
+     * Exports all decrypted key-value pairs stored in EncryptedSharedPreferences.
+     * Captures every single token, account, custom setting, and credential.
+     */
+    fun getAllSecureEntries(): Map<String, *> {
+        return try {
+            prefs.all
+        } catch (e: Exception) {
+            emptyMap<String, Any>()
+        }
+    }
+
+    /**
+     * Restores arbitrary key-value pairs into EncryptedSharedPreferences.
+     */
+    fun importSecureEntries(entries: Map<String, *>) {
+        val editor = prefs.edit()
+        for ((key, value) in entries) {
+            when (value) {
+                is String -> editor.putString(key, value)
+                is Boolean -> editor.putBoolean(key, value)
+                is Int -> editor.putInt(key, value)
+                is Long -> editor.putLong(key, value)
+                is Float -> editor.putFloat(key, value)
+            }
+        }
+        editor.apply()
+    }
+
     companion object {
         const val DEFAULT_SELECTOR_URL =
             "https://gist.githubusercontent.com/YOUR_GITHUB_USERNAME/GIST_ID/raw/dom_selectors.json"
