@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [v1.4.0] - 2026-09-25: System-Wide Oat, Plum & Tangerine Theme Lock, Luxury Typography & UI Refinements
+
+### Direct APK Download
+- **Production Release APK (R8 Minified, Signed)**: [app-release.apk](https://github.com/sandilyapoorv/Dettle/releases/download/v1.4.0/app-release.apk)
+- **Debug APK**: [app-debug.apk](https://github.com/sandilyapoorv/Dettle/releases/download/v1.4.0/app-debug.apk)
+- **GitHub Release Page**: [https://github.com/sandilyapoorv/Dettle/releases/tag/v1.4.0](https://github.com/sandilyapoorv/Dettle/releases/tag/v1.4.0)
+- **CI/CD Workflow**: [https://github.com/sandilyapoorv/Dettle/actions](https://github.com/sandilyapoorv/Dettle/actions)
+
+### Why This Release Was Done
+This release locks the entire Dettle system onto two polished themes and delivers refined UI ergonomics:
+1. **Two System-Wide Locked Themes**:
+   - **Light Mode (Oat & Plum)**: Warm textured Oat canvas (`#F7F4EE`), regal Velvet Plum primary accent (`#6B21A8`), and luminous Tangerine tertiary accent (`#F97316`) paired with deep espresso typography (`#1C1917`).
+   - **Dark Mode (Linear Obsidian)**: Precision dark slate void (`#0C0D10`), deep obsidian cards (`#13151A`), and Linear Electric Indigo accent (`#5E6AD2`).
+2. **Luxury Typography**:
+   - Updated centered `"hello Monsieur"` hero to Luxury Serif italic (`FontFamily.Serif`, `FontStyle.Italic`, 34sp).
+3. **Ergonomic Toggle & Input Card**:
+   - Flush `VerticalModeToggle` alignment (top margin set to `0.dp`).
+   - Lengthened toggle footprint (`52.dp × 118.dp`) with a `46.dp × 56.dp` sliding pill and larger 19dp icons.
+   - Refined input card corner radius set to `15.dp` (`RoundedCornerShape(15.dp)`).
+4. **Settings Screen Theme Selector**:
+   - Streamlined `ThemeAppearanceCard` down to the two primary locked themes (Oat & Plum Light vs Linear Obsidian Dark) in a clean dual-column layout.
+5. **Interactive 1:1 Frontend Replica**:
+   - Built a pure standalone 1:1 frontend replica of all 8 screens in HTML/CSS/JS with zero mock placeholders, interactive navigation, build simulator, and live theme switching between Oat Light and Obsidian Dark.
+
+---
+
 ## [v1.3.0] - 2026-09-25: Minimal Top Bar, Centered "hello Monsieur" Greeting, and Unified ai-chat-input Redesign
 
 ### Direct APK Download

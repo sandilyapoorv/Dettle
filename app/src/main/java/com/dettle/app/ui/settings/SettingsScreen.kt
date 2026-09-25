@@ -1921,20 +1921,21 @@ fun ThemeAppearanceCard(
                 }
             }
 
-            // Theme selector horizontal list
+            // Theme selector: locked onto 2 system themes (Light: Oat & Plum, Dark: Linear Obsidian)
             Text(
-                "THEMES (${AppTheme.values().size})",
+                "SYSTEM THEMES (LOCKED)",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.SemiBold
             )
 
-            LazyRow(
+            val lockedThemes = listOf(AppTheme.OAT_LIGHT, AppTheme.OBSIDIAN)
+            Row(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                items(AppTheme.values().toList(), key = { it.id }) { theme ->
-                    val isSelected = config.theme == theme
+                lockedThemes.forEach { theme ->
+                    val isSelected = config.theme == theme || (theme == AppTheme.OAT_LIGHT && config.theme == AppTheme.APPLE_LIGHT)
                     Surface(
                         onClick = { onSelectTheme(theme) },
                         shape = RoundedCornerShape(14.dp),
@@ -1944,13 +1945,13 @@ fun ThemeAppearanceCard(
                             if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
                         ),
                         modifier = Modifier
-                            .width(135.dp)
-                            .height(86.dp)
+                            .weight(1f)
+                            .height(96.dp)
                     ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(10.dp),
+                                .padding(12.dp),
                             verticalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(
@@ -1958,33 +1959,46 @@ fun ThemeAppearanceCard(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(14.dp)
-                                        .clip(CircleShape)
-                                        .background(theme.previewPrimary)
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(16.dp)
+                                            .clip(CircleShape)
+                                            .background(theme.previewPrimary)
+                                    )
+                                    if (theme == AppTheme.OAT_LIGHT) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(10.dp)
+                                                .clip(CircleShape)
+                                                .background(Color(0xFFF97316))
+                                        )
+                                    }
+                                }
                                 if (isSelected) {
                                     Icon(
                                         Icons.Outlined.CheckCircle,
                                         contentDescription = "Selected",
                                         tint = theme.previewPrimary,
-                                        modifier = Modifier.size(16.dp)
+                                        modifier = Modifier.size(18.dp)
                                     )
                                 }
                             }
                             Column {
                                 Text(
                                     theme.displayName,
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (theme == AppTheme.APPLE_LIGHT) Color(0xFF1D1D1F) else Color(0xFFF3F4F6),
+                                    color = if (theme == AppTheme.OAT_LIGHT || theme == AppTheme.APPLE_LIGHT) Color(0xFF1C1917) else Color(0xFFF3F4F6),
                                     maxLines = 1
                                 )
                                 Text(
                                     theme.description,
-                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                                    color = if (theme == AppTheme.APPLE_LIGHT) Color(0xFF6E6E73) else Color(0xFF8E95A2),
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                    color = if (theme == AppTheme.OAT_LIGHT || theme == AppTheme.APPLE_LIGHT) Color(0xFF78716C) else Color(0xFF8E95A2),
                                     maxLines = 1
                                 )
                             }

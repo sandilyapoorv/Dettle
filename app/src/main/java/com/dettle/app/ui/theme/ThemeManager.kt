@@ -27,54 +27,61 @@ enum class AppTheme(
     val previewPrimary: Color,
     val previewBackground: Color
 ) {
+    OAT_LIGHT(
+        id = "oat_light",
+        displayName = "Oat & Plum",
+        description = "Warm oat canvas, velvet plum & radiant tangerine",
+        previewPrimary = Color(0xFF6B21A8),
+        previewBackground = Color(0xFFF7F4EE)
+    ),
     OBSIDIAN(
         id = "obsidian",
-        displayName = "Obsidian Void",
+        displayName = "Linear Obsidian",
         description = "Precision dark slate & electric indigo",
         previewPrimary = Color(0xFF5E6AD2),
         previewBackground = Color(0xFF0C0D10)
     ),
     APPLE_LIGHT(
         id = "apple_light",
-        displayName = "Apple Studio Light",
-        description = "Crisp Cupertino white & titanium slate",
-        previewPrimary = Color(0xFF0071E3),
-        previewBackground = Color(0xFFF5F5F7)
+        displayName = "Oat & Plum",
+        description = "Warm oat canvas, velvet plum & radiant tangerine",
+        previewPrimary = Color(0xFF6B21A8),
+        previewBackground = Color(0xFFF7F4EE)
     ),
     TITANIUM(
         id = "titanium",
-        displayName = "Midnight Titanium",
-        description = "Space titanium gray & frosted glass",
-        previewPrimary = Color(0xFF9096A2),
-        previewBackground = Color(0xFF141518)
+        displayName = "Linear Obsidian",
+        description = "Precision dark slate & electric indigo",
+        previewPrimary = Color(0xFF5E6AD2),
+        previewBackground = Color(0xFF0C0D10)
     ),
     CYBER_INDIGO(
         id = "cyber_indigo",
-        displayName = "Cyber Indigo",
-        description = "Deep navy void & electric neon violet",
-        previewPrimary = Color(0xFF7C3AED),
-        previewBackground = Color(0xFF0B0F19)
+        displayName = "Linear Obsidian",
+        description = "Precision dark slate & electric indigo",
+        previewPrimary = Color(0xFF5E6AD2),
+        previewBackground = Color(0xFF0C0D10)
     ),
     EMERALD_MATRIX(
         id = "emerald_matrix",
-        displayName = "Emerald Matrix",
-        description = "Deep forest moss & crisp emerald",
-        previewPrimary = Color(0xFF10B981),
-        previewBackground = Color(0xFF0A120E)
+        displayName = "Linear Obsidian",
+        description = "Precision dark slate & electric indigo",
+        previewPrimary = Color(0xFF5E6AD2),
+        previewBackground = Color(0xFF0C0D10)
     ),
     SUNSET_AMBER(
         id = "sunset_amber",
-        displayName = "Sunset Amber",
-        description = "Dark charcoal & warm amber gold",
-        previewPrimary = Color(0xFFF59E0B),
-        previewBackground = Color(0xFF12100E)
+        displayName = "Linear Obsidian",
+        description = "Precision dark slate & electric indigo",
+        previewPrimary = Color(0xFF5E6AD2),
+        previewBackground = Color(0xFF0C0D10)
     ),
     TOKYO_NEON(
         id = "tokyo_neon",
-        displayName = "Tokyo Neon",
-        description = "Midnight violet & vivid cyan neon",
-        previewPrimary = Color(0xFF06B6D4),
-        previewBackground = Color(0xFF100C1A)
+        displayName = "Linear Obsidian",
+        description = "Precision dark slate & electric indigo",
+        previewPrimary = Color(0xFF5E6AD2),
+        previewBackground = Color(0xFF0C0D10)
     ),
     OLED_BLACK(
         id = "oled_black",
@@ -85,8 +92,11 @@ enum class AppTheme(
     );
 
     companion object {
-        fun fromId(id: String?): AppTheme =
-            values().firstOrNull { it.id.equals(id, ignoreCase = true) } ?: OBSIDIAN
+        fun fromId(id: String?): AppTheme = when (id?.lowercase()) {
+            "oat_light", "apple_light" -> OAT_LIGHT
+            "oled_black" -> OLED_BLACK
+            else -> OBSIDIAN
+        }
     }
 }
 

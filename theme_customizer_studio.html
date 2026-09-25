@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Dettle</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    /* Theme color variables */
+    :root {
+      --bg: #F7F4EE;
+      --surface: #FFFFFF;
+      --surface-variant: #EFEAE0;
+      --border: #E7E2D6;
+      --border-subtle: #EDE8DE;
+      --text: #1C1917;
+      --text-muted: #78716C;
+      --primary: #6B21A8;
+      --primary-container: #F3E8FF;
+      --primary-on-container: #3B0764;
+      --accent: #F97316;
+      --user-bubble: #F5EFFB;
+      --user-bubble-border: #E0CEF2;
+      --drawer-bg: #FFFFFF;
+    }
+
+    [data-theme="dark"] {
+      --bg: #0C0D10;
+      --surface: #14161E;
+      --surface-variant: #1E212B;
+      --border: #232733;
+      --border-subtle: #1C1F28;
+      --text: #EDEDEE;
+      --text-muted: #8E95A2;
+      --primary: #5E6AD2;
+      --primary-container: #20243C;
+      --primary-on-container: #C5CBFF;
+      --accent: #38BDF8;
+      --user-bubble: #1F2338;
+      --user-bubble-border: #2E3554;
+      --drawer-bg: #111319;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    .font-luxury {
+      font-family: Georgia, Cambria, "Times New Roman", Times, serif;
+    }
+
+    /* Custom smooth scrollbars */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(120, 113, 108, 0.25); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(120, 113, 108, 0.4); }
+
+    /* Animated audio waveform */
+    @keyframes wavePulse {
+      0%, 100% { height: 6px; }
+      50% { height: 22px; }
+    }
+    .wave-bar { animation: wavePulse 1s ease-in-out infinite; }
+    .wave-bar:nth-child(1) { animation-delay: 0.1s; }
+    .wave-bar:nth-child(2) { animation-delay: 0.3s; }
+    .wave-bar:nth-child(3) { animation-delay: 0.15s; }
+    .wave-bar:nth-child(4) { animation-delay: 0.4s; }
+    .wave-bar:nth-child(5) { animation-delay: 0.2s; }
+  </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex justify-center bg-slate-900 md:bg-slate-900/90">
+
+  <!-- Mobile Viewport Container (Edge-to-edge on mobile, perfectly centered app shell on desktop) -->
+  <div id="appRoot" class="w-full max-w-[440px] h-full flex flex-col relative overflow-hidden shadow-2xl transition-colors duration-200" style="background-color: var(--bg);">
+
+    <!-- ===================================================================== -->
+    <!-- 1. CHAT SCREEN (Main Default Screen) -->
+    <!-- ===================================================================== -->
+    <div id="screenChat" class="screen-view flex-1 flex flex-col relative overflow-hidden">
+
+      <!-- TOP BAR -->
+      <header class="h-14 px-4 flex items-center justify-between z-20 shrink-0">
+        <!-- 3-Line Hamburger Drawer Button -->
+        <button onclick="toggleDrawer(true)" class="w-10 h-10 rounded-full flex items-center justify-center transition active:scale-95 hover:bg-black/5 dark:hover:bg-white/5" style="color: var(--text);">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+          </svg>
+        </button>
+
+        <!-- Conditional New Chat Pencil Button (shown once messages exist) -->
+        <button id="btnNewChatTop" onclick="startNewChat()" class="w-10 h-10 rounded-full hidden items-center justify-center transition active:scale-95 hover:bg-black/5 dark:hover:bg-white/5" style="color: var(--text);" title="New Chat">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+          </svg>
+        </button>
+      </header>
+
+      <!-- VERTICAL MODE TOGGLE (Chat / Build) — Flush with 0dp top margin, 52dp x 118dp -->
+      <div id="verticalModeToggle" class="absolute top-2 right-3 z-30 flex flex-col w-[52px] h-[118px] p-1 rounded-[28px] border shadow-md backdrop-blur-md justify-between transition-all"
+           style="background-color: var(--surface); border-color: var(--border);">
+        <!-- Active Indicator Pill -->
+        <div id="toggleActivePill" class="absolute top-1 left-1 w-[44px] h-[54px] rounded-[24px] shadow-sm transition-all duration-300 pointer-events-none"
+             style="background-color: var(--primary); transform: translateY(0px);"></div>
+
+        <!-- Chat Slot -->
+        <button onclick="switchMode('chat')" class="w-full h-[54px] rounded-[24px] flex flex-col items-center justify-center z-10 transition">
+          <svg id="iconModeChat" class="w-5 h-5 mb-0.5 text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+          </svg>
+          <span id="labelModeChat" class="text-[10px] font-bold text-white transition-colors">Chat</span>
+        </button>
+
+        <!-- Build Slot -->
+        <button onclick="switchMode('build')" class="w-full h-[54px] rounded-[24px] flex flex-col items-center justify-center z-10 transition">
+          <svg id="iconModeBuild" class="w-5 h-5 mb-0.5 transition-colors" style="color: var(--text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+          </svg>
+          <span id="labelModeBuild" class="text-[10px] font-medium transition-colors" style="color: var(--text-muted);">Build</span>
+        </button>
+      </div>
+
+      <!-- MIDDLE CONTENT AREA (Empty Greeting OR Messages Stream) -->
+      <div id="chatContentArea" class="flex-1 flex flex-col relative overflow-hidden">
+
+        <!-- EMPTY STATE: Centered "hello Monsieur" (Luxury Serif) -->
+        <div id="emptyGreetingView" class="flex-1 flex flex-col items-center justify-center px-6 text-center select-none">
+          <h1 class="text-4xl md:text-5xl font-luxury italic font-normal tracking-tight leading-tight transition-all duration-300"
+              style="color: var(--text);">
+            hello Monsieur
+          </h1>
+        </div>
+
+        <!-- MESSAGE STREAM -->
+        <div id="messagesScrollView" class="hidden flex-1 overflow-y-auto px-4 pr-16 py-3 space-y-4">
+          <!-- Dynamic messages will be appended here -->
+        </div>
+
+      </div>
+
+      <!-- BOTTOM DOCKED INPUT BAR (ai-chat-input with 15px radius) -->
+      <div class="p-3 pt-1 z-20 shrink-0">
+        <div id="chatInputCard" class="p-3 flex flex-col gap-2.5 border shadow-sm transition-all"
+             style="background-color: var(--surface); border-color: var(--border); border-radius: 15px;">
+          
+          <!-- Text Input Field -->
+          <div class="px-1 flex items-start">
+            <textarea id="chatTextInput" rows="1" placeholder="Ask anything..." 
+                      class="w-full bg-transparent outline-none text-[15px] resize-none leading-relaxed placeholder-stone-400 dark:placeholder-zinc-500 font-normal"
+                      style="color: var(--text);" oninput="onInputTextChange(this)"></textarea>
+          </div>
+
+          <!-- Bottom Action Bar inside Card -->
+          <div class="flex items-center justify-between gap-1.5 pt-1">
+            <div class="flex items-center gap-1.5 overflow-x-hidden">
+              <!-- Plus (+) Button -> opens Slash Command Popup -->
+              <button onclick="toggleSlashPopup()" class="w-7 h-7 rounded-full flex items-center justify-center transition border active:scale-95"
+                      style="background-color: var(--surface-variant); border-color: var(--border); color: var(--text-muted);" title="Commands">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+              </button>
+
+              <!-- Model Selector Pill with Switcher Dropdown -->
+              <div class="relative">
+                <button onclick="toggleModelDropdown()" class="px-2.5 py-1 rounded-full flex items-center gap-1 text-[11px] font-medium border transition active:scale-95"
+                        style="background-color: var(--surface-variant); border-color: var(--border); color: var(--text);">
+                  <span id="activeModelLabel">Gemini 3.8 Flash</span>
+                  <svg class="w-3 h-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+
+                <!-- Dropdown Menu -->
+                <div id="modelDropdownMenu" class="hidden absolute bottom-9 left-0 w-44 rounded-xl border shadow-xl p-1.5 z-40"
+                     style="background-color: var(--surface); border-color: var(--border);">
+                  <div onclick="selectModel('Gemini 3.8 Flash')" class="px-2.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between">
+                    <span>Gemini 3.8 Flash</span>
+                    <span class="text-[10px] text-amber-500 font-bold">Fast</span>
+                  </div>
+                  <div onclick="selectModel('GPT 5.5')" class="px-2.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between">
+                    <span>GPT 5.5</span>
+                    <span class="text-[10px] opacity-60">OpenAI</span>
+                  </div>
+                  <div onclick="selectModel('Claude 3.5 Sonnet')" class="px-2.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between">
+                    <span>Claude 3.5</span>
+                    <span class="text-[10px] opacity-60">Anthropic</span>
+                  </div>
+                  <div onclick="selectModel('DeepSeek R1')" class="px-2.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between">
+                    <span>DeepSeek R1</span>
+                    <span class="text-[10px] opacity-60">Reason</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Dynamic Effort Level Pill (Tangerine Bars) -->
+              <button onclick="cycleEffortLevel()" class="px-2.5 py-1 rounded-full flex items-center gap-1.5 text-[11px] font-medium border transition active:scale-95"
+                      style="background-color: var(--surface-variant); border-color: var(--border); color: var(--text-muted);">
+                <!-- Dynamic 3 Bars -->
+                <div class="flex items-end gap-[2.5px] h-3">
+                  <div class="w-[2.5px] h-1.5 rounded-full" style="background-color: var(--accent);"></div>
+                  <div id="effortBar2" class="w-[2.5px] h-2.5 rounded-full" style="background-color: var(--accent);"></div>
+                  <div id="effortBar3" class="w-[2.5px] h-3 rounded-full opacity-30" style="background-color: var(--accent);"></div>
+                </div>
+                <span id="effortTextLabel" class="text-[10px] font-semibold">Medium</span>
+              </button>
+            </div>
+
+            <!-- Waveform & Action Button -->
+            <div class="flex items-center gap-2">
+              <!-- Live Audio Waveform (Tangerine) -->
+              <div id="voiceWaveVisualizer" class="hidden items-center gap-[2.5px] h-5 px-1">
+                <div class="w-[2.5px] rounded-full wave-bar" style="background-color: var(--accent);"></div>
+                <div class="w-[2.5px] rounded-full wave-bar" style="background-color: var(--accent);"></div>
+                <div class="w-[2.5px] rounded-full wave-bar" style="background-color: var(--accent);"></div>
+                <div class="w-[2.5px] rounded-full wave-bar" style="background-color: var(--accent);"></div>
+                <div class="w-[2.5px] rounded-full wave-bar" style="background-color: var(--accent);"></div>
+              </div>
+
+              <!-- Circular Morphing Action Button (Mic / Send Arrow) -->
+              <button id="btnChatAction" onclick="handleChatAction()" class="w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-90 shadow-md"
+                      style="background-color: var(--primary); color: #FFFFFF;">
+                <!-- Mic Icon (Default when text empty) -->
+                <svg id="iconActionMic" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 003-3V5a3 3 0 10-6 0v6a3 3 0 003 3z"></path>
+                </svg>
+                <!-- Send Arrow Icon (When text typed) -->
+                <svg id="iconActionSend" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+
+    <!-- ===================================================================== -->
+    <!-- 2. BUILD WORKSPACE SCREEN (BuildWorkspaceView) -->
+    <!-- ===================================================================== -->
+    <div id="screenBuild" class="screen-view hidden flex-1 flex flex-col relative overflow-hidden">
+      <!-- Build Workspace Header -->
+      <header class="h-14 px-4 flex items-center justify-between border-b z-20 shrink-0" style="border-color: var(--border);">
+        <div class="flex items-center gap-2.5">
+          <button onclick="switchMode('chat')" class="w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5" style="color: var(--text);">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+          </button>
+          <div>
+            <div class="flex items-center gap-1.5">
+              <span class="text-xs font-bold" style="color: var(--text);">sandilyapoorv / Dettle</span>
+              <span class="text-[9px] px-1.5 py-0.2 rounded-full font-mono font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400">main</span>
+            </div>
+            <span class="text-[10px]" style="color: var(--text-muted);">Build Workspace · Kotlin Multiplatform</span>
+          </div>
+        </div>
+
+        <button onclick="runBuildTrigger()" id="btnTriggerBuild" class="px-2.5 py-1 rounded-lg text-xs font-bold text-white shadow-sm flex items-center gap-1 transition"
+                style="background-color: var(--accent);">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          <span>Run</span>
+        </button>
+      </header>
+
+      <!-- Build Sub-Tabs (Console / Files / Diff) -->
+      <div class="flex border-b text-xs font-semibold px-4 shrink-0" style="border-color: var(--border);">
+        <button onclick="switchBuildTab('console')" id="btnBuildTabConsole" class="py-2.5 mr-4 border-b-2 border-amber-500 text-amber-600 dark:text-amber-400">Console Log</button>
+        <button onclick="switchBuildTab('files')" id="btnBuildTabFiles" class="py-2.5 mr-4 border-b-2 border-transparent text-stone-500">File Tree</button>
+        <button onclick="switchBuildTab('diff')" id="btnBuildTabDiff" class="py-2.5 border-b-2 border-transparent text-stone-500">Git Diff</button>
+      </div>
+
+      <!-- Sub-Tab Content -->
+      <div class="flex-1 overflow-y-auto p-4 font-mono text-xs">
+        
+        <!-- Tab 1: Terminal Console -->
+        <div id="buildTabConsole" class="space-y-1.5 leading-relaxed">
+          <div class="flex items-center gap-2 text-stone-400">
+            <span class="text-amber-500 font-bold">$</span>
+            <span>./gradlew assembleDebug --continuous</span>
+          </div>
+          <div class="text-emerald-600 dark:text-emerald-400">> Task :app:compileDebugKotlin UP-TO-DATE</div>
+          <div class="text-emerald-600 dark:text-emerald-400">> Task :app:mergeDebugResources SUCCESS [1.2s]</div>
+          <div style="color: var(--text-muted);">> Task :app:processDebugManifest [0.3s]</div>
+          <div class="p-2.5 rounded-lg border my-2 font-mono text-[11px]" style="background-color: var(--surface); border-color: var(--border);">
+            <div class="flex items-center justify-between text-stone-400 mb-1">
+              <span>STATUS: READY</span>
+              <span class="text-emerald-500 font-bold">✓ 0 Errors</span>
+            </div>
+            <p style="color: var(--text);">Artifact built: app-debug.apk (51.94 MiB)</p>
+          </div>
+          <div id="consoleLiveLogs" class="text-stone-400">
+            <div>[INFO] Reactive file watcher listening on /src/main/...</div>
+            <div class="text-amber-500">⚡ Build environment ready for hot deployment</div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Files Tree -->
+        <div id="buildTabFiles" class="hidden space-y-1 select-none font-sans text-xs">
+          <div class="font-bold mb-2 uppercase text-[10px] tracking-wider" style="color: var(--text-muted);">Repository Files</div>
+          <div class="p-2 rounded-lg flex items-center justify-between hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer">
+            <span class="flex items-center gap-2">📁 app/src/main/java/com/dettle/app/ui/chat/</span>
+          </div>
+          <div class="pl-6 py-1 flex items-center justify-between text-stone-500 hover:text-stone-900 dark:hover:text-stone-100 cursor-pointer">
+            <span>📄 ChatScreen.kt</span>
+            <span class="text-[10px] font-mono text-emerald-500 font-semibold">MODIFIED</span>
+          </div>
+          <div class="pl-6 py-1 flex items-center justify-between text-stone-500 hover:text-stone-900 dark:hover:text-stone-100 cursor-pointer">
+            <span>📄 VerticalModeToggle.kt</span>
+            <span class="text-[10px] font-mono text-emerald-500 font-semibold">UPDATED</span>
+          </div>
+          <div class="pl-6 py-1 flex items-center justify-between text-stone-500 hover:text-stone-900 dark:hover:text-stone-100 cursor-pointer">
+            <span>📄 Color.kt</span>
+            <span class="text-[10px] font-mono text-amber-500 font-semibold">OAT/PLUM</span>
+          </div>
+        </div>
+
+        <!-- Tab 3: Git Diff -->
+        <div id="buildTabDiff" class="hidden space-y-2 font-mono text-[11px]">
+          <div class="p-2.5 rounded-lg border" style="background-color: var(--surface); border-color: var(--border);">
+            <div class="text-stone-400 mb-1">--- a/app/src/main/java/com/dettle/app/ui/chat/ChatScreen.kt</div>
+            <div class="text-stone-400 mb-2">+++ b/app/src/main/java/com/dettle/app/ui/chat/ChatScreen.kt</div>
+            <div class="text-rose-600 dark:text-rose-400 bg-rose-500/10 px-1 py-0.5 rounded">- fontSize = 32.sp, fontWeight = FontWeight.Normal</div>
+            <div class="text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1 py-0.5 rounded mt-0.5">+ fontFamily = FontFamily.Serif, fontStyle = FontStyle.Italic, fontSize = 34.sp</div>
+            <div class="text-rose-600 dark:text-rose-400 bg-rose-500/10 px-1 py-0.5 rounded mt-1">- shape = RoundedCornerShape(24.dp)</div>
+            <div class="text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1 py-0.5 rounded mt-0.5">+ shape = RoundedCornerShape(15.dp)</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+
+    <!-- ===================================================================== -->
+    <!-- 3. AUTH VAULT SCREEN (AuthVaultScreen) -->
+    <!-- ===================================================================== -->
+    <div id="screenVault" class="screen-view hidden flex-1 flex flex-col relative overflow-hidden">
+      <header class="h-14 px-4 flex items-center gap-3 border-b z-20 shrink-0" style="border-color: var(--border);">
+        <button onclick="navigateTo('chat')" class="w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5" style="color: var(--text);">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+        </button>
+        <div>
+          <h2 class="text-sm font-bold" style="color: var(--text);">Auth Vault</h2>
+          <p class="text-[10px]" style="color: var(--text-muted);">Android Keystore Encrypted Provider Credentials</p>
+        </div>
+      </header>
+
+      <div class="flex-1 overflow-y-auto p-4 space-y-3">
+        <!-- Vault Item: Google Gemini -->
+        <div class="p-3.5 rounded-2xl border shadow-sm" style="background-color: var(--surface); border-color: var(--border);">
+          <div class="flex items-center justify-between mb-1.5">
+            <div class="flex items-center gap-2">
+              <div class="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-600 flex items-center justify-center text-xs font-black">G</div>
+              <span class="text-xs font-bold" style="color: var(--text);">Google Gemini AI</span>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 font-semibold">ACTIVE</span>
+          </div>
+          <p class="text-[11px] font-mono text-stone-400">AIzaSyB...9X124K</p>
+          <div class="mt-2 pt-2 border-t flex justify-between items-center text-[10px]" style="border-color: var(--border-subtle); color: var(--text-muted);">
+            <span>Quota: Free Tier (60 RPM)</span>
+            <span class="text-indigo-500 font-semibold cursor-pointer">Rotate Key</span>
+          </div>
+        </div>
+
+        <!-- Vault Item: Anthropic Claude -->
+        <div class="p-3.5 rounded-2xl border shadow-sm" style="background-color: var(--surface); border-color: var(--border);">
+          <div class="flex items-center justify-between mb-1.5">
+            <div class="flex items-center gap-2">
+              <div class="w-6 h-6 rounded-lg bg-purple-500/20 text-purple-600 flex items-center justify-center text-xs font-black">C</div>
+              <span class="text-xs font-bold" style="color: var(--text);">Anthropic Claude</span>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 font-semibold">ACTIVE</span>
+          </div>
+          <p class="text-[11px] font-mono text-stone-400">sk-ant-api03...4a89</p>
+          <div class="mt-2 pt-2 border-t flex justify-between items-center text-[10px]" style="border-color: var(--border-subtle); color: var(--text-muted);">
+            <span>Provider: Direct API</span>
+            <span class="text-indigo-500 font-semibold cursor-pointer">Rotate Key</span>
+          </div>
+        </div>
+
+        <!-- Vault Item: OpenAI -->
+        <div class="p-3.5 rounded-2xl border shadow-sm" style="background-color: var(--surface); border-color: var(--border);">
+          <div class="flex items-center justify-between mb-1.5">
+            <div class="flex items-center gap-2">
+              <div class="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-600 flex items-center justify-center text-xs font-black">O</div>
+              <span class="text-xs font-bold" style="color: var(--text);">OpenAI</span>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 font-semibold">ACTIVE</span>
+          </div>
+          <p class="text-[11px] font-mono text-stone-400">sk-proj-91A...03F</p>
+        </div>
+
+        <button class="w-full py-2.5 rounded-xl border border-dashed text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-black/5 dark:hover:bg-white/5 transition"
+                style="border-color: var(--border); color: var(--primary);">
+          <span>+ Add Provider Key</span>
+        </button>
+      </div>
+    </div>
+
+
+    <!-- ===================================================================== -->
+    <!-- 4. DEPLOYMENTS SCREEN (DeploymentsScreen) -->
+    <!-- ===================================================================== -->
+    <div id="screenDeployments" class="screen-view hidden flex-1 flex flex-col relative overflow-hidden">
+      <header class="h-14 px-4 flex items-center gap-3 border-b z-20 shrink-0" style="border-color: var(--border);">
+        <button onclick="navigateTo('chat')" class="w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5" style="color: var(--text);">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+        </button>
+        <div>
+          <h2 class="text-sm font-bold" style="color: var(--text);">Deployments</h2>
+          <p class="text-[10px]" style="color: var(--text-muted);">Cloudflare Edge & GitHub Releases</p>
+        </div>
+      </header>
+
+      <div class="flex-1 overflow-y-auto p-4 space-y-3">
+        <!-- Release Card -->
+        <div class="p-3.5 rounded-2xl border shadow-sm" style="background-color: var(--surface); border-color: var(--border);">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs font-bold" style="color: var(--text);">Release v1.3.0 (Code 13)</span>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 font-semibold">PUBLISHED</span>
+          </div>
+          <p class="text-[11px] text-stone-500 mb-2">Built via GitHub Actions CI · 8m 57s</p>
+          <div class="flex gap-2">
+            <a href="https://github.com/sandilyapoorv/Dettle/releases/tag/v1.3.0" target="_blank" class="px-2.5 py-1 rounded-lg text-[10px] font-bold text-white shadow-sm flex items-center gap-1"
+               style="background-color: var(--primary);">
+              <span>Download APK</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Cloudflare Pages -->
+        <div class="p-3.5 rounded-2xl border shadow-sm" style="background-color: var(--surface); border-color: var(--border);">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs font-bold" style="color: var(--text);">Cloudflare Pages</span>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 font-semibold">ACTIVE</span>
+          </div>
+          <p class="text-[11px] text-stone-500">https://dettle.pages.dev</p>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ===================================================================== -->
+    <!-- 5. REPOS SCREEN (ReposScreen) -->
+    <!-- ===================================================================== -->
+    <div id="screenRepos" class="screen-view hidden flex-1 flex flex-col relative overflow-hidden">
+      <header class="h-14 px-4 flex items-center gap-3 border-b z-20 shrink-0" style="border-color: var(--border);">
+        <button onclick="navigateTo('chat')" class="w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5" style="color: var(--text);">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+        </button>
+        <div>
+          <h2 class="text-sm font-bold" style="color: var(--text);">Repositories</h2>
+          <p class="text-[10px]" style="color: var(--text-muted);">Synced GitHub Projects</p>
+        </div>
+      </header>
+
+      <div class="flex-1 overflow-y-auto p-4 space-y-3">
+        <div class="p-3.5 rounded-2xl border shadow-sm" style="background-color: var(--surface); border-color: var(--border);">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs font-bold" style="color: var(--text);">sandilyapoorv / Dettle</span>
+            <span class="text-[10px] text-stone-400 font-mono">main</span>
+          </div>
+          <p class="text-[11px]" style="color: var(--text-muted);">Autonomous Mobile AI Engineer</p>
+          <div class="mt-2 pt-2 border-t flex justify-between text-[10px]" style="border-color: var(--border-subtle); color: var(--text-muted);">
+            <span>Last Commit: a7b6690</span>
+            <span class="text-emerald-500 font-semibold">Synced</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ===================================================================== -->
+    <!-- 6. OVERNIGHT AUTONOMY SCREEN (OvernightScreen) -->
+    <!-- ===================================================================== -->
+    <div id="screenOvernight" class="screen-view hidden flex-1 flex flex-col relative overflow-hidden">
+      <header class="h-14 px-4 flex items-center gap-3 border-b z-20 shrink-0" style="border-color: var(--border);">
+        <button onclick="navigateTo('chat')" class="w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5" style="color: var(--text);">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+        </button>
+        <div>
+          <h2 class="text-sm font-bold" style="color: var(--text);">Overnight Autonomy</h2>
+          <p class="text-[10px]" style="color: var(--text-muted);">Self-Directed Autonomous Engineering Run</p>
+        </div>
+      </header>
+
+      <div class="flex-1 overflow-y-auto p-4 space-y-3">
+        <div class="p-3.5 rounded-2xl border shadow-sm" style="background-color: var(--surface); border-color: var(--border);">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs font-bold" style="color: var(--text);">Continuous Audit & Bug Hunter</span>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 font-semibold">IDLE</span>
+          </div>
+          <p class="text-[11px]" style="color: var(--text-muted);">Executes automated deep audits, fixes linting errors and verifies builds overnight.</p>
+          <div class="mt-3 flex gap-2">
+            <button class="px-3 py-1.5 rounded-xl text-xs font-bold text-white shadow-sm" style="background-color: var(--primary);">
+              Start Overnight Run
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ===================================================================== -->
+    <!-- 7. SETTINGS SCREEN (SettingsScreen) -->
+    <!-- ===================================================================== -->
+    <div id="screenSettings" class="screen-view hidden flex-1 flex flex-col relative overflow-hidden">
+      <header class="h-14 px-4 flex items-center gap-3 border-b z-20 shrink-0" style="border-color: var(--border);">
+        <button onclick="navigateTo('chat')" class="w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5" style="color: var(--text);">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+        </button>
+        <div>
+          <h2 class="text-sm font-bold" style="color: var(--text);">Settings</h2>
+          <p class="text-[10px]" style="color: var(--text-muted);">Preferences, System Themes & Backups</p>
+        </div>
+      </header>
+
+      <div class="flex-1 overflow-y-auto p-4 space-y-4">
+        
+        <!-- Appearance & Themes Card -->
+        <div class="p-4 rounded-2xl border shadow-sm" style="background-color: var(--surface); border-color: var(--border);">
+          <div class="flex items-center gap-2.5 mb-3">
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold" style="background-color: var(--primary-container); color: var(--primary-on-container);">🎨</div>
+            <div>
+              <h3 class="text-xs font-bold" style="color: var(--text);">System Theme Mode</h3>
+              <p class="text-[10px]" style="color: var(--text-muted);">Choose between Light and Dark mode</p>
+            </div>
+          </div>
+
+          <!-- 2 Locked Themes Picker -->
+          <div class="grid grid-cols-2 gap-2 mt-2">
+            <!-- Oat, Plum & Tangerine Light Button -->
+            <button onclick="setAppTheme('light')" id="themeOptLight" class="p-2.5 rounded-xl border text-left transition flex flex-col justify-between"
+                    style="border-color: var(--primary); background-color: var(--surface-variant);">
+              <div class="flex -space-x-1.5 mb-2">
+                <div class="w-3.5 h-3.5 rounded-full bg-[#F7F4EE] border border-black/30"></div>
+                <div class="w-3.5 h-3.5 rounded-full bg-[#6B21A8]"></div>
+                <div class="w-3.5 h-3.5 rounded-full bg-[#F97316]"></div>
+              </div>
+              <span class="text-xs font-bold" style="color: var(--text);">Oat & Plum</span>
+              <span class="text-[10px] text-amber-600 dark:text-amber-400 font-semibold">Light Mode</span>
+            </button>
+
+            <!-- Linear Obsidian Dark Button -->
+            <button onclick="setAppTheme('dark')" id="themeOptDark" class="p-2.5 rounded-xl border text-left transition flex flex-col justify-between"
+                    style="border-color: var(--border); background-color: var(--surface);">
+              <div class="flex -space-x-1.5 mb-2">
+                <div class="w-3.5 h-3.5 rounded-full bg-[#0C0D10] border border-white/20"></div>
+                <div class="w-3.5 h-3.5 rounded-full bg-[#5E6AD2]"></div>
+                <div class="w-3.5 h-3.5 rounded-full bg-[#38BDF8]"></div>
+              </div>
+              <span class="text-xs font-bold" style="color: var(--text);">Linear Obsidian</span>
+              <span class="text-[10px] text-stone-400 font-semibold">Dark Mode</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Google Drive Backup Card -->
+        <div class="p-4 rounded-2xl border shadow-sm" style="background-color: var(--surface); border-color: var(--border);">
+          <div class="flex items-center gap-2.5 mb-2">
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold bg-blue-500/20 text-blue-600">📁</div>
+            <div>
+              <h3 class="text-xs font-bold" style="color: var(--text);">Google Drive Sync</h3>
+              <p class="text-[10px]" style="color: var(--text-muted);">Automated encrypted repo snapshots</p>
+            </div>
+          </div>
+          <div class="flex justify-between items-center text-xs mt-3">
+            <span class="text-[11px] text-emerald-600 font-semibold">✓ Connected (OAuth2)</span>
+            <button class="px-2.5 py-1 rounded-lg text-xs font-bold text-white" style="background-color: var(--primary);">Backup Now</button>
+          </div>
+        </div>
+
+        <!-- App Details -->
+        <div class="p-3 text-center text-[10px] space-y-1" style="color: var(--text-muted);">
+          <div class="font-bold">Dettle v1.3.0 · Build 13</div>
+          <div>Kotlin Compose Multiplatform · Autonomous Agent</div>
+        </div>
+
+      </div>
+    </div>
+
+
+    <!-- ===================================================================== -->
+    <!-- 8. SLIDE-OUT CHAT HISTORY DRAWER (ChatHistoryDrawer) -->
+    <!-- ===================================================================== -->
+    <!-- Backdrop Overlay -->
+    <div id="drawerBackdrop" onclick="toggleDrawer(false)" class="hidden absolute inset-0 bg-black/50 z-40 transition-opacity duration-300"></div>
+
+    <!-- Drawer Sheet -->
+    <aside id="drawerSheet" class="absolute top-0 bottom-0 left-0 w-[300px] z-50 shadow-2xl flex flex-col transition-transform duration-300 -translate-x-full"
+           style="background-color: var(--drawer-bg); border-right: 1px solid var(--border);">
+      
+      <!-- Drawer Header -->
+      <div class="p-4 pb-2 flex items-center justify-between border-b" style="border-color: var(--border-subtle);">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-xl flex items-center justify-center font-bold text-white shadow-sm" style="background-color: var(--primary);">
+            ⚡
+          </div>
+          <div>
+            <h3 class="text-sm font-bold tracking-tight" style="color: var(--text);">Dettle</h3>
+            <p class="text-[10px]" style="color: var(--text-muted);">AI Engineering Assistant</p>
+          </div>
+        </div>
+        <button onclick="toggleDrawer(false)" class="w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5" style="color: var(--text-muted);">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+
+      <!-- "+ New Chat" Button -->
+      <div class="p-3">
+        <button onclick="startNewChat(); toggleDrawer(false);" class="w-full py-2.5 rounded-xl text-xs font-bold text-white shadow-sm flex items-center justify-center gap-1.5 transition active:scale-95"
+                style="background-color: var(--primary);">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+          <span>New Chat</span>
+        </button>
+      </div>
+
+      <!-- Unleashed Mode Switcher -->
+      <div class="px-3 pb-2">
+        <div class="p-2.5 rounded-xl border flex items-center justify-between" style="border-color: var(--border-subtle); background-color: var(--surface-variant);">
+          <div class="flex items-center gap-2">
+            <span class="text-xs">⚡</span>
+            <div>
+              <div class="text-[11px] font-bold" style="color: var(--text);">Unleashed Mode</div>
+              <div class="text-[9px]" style="color: var(--text-muted);">Unrestricted filesystem execution</div>
+            </div>
+          </div>
+          <input type="checkbox" id="chkUnleashed" class="w-4 h-4 accent-amber-500 cursor-pointer">
+        </div>
+      </div>
+
+      <!-- Recent Conversations List -->
+      <div class="flex-1 overflow-y-auto px-3 py-1 space-y-1">
+        <div class="text-[10px] font-bold uppercase tracking-wider px-2 py-1" style="color: var(--text-muted);">Recent Chats</div>
+        
+        <div onclick="loadConversation(1); toggleDrawer(false);" class="p-2 rounded-xl border cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition flex flex-col gap-0.5"
+             style="border-color: var(--border-subtle); background-color: var(--surface);">
+          <span class="text-xs font-semibold truncate" style="color: var(--text);">Redesign Chat UI with ai-chat-input</span>
+          <span class="text-[10px]" style="color: var(--text-muted);">Today · 10:44 AM</span>
+        </div>
+
+        <div onclick="loadConversation(2); toggleDrawer(false);" class="p-2 rounded-xl border cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition flex flex-col gap-0.5"
+             style="border-color: var(--border-subtle); background-color: var(--surface);">
+          <span class="text-xs font-semibold truncate" style="color: var(--text);">GitHub Release Pipeline v1.3.0</span>
+          <span class="text-[10px]" style="color: var(--text-muted);">Yesterday · 9:15 PM</span>
+        </div>
+      </div>
+
+      <!-- Bottom Quick Navigation (Auth Vault, Deployments, Repos, Overnight, Settings) -->
+      <div class="p-3 border-t space-y-1" style="border-color: var(--border-subtle);">
+        <button onclick="navigateTo('vault'); toggleDrawer(false);" class="w-full px-2.5 py-2 rounded-xl text-xs font-medium flex items-center justify-between hover:bg-black/5 dark:hover:bg-white/5 transition" style="color: var(--text);">
+          <div class="flex items-center gap-2">
+            <span>🛡️</span>
+            <span>Auth Vault</span>
+          </div>
+          <span class="text-[10px] text-stone-400">→</span>
+        </button>
+
+        <button onclick="navigateTo('deployments'); toggleDrawer(false);" class="w-full px-2.5 py-2 rounded-xl text-xs font-medium flex items-center justify-between hover:bg-black/5 dark:hover:bg-white/5 transition" style="color: var(--text);">
+          <div class="flex items-center gap-2">
+            <span>🚀</span>
+            <span>Deployments</span>
+          </div>
+          <span class="text-[10px] text-stone-400">→</span>
+        </button>
+
+        <button onclick="navigateTo('repos'); toggleDrawer(false);" class="w-full px-2.5 py-2 rounded-xl text-xs font-medium flex items-center justify-between hover:bg-black/5 dark:hover:bg-white/5 transition" style="color: var(--text);">
+          <div class="flex items-center gap-2">
+            <span>📦</span>
+            <span>Repositories</span>
+          </div>
+          <span class="text-[10px] text-stone-400">→</span>
+        </button>
+
+        <button onclick="navigateTo('overnight'); toggleDrawer(false);" class="w-full px-2.5 py-2 rounded-xl text-xs font-medium flex items-center justify-between hover:bg-black/5 dark:hover:bg-white/5 transition" style="color: var(--text);">
+          <div class="flex items-center gap-2">
+            <span>🌙</span>
+            <span>Overnight Autonomy</span>
+          </div>
+          <span class="text-[10px] text-stone-400">→</span>
+        </button>
+
+        <button onclick="navigateTo('settings'); toggleDrawer(false);" class="w-full px-2.5 py-2 rounded-xl text-xs font-medium flex items-center justify-between hover:bg-black/5 dark:hover:bg-white/5 transition" style="color: var(--text);">
+          <div class="flex items-center gap-2">
+            <span>⚙️</span>
+            <span>Settings</span>
+          </div>
+          <span class="text-[10px] text-stone-400">→</span>
+        </button>
+      </div>
+
+    </aside>
+
+
+    <!-- ===================================================================== -->
+    <!-- 9. SLASH COMMAND POPUP (SlashCommandPopup) -->
+    <!-- ===================================================================== -->
+    <div id="slashCommandPopup" class="hidden absolute bottom-20 left-4 right-4 rounded-2xl border shadow-2xl p-2 z-40 transition-all"
+         style="background-color: var(--surface); border-color: var(--border);">
+      <div class="px-2 py-1 text-[10px] font-bold uppercase tracking-wider border-b mb-1" style="border-color: var(--border-subtle); color: var(--text-muted);">
+        Autonomous Skills & Commands
+      </div>
+      <div class="max-h-48 overflow-y-auto space-y-1 text-xs">
+        <div onclick="insertSlashCommand('/goal ')" class="p-2 rounded-xl cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between">
+          <div>
+            <span class="font-bold text-amber-600 dark:text-amber-400">/goal</span>
+            <span class="ml-1.5" style="color: var(--text);">Run long-running autonomous task</span>
+          </div>
+        </div>
+        <div onclick="insertSlashCommand('/schedule ')" class="p-2 rounded-xl cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between">
+          <div>
+            <span class="font-bold text-indigo-500">/schedule</span>
+            <span class="ml-1.5" style="color: var(--text);">Recurring cron or one-shot timer</span>
+          </div>
+        </div>
+        <div onclick="insertSlashCommand('/grill-me')" class="p-2 rounded-xl cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between">
+          <div>
+            <span class="font-bold text-purple-500">/grill-me</span>
+            <span class="ml-1.5" style="color: var(--text);">Rigorous design challenge interview</span>
+          </div>
+        </div>
+        <div onclick="insertSlashCommand('/boost')" class="p-2 rounded-xl cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between">
+          <div>
+            <span class="font-bold text-emerald-500">/boost</span>
+            <span class="ml-1.5" style="color: var(--text);">Multi-perspective deep thinking</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+
+  <!-- ===================================================================== -->
+  <!-- JAVASCRIPT: Full Interactive Simulation Engine -->
+  <!-- ===================================================================== -->
+  <script>
+    // State
+    const state = {
+      theme: 'light', // 'light' (Oat & Plum) | 'dark' (Linear Obsidian)
+      mode: 'chat',   // 'chat' | 'build'
+      activeScreen: 'chat',
+      effortLevel: 1, // 0=Low, 1=Medium, 2=Max Effort
+      isVoiceRecording: false,
+      messages: []
+    };
+
+    // Navigation handler
+    function navigateTo(screenId) {
+      state.activeScreen = screenId;
+      document.querySelectorAll('.screen-view').forEach(el => el.classList.add('hidden'));
+      
+      const target = document.getElementById(`screen${screenId.charAt(0).toUpperCase() + screenId.slice(1)}`);
+      if (target) {
+        target.classList.remove('hidden');
+      }
+    }
+
+    // Toggle Chat / Build Mode (Vertical Mode Toggle)
+    function switchMode(mode) {
+      state.mode = mode;
+      const pill = document.getElementById('toggleActivePill');
+      const chatIcon = document.getElementById('iconModeChat');
+      const chatLabel = document.getElementById('labelModeChat');
+      const buildIcon = document.getElementById('iconModeBuild');
+      const buildLabel = document.getElementById('labelModeBuild');
+
+      if (mode === 'chat') {
+        pill.style.transform = 'translateY(0px)';
+        pill.style.backgroundColor = 'var(--primary)';
+        chatIcon.className = 'w-5 h-5 mb-0.5 text-white transition-colors';
+        chatLabel.className = 'text-[10px] font-bold text-white transition-colors';
+        buildIcon.style.color = 'var(--text-muted)';
+        buildLabel.style.color = 'var(--text-muted)';
+        buildLabel.className = 'text-[10px] font-medium transition-colors';
+        navigateTo('chat');
+      } else {
+        pill.style.transform = 'translateY(56px)';
+        pill.style.backgroundColor = 'var(--accent)';
+        chatIcon.style.color = 'var(--text-muted)';
+        chatLabel.style.color = 'var(--text-muted)';
+        chatLabel.className = 'text-[10px] font-medium transition-colors';
+        buildIcon.className = 'w-5 h-5 mb-0.5 text-white transition-colors';
+        buildLabel.className = 'text-[10px] font-bold text-white transition-colors';
+        navigateTo('build');
+      }
+    }
+
+    // Build Sub-Tabs
+    function switchBuildTab(tab) {
+      const tabs = ['console', 'files', 'diff'];
+      tabs.forEach(t => {
+        const btn = document.getElementById(`btnBuildTab${t.charAt(0).toUpperCase() + t.slice(1)}`);
+        const content = document.getElementById(`buildTab${t.charAt(0).toUpperCase() + t.slice(1)}`);
+        if (t === tab) {
+          btn.className = 'py-2.5 mr-4 border-b-2 border-amber-500 text-amber-600 dark:text-amber-400 font-bold';
+          content.classList.remove('hidden');
+        } else {
+          btn.className = 'py-2.5 mr-4 border-b-2 border-transparent text-stone-500';
+          content.classList.add('hidden');
+        }
+      });
+    }
+
+    function runBuildTrigger() {
+      const btn = document.getElementById('btnTriggerBuild');
+      btn.innerHTML = '<span>Building...</span>';
+      btn.style.opacity = '0.7';
+
+      setTimeout(() => {
+        const log = document.getElementById('consoleLiveLogs');
+        const time = new Date().toLocaleTimeString();
+        log.innerHTML += `<div class="text-emerald-500">[${time}] Build clean assembled in 4.1s. All 42 unit tests passed.</div>`;
+        btn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><span>Run</span>';
+        btn.style.opacity = '1.0';
+      }, 1500);
+    }
+
+    // Slide-out Drawer
+    function toggleDrawer(open) {
+      const drawer = document.getElementById('drawerSheet');
+      const backdrop = document.getElementById('drawerBackdrop');
+      if (open) {
+        backdrop.classList.remove('hidden');
+        drawer.style.transform = 'translateX(0)';
+      } else {
+        drawer.style.transform = 'translateX(-100%)';
+        setTimeout(() => backdrop.classList.add('hidden'), 250);
+      }
+    }
+
+    // Dynamic Effort Level cycle
+    function cycleEffortLevel() {
+      state.effortLevel = (state.effortLevel + 1) % 3;
+      const label = document.getElementById('effortTextLabel');
+      const b2 = document.getElementById('effortBar2');
+      const b3 = document.getElementById('effortBar3');
+
+      if (state.effortLevel === 0) {
+        label.innerText = 'Low';
+        b2.style.opacity = '0.3';
+        b3.style.opacity = '0.3';
+      } else if (state.effortLevel === 1) {
+        label.innerText = 'Medium';
+        b2.style.opacity = '1.0';
+        b3.style.opacity = '0.3';
+      } else {
+        label.innerText = 'Max Effort';
+        b2.style.opacity = '1.0';
+        b3.style.opacity = '1.0';
+      }
+    }
+
+    // Model Selector
+    function toggleModelDropdown() {
+      const menu = document.getElementById('modelDropdownMenu');
+      menu.classList.toggle('hidden');
+    }
+
+    function selectModel(modelName) {
+      document.getElementById('activeModelLabel').innerText = modelName;
+      document.getElementById('modelDropdownMenu').classList.add('hidden');
+    }
+
+    // Slash Commands Popup
+    function toggleSlashPopup() {
+      const pop = document.getElementById('slashCommandPopup');
+      pop.classList.toggle('hidden');
+    }
+
+    function insertSlashCommand(cmd) {
+      const input = document.getElementById('chatTextInput');
+      input.value = cmd;
+      input.focus();
+      toggleSlashPopup();
+      onInputTextChange(input);
+    }
+
+    // Text Input & Action Button (Morphing Mic / Send)
+    function onInputTextChange(el) {
+      el.style.height = 'auto';
+      el.style.height = (el.scrollHeight) + 'px';
+
+      const sendIcon = document.getElementById('iconActionSend');
+      const micIcon = document.getElementById('iconActionMic');
+
+      if (el.value.trim().length > 0) {
+        sendIcon.classList.remove('hidden');
+        micIcon.classList.add('hidden');
+      } else {
+        sendIcon.classList.add('hidden');
+        micIcon.classList.remove('hidden');
+      }
+    }
+
+    // Handle Mic vs Send
+    function handleChatAction() {
+      const input = document.getElementById('chatTextInput');
+      const text = input.value.trim();
+
+      if (text.length > 0) {
+        // Send Message
+        sendMessage(text);
+        input.value = '';
+        input.style.height = 'auto';
+        onInputTextChange(input);
+      } else {
+        // Toggle Voice Recording Simulation
+        toggleVoiceRecording();
+      }
+    }
+
+    function toggleVoiceRecording() {
+      state.isVoiceRecording = !state.isVoiceRecording;
+      const wave = document.getElementById('voiceWaveVisualizer');
+      const actionBtn = document.getElementById('btnChatAction');
+
+      if (state.isVoiceRecording) {
+        wave.classList.remove('hidden');
+        wave.classList.add('flex');
+        actionBtn.style.backgroundColor = '#EF4444'; // Red recording stop
+        actionBtn.innerHTML = '<div class="w-3 h-3 bg-white rounded-sm"></div>';
+        
+        // Simulate auto speech-to-text after 2.5s
+        setTimeout(() => {
+          if (state.isVoiceRecording) {
+            toggleVoiceRecording();
+            const input = document.getElementById('chatTextInput');
+            input.value = "Inspect the release pipeline and build the new release APK.";
+            onInputTextChange(input);
+          }
+        }, 2500);
+      } else {
+        wave.classList.add('hidden');
+        wave.classList.remove('flex');
+        actionBtn.style.backgroundColor = 'var(--primary)';
+        actionBtn.innerHTML = `
+          <svg id="iconActionMic" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 003-3V5a3 3 0 10-6 0v6a3 3 0 003 3z"></path>
+          </svg>
+          <svg id="iconActionSend" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+          </svg>
+        `;
+      }
+    }
+
+    // Message Sending & Stream Management
+    function sendMessage(text) {
+      // Hide empty greeting, show stream
+      document.getElementById('emptyGreetingView').classList.add('hidden');
+      const stream = document.getElementById('messagesScrollView');
+      stream.classList.remove('hidden');
+      document.getElementById('btnNewChatTop').classList.remove('hidden');
+      document.getElementById('btnNewChatTop').classList.add('flex');
+
+      // 1. Append User Message
+      const userBubble = document.createElement('div');
+      userBubble.className = 'self-end max-w-[85%] rounded-2xl p-3 border shadow-sm ml-auto animate-fade-in';
+      userBubble.style.backgroundColor = 'var(--user-bubble)';
+      userBubble.style.borderColor = 'var(--user-bubble-border)';
+      userBubble.style.color = 'var(--text)';
+      userBubble.innerHTML = `<p class="text-xs leading-relaxed font-medium">${escapeHtml(text)}</p>`;
+      stream.appendChild(userBubble);
+      stream.scrollTop = stream.scrollHeight;
+
+      // 2. Simulate AI Thinking & Response
+      setTimeout(() => {
+        const aiBubble = document.createElement('div');
+        aiBubble.className = 'self-start max-w-[92%] rounded-2xl p-3.5 border shadow-sm animate-fade-in';
+        aiBubble.style.backgroundColor = 'var(--surface)';
+        aiBubble.style.borderColor = 'var(--border)';
+        aiBubble.style.color = 'var(--text)';
+
+        aiBubble.innerHTML = `
+          <div class="flex items-center gap-1.5 mb-1.5 font-bold text-[11px]" style="color: var(--primary);">
+            <span>✨ Dettle Engine</span>
+            <span class="text-[9px] px-1.5 rounded-full font-mono bg-purple-500/10 text-purple-600">Autonomous</span>
+          </div>
+          <div class="text-xs leading-relaxed space-y-2">
+            <p>Understood. Executing verification and assembling the build artifacts using the verified pipeline.</p>
+            <div class="p-2 rounded-xl border text-[11px] font-mono flex items-center justify-between" style="background-color: var(--surface-variant); border-color: var(--border);">
+              <span>⚡ Task: assembleRelease</span>
+              <span class="text-emerald-600 font-bold">READY</span>
+            </div>
+          </div>
+        `;
+        stream.appendChild(aiBubble);
+        stream.scrollTop = stream.scrollHeight;
+      }, 700);
+    }
+
+    function startNewChat() {
+      const stream = document.getElementById('messagesScrollView');
+      stream.innerHTML = '';
+      stream.classList.add('hidden');
+      document.getElementById('emptyGreetingView').classList.remove('hidden');
+      document.getElementById('btnNewChatTop').classList.add('hidden');
+      document.getElementById('btnNewChatTop').classList.remove('flex');
+      
+      const input = document.getElementById('chatTextInput');
+      input.value = '';
+      input.style.height = 'auto';
+      onInputTextChange(input);
+      navigateTo('chat');
+    }
+
+    function loadConversation(id) {
+      startNewChat();
+      if (id === 1) {
+        sendMessage("Redesign the chat UI with the minimal topbar, centered greeting and unified ai-chat-input card.");
+      } else {
+        sendMessage("Inspect GitHub Actions CI and publish the v1.3.0 release APK.");
+      }
+    }
+
+    // Theme Switcher (Oat/Plum Light vs Linear Obsidian Dark)
+    function setAppTheme(mode) {
+      state.theme = mode;
+      const html = document.documentElement;
+      const lightBtn = document.getElementById('themeOptLight');
+      const darkBtn = document.getElementById('themeOptDark');
+
+      if (mode === 'dark') {
+        html.setAttribute('data-theme', 'dark');
+        darkBtn.style.borderColor = 'var(--primary)';
+        darkBtn.style.backgroundColor = 'var(--surface-variant)';
+        lightBtn.style.borderColor = 'var(--border)';
+        lightBtn.style.backgroundColor = 'var(--surface)';
+      } else {
+        html.removeAttribute('data-theme');
+        lightBtn.style.borderColor = 'var(--primary)';
+        lightBtn.style.backgroundColor = 'var(--surface-variant)';
+        darkBtn.style.borderColor = 'var(--border)';
+        darkBtn.style.backgroundColor = 'var(--surface)';
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.innerText = text;
+      return div.innerHTML;
+    }
+
+    // Auto-focus input after 1-second delay (as specified in product requirements)
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        const input = document.getElementById('chatTextInput');
+        if (input && state.activeScreen === 'chat') {
+          input.focus();
+        }
+      }, 1000);
+    });
+  </script>
+</body>
+</html>

@@ -38,29 +38,53 @@ val DettleDarkOnError = Color(0xFF450A0A)
 val DettleDarkErrorContainer = Color(0xFF2D1214)
 val DettleDarkOnErrorContainer = Color(0xFFFCA5A5)
 
-// Light Theme Palette (Apple Studio Light)
-val DettleLightBackground = Color(0xFFF5F5F7)
-val DettleLightOnBackground = Color(0xFF1D1D1F)
-val DettleLightSurface = Color(0xFFFFFFFF)
-val DettleLightOnSurface = Color(0xFF1D1D1F)
-val DettleLightSurfaceVariant = Color(0xFFE8E8ED)
-val DettleLightOnSurfaceVariant = Color(0xFF6E6E73)
+// Light Theme Palette (Oat, Plum Purple & Tangerine)
+val DettleOatBackground = Color(0xFFF7F4EE)
+val DettleOatOnBackground = Color(0xFF1C1917)
+val DettleOatSurface = Color(0xFFFFFFFF)
+val DettleOatOnSurface = Color(0xFF1C1917)
+val DettleOatSurfaceVariant = Color(0xFFEDE8DF)
+val DettleOatOnSurfaceVariant = Color(0xFF78716C)
 
-val DettleLightPrimary = Color(0xFF0071E3)
-val DettleLightOnPrimary = Color(0xFFFFFFFF)
-val DettleLightPrimaryContainer = Color(0xFFE1F0FF)
-val DettleLightOnPrimaryContainer = Color(0xFF003D7A)
+val DettlePlumPrimary = Color(0xFF6B21A8)
+val DettlePlumOnPrimary = Color(0xFFFFFFFF)
+val DettlePlumPrimaryContainer = Color(0xFFF3E8FF)
+val DettlePlumOnPrimaryContainer = Color(0xFF3B0764)
 
-val DettleLightSecondary = Color(0xFF515154)
-val DettleLightOnSecondary = Color(0xFFFFFFFF)
-val DettleLightSecondaryContainer = Color(0xFFE3E3E8)
-val DettleLightOnSecondaryContainer = Color(0xFF1D1D1F)
+val DettleTangerineTertiary = Color(0xFFF97316)
+val DettleTangerineOnTertiary = Color(0xFFFFFFFF)
 
-val DettleLightTertiary = Color(0xFF30B0C7)
-val DettleLightOnTertiary = Color(0xFFFFFFFF)
+val DettleOatSecondary = Color(0xFF78716C)
+val DettleOatOnSecondary = Color(0xFFFFFFFF)
+val DettleOatSecondaryContainer = Color(0xFFE7E1D5)
+val DettleOatOnSecondaryContainer = Color(0xFF292524)
 
-val DettleLightOutline = Color(0xFFC6C6C8)
-val DettleLightOutlineVariant = Color(0xFFD2D2D7)
+val DettleOatOutline = Color(0xFFD4CEBF)
+val DettleOatOutlineVariant = Color(0xFFE2DDD2)
+
+// Backward-compatible semantic aliases
+val DettleLightBackground = DettleOatBackground
+val DettleLightOnBackground = DettleOatOnBackground
+val DettleLightSurface = DettleOatSurface
+val DettleLightOnSurface = DettleOatOnSurface
+val DettleLightSurfaceVariant = DettleOatSurfaceVariant
+val DettleLightOnSurfaceVariant = DettleOatOnSurfaceVariant
+
+val DettleLightPrimary = DettlePlumPrimary
+val DettleLightOnPrimary = DettlePlumOnPrimary
+val DettleLightPrimaryContainer = DettlePlumPrimaryContainer
+val DettleLightOnPrimaryContainer = DettlePlumOnPrimaryContainer
+
+val DettleLightSecondary = DettleOatSecondary
+val DettleLightOnSecondary = DettleOatOnSecondary
+val DettleLightSecondaryContainer = DettleOatSecondaryContainer
+val DettleLightOnSecondaryContainer = DettleOatOnSecondaryContainer
+
+val DettleLightTertiary = DettleTangerineTertiary
+val DettleLightOnTertiary = DettleTangerineOnTertiary
+
+val DettleLightOutline = DettleOatOutline
+val DettleLightOutlineVariant = DettleOatOutlineVariant
 
 val DettleLightError = Color(0xFFFF3B30)
 val DettleLightOnError = Color(0xFFFFFFFF)
@@ -139,27 +163,27 @@ fun createColorSchemeForTheme(
                 onErrorContainer = DettleDarkOnErrorContainer
             )
         }
-        AppTheme.APPLE_LIGHT -> {
-            val primary = customAccent ?: Color(0xFF0071E3)
+        AppTheme.OAT_LIGHT, AppTheme.APPLE_LIGHT -> {
+            val primary = customAccent ?: DettlePlumPrimary
             lightColorScheme(
                 primary = primary,
                 onPrimary = Color.White,
-                primaryContainer = primary.copy(alpha = 0.12f),
-                onPrimaryContainer = Color(0xFF003D7A),
-                secondary = DettleLightSecondary,
+                primaryContainer = DettlePlumPrimaryContainer,
+                onPrimaryContainer = DettlePlumOnPrimaryContainer,
+                secondary = DettleOatSecondary,
                 onSecondary = Color.White,
-                secondaryContainer = DettleLightSecondaryContainer,
-                onSecondaryContainer = DettleLightOnSecondaryContainer,
-                tertiary = DettleLightTertiary,
+                secondaryContainer = DettleOatSecondaryContainer,
+                onSecondaryContainer = DettleOatOnSecondaryContainer,
+                tertiary = DettleTangerineTertiary,
                 onTertiary = Color.White,
-                background = DettleLightBackground,
-                onBackground = DettleLightOnBackground,
-                surface = DettleLightSurface,
-                onSurface = DettleLightOnSurface,
-                surfaceVariant = DettleLightSurfaceVariant,
-                onSurfaceVariant = DettleLightOnSurfaceVariant,
-                outline = DettleLightOutline,
-                outlineVariant = DettleLightOutlineVariant,
+                background = DettleOatBackground,
+                onBackground = DettleOatOnBackground,
+                surface = DettleOatSurface,
+                onSurface = DettleOatOnSurface,
+                surfaceVariant = DettleOatSurfaceVariant,
+                onSurfaceVariant = DettleOatOnSurfaceVariant,
+                outline = DettleOatOutline,
+                outlineVariant = DettleOatOutlineVariant,
                 error = DettleLightError,
                 onError = DettleLightOnError,
                 errorContainer = DettleLightErrorContainer,

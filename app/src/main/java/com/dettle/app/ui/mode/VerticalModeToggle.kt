@@ -76,9 +76,9 @@ fun VerticalModeToggle(
         label = "pressScale"
     )
 
-    // Vertical sliding pill position: 3dp for CHAT (top), 47dp for BUILD (bottom)
+    // Vertical sliding pill position: 3dp for CHAT (top), 59dp for BUILD (bottom)
     val pillOffsetY by animateDpAsState(
-        targetValue = if (selected == EnvironmentMode.CHAT) 3.dp else 47.dp,
+        targetValue = if (selected == EnvironmentMode.CHAT) 3.dp else 59.dp,
         animationSpec = spring(
             dampingRatio = 0.82f,
             stiffness = Spring.StiffnessMediumLow
@@ -98,18 +98,18 @@ fun VerticalModeToggle(
                 scaleX = pressScale
                 scaleY = pressScale
             }
-            .shadow(6.dp, RoundedCornerShape(26.dp))
-            .clip(RoundedCornerShape(26.dp))
+            .shadow(6.dp, RoundedCornerShape(28.dp))
+            .clip(RoundedCornerShape(28.dp))
             .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
             .border(
                 BorderStroke(
                     1.dp,
                     MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)
                 ),
-                RoundedCornerShape(26.dp)
+                RoundedCornerShape(28.dp)
             )
-            .width(46.dp)
-            .height(94.dp)
+            .width(52.dp)
+            .height(118.dp)
             .pointerInput(selected) {
                 detectTapGestures { offset ->
                     val isTopHalf = offset.y < size.height / 2f
@@ -121,19 +121,19 @@ fun VerticalModeToggle(
                 }
             }
     ) {
-        // Sliding Active Indicator Pill
+        // Sliding Active Indicator Pill (larger and longer)
         Box(
             modifier = Modifier
                 .padding(horizontal = 3.dp)
                 .offset { IntOffset(0, pillOffsetY.roundToPx()) }
-                .width(40.dp)
-                .height(44.dp)
-                .shadow(2.dp, RoundedCornerShape(22.dp))
-                .clip(RoundedCornerShape(22.dp))
+                .width(46.dp)
+                .height(56.dp)
+                .shadow(2.dp, RoundedCornerShape(24.dp))
+                .clip(RoundedCornerShape(24.dp))
                 .background(MaterialTheme.colorScheme.primaryContainer)
                 .border(
                     BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
-                    RoundedCornerShape(22.dp)
+                    RoundedCornerShape(24.dp)
                 )
         )
 
@@ -146,8 +146,8 @@ fun VerticalModeToggle(
             val isChat = selected == EnvironmentMode.CHAT
             Box(
                 modifier = Modifier
-                    .width(46.dp)
-                    .height(47.dp)
+                    .width(52.dp)
+                    .height(59.dp)
                     .clickable(
                         interactionSource = interactionSource,
                         indication = null
@@ -166,13 +166,13 @@ fun VerticalModeToggle(
                         imageVector = Icons.Outlined.ChatBubbleOutline,
                         contentDescription = "Chat Mode",
                         tint = if (isChat) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(19.dp)
                     )
-                    Spacer(Modifier.height(2.dp))
+                    Spacer(Modifier.height(3.dp))
                     Text(
                         text = "Chat",
                         style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 9.sp,
+                            fontSize = 10.sp,
                             fontWeight = if (isChat) FontWeight.Bold else FontWeight.Medium,
                             letterSpacing = (-0.02).sp
                         ),
@@ -185,8 +185,8 @@ fun VerticalModeToggle(
             val isBuild = selected == EnvironmentMode.BUILD
             Box(
                 modifier = Modifier
-                    .width(46.dp)
-                    .height(47.dp)
+                    .width(52.dp)
+                    .height(59.dp)
                     .clickable(
                         interactionSource = interactionSource,
                         indication = null
@@ -205,13 +205,13 @@ fun VerticalModeToggle(
                         imageVector = Icons.Outlined.Construction,
                         contentDescription = "Build Mode",
                         tint = if (isBuild) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(19.dp)
                     )
-                    Spacer(Modifier.height(2.dp))
+                    Spacer(Modifier.height(3.dp))
                     Text(
                         text = "Build",
                         style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 9.sp,
+                            fontSize = 10.sp,
                             fontWeight = if (isBuild) FontWeight.Bold else FontWeight.Medium,
                             letterSpacing = (-0.02).sp
                         ),

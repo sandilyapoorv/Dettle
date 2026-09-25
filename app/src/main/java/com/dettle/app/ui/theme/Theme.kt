@@ -36,7 +36,7 @@ fun DettleTheme(
         ThemeMode.SYSTEM, null -> darkTheme
     }
 
-    val activeTheme = themeConfig?.theme ?: if (isEffectiveDark) AppTheme.OBSIDIAN else AppTheme.APPLE_LIGHT
+    val activeTheme = themeConfig?.theme ?: if (isEffectiveDark) AppTheme.OBSIDIAN else AppTheme.OAT_LIGHT
     val customAccent = themeConfig?.customAccentHex?.let { Color(it) }
     val isPureOled = themeConfig?.isPureOled == true || activeTheme == AppTheme.OLED_BLACK
 

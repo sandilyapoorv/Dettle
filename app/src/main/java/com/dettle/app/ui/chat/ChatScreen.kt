@@ -145,6 +145,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -524,11 +525,13 @@ fun ChatScreen(
                                     Text(
                                         text = "hello Monsieur",
                                         style = MaterialTheme.typography.headlineMedium.copy(
-                                            fontSize = 32.sp,
+                                            fontFamily = FontFamily.Serif,
+                                            fontStyle = FontStyle.Italic,
+                                            fontSize = 34.sp,
                                             fontWeight = FontWeight.Normal,
                                             letterSpacing = (-0.02).sp
                                         ),
-                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f)
+                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.88f)
                                     )
                                 }
                             } else {
@@ -646,7 +649,7 @@ fun ChatScreen(
                     onSelect = viewModel::setEnvironmentMode,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(top = 18.dp, end = 12.dp)
+                        .padding(top = 0.dp, end = 12.dp)
                 )
             }
         }
@@ -680,7 +683,9 @@ fun ChatWelcomeHero(onPromptSelected: (String) -> Unit) {
         Text(
             text = "hello Monsieur",
             style = MaterialTheme.typography.headlineMedium.copy(
-                fontSize = 32.sp,
+                fontFamily = FontFamily.Serif,
+                fontStyle = FontStyle.Italic,
+                fontSize = 34.sp,
                 fontWeight = FontWeight.Normal,
                 letterSpacing = (-0.02).sp
             ),
@@ -700,7 +705,9 @@ fun BuildWelcomeHero(onPromptSelected: (String) -> Unit) {
         Text(
             text = "hello Monsieur",
             style = MaterialTheme.typography.headlineMedium.copy(
-                fontSize = 32.sp,
+                fontFamily = FontFamily.Serif,
+                fontStyle = FontStyle.Italic,
+                fontSize = 34.sp,
                 fontWeight = FontWeight.Normal,
                 letterSpacing = (-0.02).sp
             ),
@@ -1292,7 +1299,7 @@ fun ChatInputBar(
     ) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(15.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 2.dp,
             shadowElevation = 2.dp,
