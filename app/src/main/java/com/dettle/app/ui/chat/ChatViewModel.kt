@@ -152,6 +152,14 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch { modeRepository.resetToDefault(id) }
     }
 
+    fun setSelectedModel(model: String) {
+        _uiState.update { it.copy(selectedModel = model) }
+    }
+
+    fun setEffortLevel(effort: String) {
+        _uiState.update { it.copy(effortLevel = effort) }
+    }
+
     // ── Conversation Persistence ────────────────────────────────────────────
 
     fun switchConversation(id: String) {
@@ -554,5 +562,7 @@ data class ChatUiState(
     val environmentMode: EnvironmentMode = EnvironmentMode.CHAT,
     val activeConversationId: String? = null,
     val isUnleashed: Boolean = false,
-    val cognitiveStatus: String? = null
+    val cognitiveStatus: String? = null,
+    val selectedModel: String = "Gemini 3.8 Flash",
+    val effortLevel: String = "Medium"
 )

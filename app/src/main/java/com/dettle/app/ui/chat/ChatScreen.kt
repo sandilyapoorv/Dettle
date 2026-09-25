@@ -11,6 +11,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -54,14 +55,23 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.ElectricBolt
 import androidx.compose.material.icons.outlined.Close
@@ -174,6 +184,14 @@ fun ChatScreen(
     var customizingMode by remember { mutableStateOf<com.dettle.app.orchestrator.mode.AgentMode?>(null) }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(Unit) {
+        delay(1000)
+        focusRequester.requestFocus()
+        keyboardController?.show()
+    }
 
     // Voice Typing state
     val voiceTypingManager = remember { VoiceTypingManager(context.applicationContext) }
@@ -317,13 +335,6 @@ fun ChatScreen(
 
                         Spacer(Modifier.weight(1f))
 
-                        AppleModePillToggle(
-                            selected = uiState.environmentMode,
-                            onSelect = viewModel::setEnvironmentMode
-                        )
-
-                        Spacer(Modifier.weight(1f))
-
                         if (uiState.isAgentRunning && uiState.thinkingStep > 0) {
                             Surface(
                                 shape = MaterialTheme.shapes.extraSmall,
@@ -347,15 +358,17 @@ fun ChatScreen(
                             )
                         }
 
-                        IconButton(
-                            onClick = viewModel::startNewChat,
-                            modifier = Modifier.size(40.dp)
-                        ) {
-                            Icon(
-                                Icons.Outlined.Edit,
-                                contentDescription = "New chat",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
+                        if (uiState.messages.isNotEmpty()) {
+                            IconButton(
+                                onClick = viewModel::startNewChat,
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Edit,
+                                    contentDescription = "New chat",
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
                         }
                     }
                 }
@@ -384,6 +397,14 @@ fun ChatScreen(
                         isRunning = uiState.isAgentRunning,
                         isListening = isVoiceListening,
                         voiceRmsFlow = voiceTypingManager.rmsDb,
+                        focusRequester = focusRequester,
+                        selectedModel = uiState.selectedModel,
+                        onModelSelect = viewModel::setSelectedModel,
+                        effortLevel = uiState.effortLevel,
+                        onEffortChange = viewModel::setEffortLevel,
+                        onPlusClick = {
+                            if (inputText.isEmpty()) inputText = "/"
+                        },
                         onValueChange = { inputText = it },
                         onSend = {
                             if (inputText.isNotBlank()) {
@@ -493,24 +514,35 @@ fun ChatScreen(
                                 }
                             }
 
-                            // Message List
-                            LazyColumn(
-                                state = listState,
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(start = 20.dp, end = 68.dp, top = 8.dp, bottom = 12.dp),
-                                verticalArrangement = Arrangement.spacedBy(14.dp)
-                            ) {
-                                if (uiState.messages.isEmpty()) {
-                                    item(key = "welcome_card_chat") {
-                                        ChatWelcomeHero(onPromptSelected = onPromptSelected)
-                                    }
+                            if (uiState.messages.isEmpty()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(bottom = 60.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "hello Monsieur",
+                                        style = MaterialTheme.typography.headlineMedium.copy(
+                                            fontSize = 32.sp,
+                                            fontWeight = FontWeight.Normal,
+                                            letterSpacing = (-0.02).sp
+                                        ),
+                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f)
+                                    )
                                 }
-
-                                items(
-                                    items = uiState.messages,
-                                    key = { it.id },
-                                    contentType = { it.type.name }
-                                ) { message ->
+                            } else {
+                                LazyColumn(
+                                    state = listState,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(start = 20.dp, end = 68.dp, top = 8.dp, bottom = 12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                                ) {
+                                    items(
+                                        items = uiState.messages,
+                                        key = { it.id },
+                                        contentType = { it.type.name }
+                                    ) { message ->
                                     MessageItem(
                                         message = message,
                                         onApprove = onApprove,
@@ -542,7 +574,8 @@ fun ChatScreen(
                                 }
                             }
                         }
-                    } else {
+                    }
+                } else {
                         // BUILD mode
                         val workModes = remember(allModes) {
                             allModes.filter { it.id.environment == EnvironmentMode.BUILD }
@@ -613,7 +646,7 @@ fun ChatScreen(
                     onSelect = viewModel::setEnvironmentMode,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(top = 10.dp, end = 10.dp)
+                        .padding(top = 18.dp, end = 12.dp)
                 )
             }
         }
@@ -638,119 +671,41 @@ fun WelcomeCard(onPromptSelected: (String) -> Unit) {
 
 @Composable
 fun ChatWelcomeHero(onPromptSelected: (String) -> Unit) {
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(vertical = 48.dp),
+        contentAlignment = Alignment.Center
     ) {
         Text(
-            text = "what would you like to chat about Shri",
-            style = MaterialTheme.typography.headlineSmall.copy(
-                fontSize = 24.sp,
-                lineHeight = 30.sp,
+            text = "hello Monsieur",
+            style = MaterialTheme.typography.headlineMedium.copy(
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Normal,
                 letterSpacing = (-0.02).sp
             ),
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.9f)
         )
-
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        Icons.Outlined.Psychology,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Text(
-                        "Quick Prompts",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-
-                listOf(
-                    Pair(Icons.Outlined.RateReview, "Explain this architecture and recent changes"),
-                    Pair(Icons.Outlined.BugReport, "Debug a tricky issue in the project"),
-                    Pair(Icons.Outlined.Code, "Draft a new feature or implementation plan"),
-                    Pair(Icons.Outlined.Security, "Review security rules and credentials")
-                ).forEach { (icon, text) ->
-                    QuickActionCard(icon = icon, text = text, onClick = { onPromptSelected(text) })
-                }
-            }
-        }
     }
 }
 
 @Composable
 fun BuildWelcomeHero(onPromptSelected: (String) -> Unit) {
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(vertical = 48.dp),
+        contentAlignment = Alignment.Center
     ) {
         Text(
-            text = "what would you like to put in your wiener sir today",
-            style = MaterialTheme.typography.headlineSmall.copy(
-                fontSize = 24.sp,
-                lineHeight = 30.sp,
+            text = "hello Monsieur",
+            style = MaterialTheme.typography.headlineMedium.copy(
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Normal,
                 letterSpacing = (-0.02).sp
             ),
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.9f)
         )
-
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        Icons.Outlined.Construction,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Text(
-                        "Workspace Quick Actions",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-
-                listOf(
-                    Pair(Icons.Outlined.FolderCopy, "Map repository codebase and start a project"),
-                    Pair(Icons.Outlined.Terminal, "Run autonomous task and create a PR"),
-                    Pair(Icons.Outlined.CloudUpload, "Deploy current build to Cloudflare"),
-                    Pair(Icons.Outlined.Bedtime, "Configure an overnight autonomous run")
-                ).forEach { (icon, text) ->
-                    QuickActionCard(icon = icon, text = text, onClick = { onPromptSelected(text) })
-                }
-            }
-        }
     }
 }
 
@@ -1271,6 +1226,41 @@ enum class ActionButtonState {
     SEND
 }
 
+@Composable
+fun DynamicBarsIcon(level: String, modifier: Modifier = Modifier) {
+    val isMediumOrHigh = level == "Medium" || level == "Max Effort"
+    val isHigh = level == "Max Effort"
+    val barColor = MaterialTheme.colorScheme.primary
+
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.Bottom,
+        horizontalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .width(2.5.dp)
+                .height(5.dp)
+                .clip(RoundedCornerShape(1.dp))
+                .background(barColor)
+        )
+        Box(
+            modifier = Modifier
+                .width(2.5.dp)
+                .height(8.dp)
+                .clip(RoundedCornerShape(1.dp))
+                .background(if (isMediumOrHigh) barColor else barColor.copy(alpha = 0.3f))
+        )
+        Box(
+            modifier = Modifier
+                .width(2.5.dp)
+                .height(11.dp)
+                .clip(RoundedCornerShape(1.dp))
+                .background(if (isHigh) barColor else barColor.copy(alpha = 0.3f))
+        )
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ChatInputBar(
@@ -1279,142 +1269,295 @@ fun ChatInputBar(
     isRunning: Boolean,
     isListening: Boolean,
     voiceRmsFlow: StateFlow<Float>,
+    focusRequester: FocusRequester? = null,
+    selectedModel: String = "Gemini 3.8 Flash",
+    onModelSelect: (String) -> Unit = {},
+    effortLevel: String = "Medium",
+    onEffortChange: (String) -> Unit = {},
+    onPlusClick: () -> Unit = {},
     onValueChange: (String) -> Unit,
     onSend: () -> Unit,
     onMicClick: () -> Unit,
     onStopVoiceClick: () -> Unit,
     onCancelVoiceClick: () -> Unit
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 3.dp,
-        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+    val rmsValue by voiceRmsFlow.collectAsState()
+    var isModelMenuOpen by remember { mutableStateOf(false) }
+    val efforts = remember { listOf("Low", "Medium", "Max Effort") }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 6.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 2.dp,
+            shadowElevation = 2.dp,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
         ) {
-            AnimatedContent(
-                targetState = isListening,
-                modifier = Modifier.weight(1f),
-                transitionSpec = {
-                    (fadeIn(tween(180)) + scaleIn(initialScale = 0.97f))
-                        .togetherWith(fadeOut(tween(140)) + scaleOut(targetScale = 0.97f))
-                },
-                label = "inputModeAnimation"
-            ) { listening ->
-                if (listening) {
-                    VoiceWaveformBar(
-                        rmsFlow = voiceRmsFlow,
-                        onCancel = onCancelVoiceClick
-                    )
-                } else {
-                    OutlinedTextField(
-                        value = value,
-                        onValueChange = onValueChange,
-                        enabled = enabled,
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = {
-                            Text(
-                                if (!enabled && isRunning) "Agent is working..."
-                                else "Ask Dettle anything...",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        },
-                        shape = RoundedCornerShape(24.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                        ),
-                        keyboardOptions = KeyboardOptions(
-                            capitalization = KeyboardCapitalization.Sentences,
-                            imeAction = ImeAction.Send
-                        ),
-                        keyboardActions = KeyboardActions(onSend = {
-                            if (value.isNotBlank()) onSend()
-                        }),
-                        maxLines = 5,
-                        textStyle = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-
-            Spacer(Modifier.width(10.dp))
-
-            // Dynamic Morphing Action Button: Mic / Hold (Stop) / Send
-            val buttonState = when {
-                isListening -> ActionButtonState.HOLD
-                value.isNotBlank() -> ActionButtonState.SEND
-                else -> ActionButtonState.MIC
-            }
-
-            AnimatedContent(
-                targetState = buttonState,
-                transitionSpec = {
-                    (scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)) + fadeIn(tween(150)))
-                        .togetherWith(scaleOut(spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium)) + fadeOut(tween(120)))
-                },
-                label = "actionButtonMorph"
-            ) { state ->
-                when (state) {
-                    ActionButtonState.HOLD -> {
-                        FilledIconButton(
-                            onClick = onStopVoiceClick,
-                            modifier = Modifier.size(46.dp),
-                            shape = CircleShape,
-                            colors = IconButtonDefaults.filledIconButtonColors(
-                                containerColor = DettleRed,
-                                contentColor = Color.White
-                            )
-                        ) {
-                            Icon(
-                                Icons.Filled.Pause,
-                                contentDescription = "Hold / Tap to stop recording and transcribe",
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-                    ActionButtonState.SEND -> {
-                        FilledIconButton(
-                            onClick = onSend,
-                            enabled = enabled && value.isNotBlank(),
-                            modifier = Modifier.size(46.dp),
-                            shape = CircleShape,
-                            colors = IconButtonDefaults.filledIconButtonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary,
-                                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
-                            )
-                        ) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.Send,
-                                contentDescription = "Send",
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                    ActionButtonState.MIC -> {
-                        IconButton(
-                            onClick = onMicClick,
-                            enabled = enabled && !isRunning,
+            Column(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                // Main Text Input Area or Voice Waveform Mode
+                AnimatedContent(
+                    targetState = isListening,
+                    transitionSpec = {
+                        (fadeIn(tween(180)) + scaleIn(initialScale = 0.97f))
+                            .togetherWith(fadeOut(tween(140)) + scaleOut(targetScale = 0.97f))
+                    },
+                    label = "inputModeAnimation"
+                ) { listening ->
+                    if (listening) {
+                        VoiceWaveformBar(
+                            rmsFlow = voiceRmsFlow,
+                            onCancel = onCancelVoiceClick,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        )
+                    } else {
+                        BasicTextField(
+                            value = value,
+                            onValueChange = onValueChange,
+                            enabled = enabled,
                             modifier = Modifier
-                                .size(46.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
-                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                                .fillMaxWidth()
+                                .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+                                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 6.dp),
+                            textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontSize = 15.sp,
+                                lineHeight = 22.sp
+                            ),
+                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                            keyboardOptions = KeyboardOptions(
+                                capitalization = KeyboardCapitalization.Sentences,
+                                imeAction = ImeAction.Default
+                            ),
+                            maxLines = 5,
+                            decorationBox = { innerTextField ->
+                                Box(modifier = Modifier.fillMaxWidth()) {
+                                    if (value.isEmpty()) {
+                                        Text(
+                                            text = if (!enabled && isRunning) "Agent is working..." else "Ask anything...",
+                                            style = MaterialTheme.typography.bodyLarge.copy(
+                                                fontSize = 15.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                            )
+                                        )
+                                    }
+                                    innerTextField()
+                                }
+                            }
+                        )
+                    }
+                }
+
+                // Bottom toolbar inside the box
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 10.dp, end = 10.dp, bottom = 8.dp, top = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Model Selector Pill
+                    Box {
+                        Surface(
+                            onClick = { isModelMenuOpen = true },
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                         ) {
-                            Icon(
-                                Icons.Outlined.Mic,
-                                contentDescription = "Start voice typing",
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(20.dp)
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Psychology,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    text = selectedModel,
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 11.sp
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.ArrowDropDown,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+
+                        DropdownMenu(
+                            expanded = isModelMenuOpen,
+                            onDismissRequest = { isModelMenuOpen = false }
+                        ) {
+                            listOf(
+                                "Gemini 3.8 Flash",
+                                "GPT 5.5",
+                                "Claude 3.5 Sonnet",
+                                "DeepSeek R1",
+                                "Groq Llama 3.3",
+                                "Ollama (Local)"
+                            ).forEach { modelName ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            modelName,
+                                            fontWeight = if (modelName == selectedModel) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (modelName == selectedModel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                        )
+                                    },
+                                    onClick = {
+                                        onModelSelect(modelName)
+                                        isModelMenuOpen = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.width(6.dp))
+
+                    // Effort Level Pill
+                    Surface(
+                        onClick = {
+                            val currentIndex = efforts.indexOf(effortLevel).coerceAtLeast(0)
+                            val nextIndex = (currentIndex + 1) % efforts.size
+                            onEffortChange(efforts[nextIndex])
+                        },
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            DynamicBarsIcon(level = effortLevel, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = effortLevel,
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 11.sp
+                                ),
+                                color = MaterialTheme.colorScheme.onSurface
                             )
+                        }
+                    }
+
+                    Spacer(Modifier.width(6.dp))
+
+                    // Plus (+) Button
+                    IconButton(
+                        onClick = onPlusClick,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Options or commands",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+
+                    Spacer(Modifier.weight(1f))
+
+                    // Audio wave visualizer overlay when recording
+                    if (isListening) {
+                        Row(
+                            modifier = Modifier.padding(end = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                        ) {
+                            repeat(5) { i ->
+                                val barHeight by animateDpAsState(
+                                    targetValue = (6 + (rmsValue.coerceIn(0f, 1f) * (14 + i * 3))).dp,
+                                    animationSpec = tween(80),
+                                    label = "waveBar$i"
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .width(2.5.dp)
+                                        .height(barHeight)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary)
+                                )
+                            }
+                        }
+                    }
+
+                    // Circular Action Button (Mic / Stop / Send)
+                    val buttonState = when {
+                        isListening -> ActionButtonState.HOLD
+                        value.isNotBlank() -> ActionButtonState.SEND
+                        else -> ActionButtonState.MIC
+                    }
+
+                    Surface(
+                        onClick = {
+                            when (buttonState) {
+                                ActionButtonState.HOLD -> onStopVoiceClick()
+                                ActionButtonState.SEND -> if (enabled && value.isNotBlank()) onSend()
+                                ActionButtonState.MIC -> onMicClick()
+                            }
+                        },
+                        shape = CircleShape,
+                        color = if (buttonState == ActionButtonState.HOLD) DettleRed else MaterialTheme.colorScheme.primary,
+                        contentColor = Color.White,
+                        shadowElevation = 2.dp,
+                        modifier = Modifier.size(38.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            AnimatedContent(
+                                targetState = buttonState,
+                                transitionSpec = {
+                                    (scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)) + fadeIn(tween(150)))
+                                        .togetherWith(scaleOut(spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium)) + fadeOut(tween(120)))
+                                },
+                                label = "circleActionMorph"
+                            ) { state ->
+                                when (state) {
+                                    ActionButtonState.HOLD -> {
+                                        Icon(
+                                            Icons.Filled.Stop,
+                                            contentDescription = "Stop recording",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    ActionButtonState.SEND -> {
+                                        Icon(
+                                            Icons.AutoMirrored.Filled.Send,
+                                            contentDescription = "Send",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                    ActionButtonState.MIC -> {
+                                        Icon(
+                                            Icons.Filled.Mic,
+                                            contentDescription = "Voice input",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
