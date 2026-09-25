@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [v1.3.0] - 2026-09-25: Minimal Top Bar, Centered "hello Monsieur" Greeting, and Unified ai-chat-input Redesign
+
+### Direct APK Download
+- **Production Release APK (R8 Minified, Signed)**: [app-release.apk](https://github.com/sandilyapoorv/Dettle/releases/download/v1.3.0/app-release.apk)
+- **Debug APK**: [app-debug.apk](https://github.com/sandilyapoorv/Dettle/releases/download/v1.3.0/app-debug.apk)
+- **GitHub Release Page**: [https://github.com/sandilyapoorv/Dettle/releases/tag/v1.3.0](https://github.com/sandilyapoorv/Dettle/releases/tag/v1.3.0)
+- **CI/CD Workflow**: [https://github.com/sandilyapoorv/Dettle/actions](https://github.com/sandilyapoorv/Dettle/actions)
+
+### Why This Release Was Done
+Complete overhaul of the Chat interface to deliver an ultra-clean, minimalist developer experience inspired by 21st.dev's ai-chat-input:
+1. Removed top-bar clutter and duplicate pill toggles; left 3-line hamburger menu opens history drawer.
+2. Docked VerticalModeToggle (Chat / Build) on top-right with increased vertical breathing space.
+3. New Chat button only appears once a conversation has started.
+4. Centered "hello Monsieur" greeting on blank screen with zero clutter or distraction.
+5. Automatic 1-second keyboard focus on app launch.
+6. Unified card box chat input with multi-line auto-expand, model selector pill with switcher, dynamic effort level selector, live audio wave visualizer, and a circular morphing action button (mic / stop / send).
+
+---
+
 ## [v1.1.0] - 2026-09-24: Linear / Raycast Obsidian Theme Overhaul, Precision Geometry, & Dock Navigation
 
 ### Direct APK Download
