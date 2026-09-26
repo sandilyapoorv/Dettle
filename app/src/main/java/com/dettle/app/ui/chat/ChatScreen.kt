@@ -18,6 +18,8 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -31,17 +33,22 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -74,6 +81,10 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.ElectricBolt
 import androidx.compose.material.icons.outlined.Close
@@ -204,6 +215,14 @@ fun ChatScreen(
     val coroutineScope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+
+    LaunchedEffect(drawerState.isOpen, drawerState.isAnimationRunning) {
+        if (drawerState.isOpen || drawerState.targetValue == DrawerValue.Open) {
+            keyboardController?.hide()
+            focusManager.clearFocus()
+        }
+    }
 
     LaunchedEffect(Unit) {
         delay(1000)
@@ -353,6 +372,8 @@ fun ChatScreen(
                         isListening = isVoiceListening,
                         voiceRmsFlow = voiceTypingManager.rmsDb,
                         focusRequester = focusRequester,
+                        selectedChatModes = uiState.selectedChatModes,
+                        onToggleChatMode = viewModel::toggleChatMode,
                         searchOrResearchMode = uiState.searchOrResearchMode,
                         onSearchOrResearchChange = viewModel::setSearchOrResearchMode,
                         effortLevel = uiState.effortLevel,
@@ -546,11 +567,15 @@ fun ChatScreen(
                             lockedModeId = uiState.lockedModeId,
                             onModeTap = onModeTap,
                             onModeSettings = onModeSettings,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .statusBarsPadding()
+                                .padding(top = 126.dp),
                             messageStreamContent = {
                                 LazyColumn(
                                     state = listState,
                                     modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(start = 20.dp, end = 68.dp, top = 136.dp, bottom = 12.dp),
+                                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 12.dp),
                                     verticalArrangement = Arrangement.spacedBy(14.dp)
                                 ) {
                                     if (uiState.messages.isEmpty()) {
@@ -612,7 +637,11 @@ fun ChatScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(
-                            onClick = { coroutineScope.launch { drawerState.open() } },
+                            onClick = {
+                                keyboardController?.hide()
+                                focusManager.clearFocus()
+                                coroutineScope.launch { drawerState.open() }
+                            },
                             modifier = Modifier.size(40.dp)
                         ) {
                             Icon(
@@ -1235,37 +1264,100 @@ enum class ActionButtonState {
 }
 
 @Composable
-fun DynamicBarsIcon(level: String, modifier: Modifier = Modifier) {
-    val isMediumOrHigh = level == "Medium" || level == "Max Effort"
-    val isHigh = level == "Max Effort"
-    val barColor = MaterialTheme.colorScheme.primary
+fun EffortSlideBar(
+    effortLevel: String,
+    onEffortChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val options = remember { listOf("Low", "Medium", "Max") }
+    val selectedIndex = remember(effortLevel) {
+        when {
+            effortLevel.startsWith("Low", ignoreCase = true) -> 0
+            effortLevel.startsWith("Max", ignoreCase = true) -> 2
+            else -> 1
+        }
+    }
 
-    Row(
-        modifier = modifier,
-        verticalAlignment = Alignment.Bottom,
-        horizontalArrangement = Arrangement.spacedBy(2.dp)
+    val animatedIndex by animateFloatAsState(
+        targetValue = selectedIndex.toFloat(),
+        animationSpec = spring(
+            dampingRatio = 0.82f,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "effortSlide"
+    )
+
+    BoxWithConstraints(
+        modifier = modifier
+            .height(28.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+            .border(
+                0.5.dp,
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                RoundedCornerShape(14.dp)
+            )
+            .pointerInput(Unit) {
+                detectTapGestures { offset ->
+                    val segW = size.width / 3f
+                    val idx = (offset.x / segW).toInt().coerceIn(0, 2)
+                    onEffortChange(options[idx])
+                }
+            }
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures { change, _ ->
+                    val segW = size.width / 3f
+                    val idx = (change.position.x / segW).toInt().coerceIn(0, 2)
+                    onEffortChange(options[idx])
+                }
+            }
     ) {
+        val segmentWidth = maxWidth / 3
+
+        // Sliding Active Capsule
         Box(
             modifier = Modifier
-                .width(2.5.dp)
-                .height(5.dp)
-                .clip(RoundedCornerShape(1.dp))
-                .background(barColor)
+                .padding(vertical = 2.dp, horizontal = 2.dp)
+                .offset(x = segmentWidth * animatedIndex)
+                .width(segmentWidth - 4.dp)
+                .fillMaxHeight()
+                .shadow(1.5.dp, RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.primaryContainer)
+                .border(
+                    0.5.dp,
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
+                    RoundedCornerShape(12.dp)
+                )
         )
-        Box(
-            modifier = Modifier
-                .width(2.5.dp)
-                .height(8.dp)
-                .clip(RoundedCornerShape(1.dp))
-                .background(if (isMediumOrHigh) barColor else barColor.copy(alpha = 0.3f))
-        )
-        Box(
-            modifier = Modifier
-                .width(2.5.dp)
-                .height(11.dp)
-                .clip(RoundedCornerShape(1.dp))
-                .background(if (isHigh) barColor else barColor.copy(alpha = 0.3f))
-        )
+
+        // 3 Components (Low, Medium, Max)
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            options.forEachIndexed { index, option ->
+                val isSelected = selectedIndex == index
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = option,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            fontSize = 10.5.sp
+                        ),
+                        color = if (isSelected)
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -1278,7 +1370,9 @@ fun ChatInputBar(
     isListening: Boolean,
     voiceRmsFlow: StateFlow<Float>,
     focusRequester: FocusRequester? = null,
-    searchOrResearchMode: String = "Web Search",
+    selectedChatModes: Set<String> = setOf("Normal"),
+    onToggleChatMode: (String) -> Unit = {},
+    searchOrResearchMode: String = "Normal",
     onSearchOrResearchChange: (String) -> Unit = {},
     effortLevel: String = "Medium",
     onEffortChange: (String) -> Unit = {},
@@ -1447,6 +1541,102 @@ fun ChatInputBar(
                     }
                 }
 
+                // Expandable Mode Selection Bar with Tick Marks (Normal, Web Search, Research)
+                AnimatedVisibility(
+                    visible = isModeBarOpen,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val modeItems = listOf(
+                                Triple("Normal", Icons.Outlined.AutoAwesome, "Normal"),
+                                Triple("Web Search", Icons.Outlined.Search, "Web Search"),
+                                Triple("Research", Icons.Outlined.Psychology, "Research")
+                            )
+
+                            modeItems.forEach { (modeId, icon, label) ->
+                                val isSelected = selectedChatModes.contains(modeId)
+                                Surface(
+                                    onClick = { onToggleChatMode(modeId) },
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                                    border = BorderStroke(
+                                        1.dp,
+                                        if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                                    )
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        // Tick mark box
+                                        Box(
+                                            modifier = Modifier
+                                                .size(16.dp)
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .background(
+                                                    if (isSelected) MaterialTheme.colorScheme.primary
+                                                    else Color.Transparent
+                                                )
+                                                .border(
+                                                    1.dp,
+                                                    if (isSelected) MaterialTheme.colorScheme.primary
+                                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                                    RoundedCornerShape(4.dp)
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            if (isSelected) {
+                                                Icon(
+                                                    imageVector = Icons.Outlined.Check,
+                                                    contentDescription = "Checked",
+                                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                                    modifier = Modifier.size(12.dp)
+                                                )
+                                            }
+                                        }
+
+                                        Spacer(Modifier.width(6.dp))
+
+                                        Icon(
+                                            imageVector = icon,
+                                            contentDescription = null,
+                                            tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(13.dp)
+                                        )
+
+                                        Spacer(Modifier.width(5.dp))
+
+                                        Text(
+                                            text = label,
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                fontSize = 11.sp
+                                            ),
+                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Bottom toolbar inside the box
                 Row(
                     modifier = Modifier
@@ -1454,102 +1644,73 @@ fun ChatInputBar(
                         .padding(start = 10.dp, end = 10.dp, bottom = 8.dp, top = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Web Search / Research Mode Pill
-                    Box {
-                        Surface(
-                            onClick = {
-                                val nextMode = if (searchOrResearchMode == "Web Search") "Research" else "Web Search"
-                                onSearchOrResearchChange(nextMode)
-                            },
-                            shape = RoundedCornerShape(16.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = if (searchOrResearchMode.contains("Research", ignoreCase = true)) {
-                                        Icons.Outlined.Psychology
-                                    } else {
-                                        Icons.Outlined.Search
-                                    },
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(13.dp)
-                                )
-                                Spacer(Modifier.width(4.dp))
-                                Text(
-                                    text = searchOrResearchMode,
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 11.sp
-                                    ),
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Spacer(Modifier.width(2.dp))
-                                Icon(
-                                    imageVector = Icons.Default.ArrowDropDown,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                            }
-                        }
-
-                        DropdownMenu(
-                            expanded = isModeMenuOpen,
-                            onDismissRequest = { isModeMenuOpen = false }
-                        ) {
-                            DropdownMenuItem(
-                                leadingIcon = { Icon(Icons.Outlined.Search, null, tint = MaterialTheme.colorScheme.primary) },
-                                text = { Text("Web Search", fontWeight = if (searchOrResearchMode == "Web Search") FontWeight.Bold else FontWeight.Normal) },
-                                onClick = {
-                                    onSearchOrResearchChange("Web Search")
-                                    isModeMenuOpen = false
-                                }
-                            )
-                            DropdownMenuItem(
-                                leadingIcon = { Icon(Icons.Outlined.Psychology, null, tint = MaterialTheme.colorScheme.primary) },
-                                text = { Text("Research", fontWeight = if (searchOrResearchMode == "Research") FontWeight.Bold else FontWeight.Normal) },
-                                onClick = {
-                                    onSearchOrResearchChange("Research")
-                                    isModeMenuOpen = false
-                                }
-                            )
-                        }
+                    // Mode Summary Pill (Opens/Closes the Mode Selection Bar)
+                    val modeIcon = when {
+                        selectedChatModes.contains("Research") && selectedChatModes.contains("Web Search") -> Icons.Outlined.Psychology
+                        selectedChatModes.contains("Research") -> Icons.Outlined.Psychology
+                        selectedChatModes.contains("Web Search") -> Icons.Outlined.Search
+                        else -> Icons.Outlined.AutoAwesome
+                    }
+                    val modeSummaryText = when {
+                        selectedChatModes.contains("Research") && selectedChatModes.contains("Web Search") -> "Web & Research"
+                        selectedChatModes.contains("Research") -> "Research"
+                        selectedChatModes.contains("Web Search") -> "Web Search"
+                        else -> "Normal"
                     }
 
-                    Spacer(Modifier.width(6.dp))
-
-                    // Effort Level Pill (Low, Medium, Max Effort) - Clean display without showing step budget numbers
                     Surface(
-                        onClick = {
-                            val currentIndex = efforts.indexOf(effortLevel).coerceAtLeast(0)
-                            val nextIndex = (currentIndex + 1) % efforts.size
-                            onEffortChange(efforts[nextIndex])
-                        },
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                        onClick = { isModeBarOpen = !isModeBarOpen },
+                        shape = RoundedCornerShape(14.dp),
+                        color = if (isModeBarOpen) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = BorderStroke(
+                            0.5.dp,
+                            if (isModeBarOpen) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                        )
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            DynamicBarsIcon(level = effortLevel, modifier = Modifier.size(14.dp))
+                            Icon(
+                                imageVector = modeIcon,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(13.dp)
+                            )
                             Spacer(Modifier.width(4.dp))
                             Text(
-                                text = effortLevel,
+                                text = modeSummaryText,
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 11.sp
                                 ),
                                 color = MaterialTheme.colorScheme.onSurface
                             )
+                            Spacer(Modifier.width(2.dp))
+                            val arrowRotation by animateFloatAsState(
+                                targetValue = if (isModeBarOpen) 180f else 0f,
+                                animationSpec = tween(200),
+                                label = "modeArrowRot"
+                            )
+                            Icon(
+                                imageVector = Icons.Default.ArrowDropDown,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .size(14.dp)
+                                    .graphicsLayer { rotationZ = arrowRotation }
+                            )
                         }
                     }
+
+                    Spacer(Modifier.width(6.dp))
+
+                    // Slide bar with 3 main components: Low, Medium, Max
+                    EffortSlideBar(
+                        effortLevel = effortLevel,
+                        onEffortChange = onEffortChange,
+                        modifier = Modifier.width(136.dp)
+                    )
 
                     Spacer(Modifier.weight(1f))
 

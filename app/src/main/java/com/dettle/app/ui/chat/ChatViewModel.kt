@@ -157,13 +157,71 @@ class ChatViewModel @Inject constructor(
     }
 
     fun setSearchOrResearchMode(mode: String) {
-        val targetModeId = if (mode.contains("Research", ignoreCase = true)) ModeId.RESEARCH else ModeId.WEB
+        val targetModeId = when {
+            mode.contains("Research", ignoreCase = true) && mode.contains("Web", ignoreCase = true) -> ModeId.RESEARCH
+            mode.contains("Research", ignoreCase = true) -> ModeId.RESEARCH
+            mode.contains("Web", ignoreCase = true) -> ModeId.WEB
+            else -> null
+        }
+        val modes = when {
+            mode.contains("Research", ignoreCase = true) && mode.contains("Web", ignoreCase = true) -> setOf("Web Search", "Research")
+            mode.contains("Research", ignoreCase = true) -> setOf("Research")
+            mode.contains("Web", ignoreCase = true) -> setOf("Web Search")
+            else -> setOf("Normal")
+        }
         lockedModeId = targetModeId
         _uiState.update {
             it.copy(
+                selectedChatModes = modes,
                 searchOrResearchMode = mode,
                 lockedModeId = targetModeId,
-                activeModeId = targetModeId
+                activeModeId = targetModeId ?: ModeId.CHAT
+            )
+        }
+    }
+
+    fun toggleChatMode(mode: String) {
+        _uiState.update { current ->
+            val updated = current.selectedChatModes.toMutableSet()
+            if (mode == "Normal") {
+                if (updated.contains("Normal")) {
+                    if (updated.size > 1) {
+                        updated.remove("Normal")
+                    }
+                } else {
+                    updated.add("Normal")
+                }
+            } else {
+                if (updated.contains(mode)) {
+                    updated.remove(mode)
+                    if (updated.isEmpty()) {
+                        updated.add("Normal")
+                    }
+                } else {
+                    updated.add(mode)
+                }
+            }
+
+            val newLockedModeId = when {
+                updated.contains("Research") && updated.contains("Web Search") -> ModeId.RESEARCH
+                updated.contains("Research") -> ModeId.RESEARCH
+                updated.contains("Web Search") -> ModeId.WEB
+                else -> null
+            }
+            lockedModeId = newLockedModeId
+
+            val summaryText = when {
+                updated.contains("Research") && updated.contains("Web Search") -> "Web & Research"
+                updated.contains("Research") -> "Research"
+                updated.contains("Web Search") -> "Web Search"
+                else -> "Normal"
+            }
+
+            current.copy(
+                selectedChatModes = updated,
+                searchOrResearchMode = summaryText,
+                lockedModeId = newLockedModeId,
+                activeModeId = newLockedModeId ?: ModeId.CHAT
             )
         }
     }
@@ -585,6 +643,7 @@ data class ChatUiState(
     val isUnleashed: Boolean = false,
     val cognitiveStatus: String? = null,
     val selectedModel: String = "Gemini 3.8 Flash",
-    val searchOrResearchMode: String = "Web Search",
+    val selectedChatModes: Set<String> = setOf("Normal"),
+    val searchOrResearchMode: String = "Normal",
     val effortLevel: String = "Medium"
 )
