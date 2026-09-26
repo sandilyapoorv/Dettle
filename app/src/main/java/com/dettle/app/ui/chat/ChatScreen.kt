@@ -50,6 +50,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -182,6 +184,19 @@ fun ChatScreen(
     val recentConversations by viewModel.recentConversations.collectAsState()
     val listState = rememberLazyListState()
     var inputText by remember { mutableStateOf("") }
+    var attachments by remember { mutableStateOf<List<ChatAttachment>>(emptyList()) }
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            val newAttachments = uris.map { uri ->
+                AttachmentHelper.resolveAttachment(context, uri)
+            }
+            attachments = attachments + newAttachments
+        }
+    }
+
     var customizingMode by remember { mutableStateOf<com.dettle.app.orchestrator.mode.AgentMode?>(null) }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
@@ -311,69 +326,6 @@ fun ChatScreen(
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
-            topBar = {
-                Surface(
-                    color = MaterialTheme.colorScheme.background,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .statusBarsPadding()
-                            .padding(top = 2.dp, bottom = 4.dp, start = 8.dp, end = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(
-                            onClick = { coroutineScope.launch { drawerState.open() } },
-                            modifier = Modifier.size(40.dp)
-                        ) {
-                            Icon(
-                                Icons.Filled.Menu,
-                                contentDescription = "Open Chat History",
-                                tint = MaterialTheme.colorScheme.onBackground
-                            )
-                        }
-
-                        Spacer(Modifier.weight(1f))
-
-                        if (uiState.isAgentRunning && uiState.thinkingStep > 0) {
-                            Surface(
-                                shape = MaterialTheme.shapes.extraSmall,
-                                color = if (uiState.isUnleashed) DettleGreen.copy(alpha = 0.2f) else MaterialTheme.colorScheme.primaryContainer,
-                                modifier = Modifier.padding(end = 4.dp)
-                            ) {
-                                Text(
-                                    "${uiState.thinkingStep}/${uiState.maxSteps}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (uiState.isUnleashed) DettleGreen else MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        } else if (uiState.isAgentRunning) {
-                            CircularProgressIndicator(
-                                modifier = Modifier
-                                    .size(18.dp)
-                                    .padding(end = 4.dp),
-                                color = if (uiState.isUnleashed) DettleGreen else MaterialTheme.colorScheme.primary,
-                                strokeWidth = 2.dp
-                            )
-                        }
-
-                        if (uiState.messages.isNotEmpty()) {
-                            IconButton(
-                                onClick = viewModel::startNewChat,
-                                modifier = Modifier.size(40.dp)
-                            ) {
-                                Icon(
-                                    Icons.Outlined.Edit,
-                                    contentDescription = "New chat",
-                                    tint = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
-                    }
-                }
-            },
             bottomBar = {
                 Column(
                     modifier = Modifier
@@ -399,31 +351,33 @@ fun ChatScreen(
                         isListening = isVoiceListening,
                         voiceRmsFlow = voiceTypingManager.rmsDb,
                         focusRequester = focusRequester,
-                        selectedModel = uiState.selectedModel,
-                        onModelSelect = viewModel::setSelectedModel,
+                        searchOrResearchMode = uiState.searchOrResearchMode,
+                        onSearchOrResearchChange = viewModel::setSearchOrResearchMode,
                         effortLevel = uiState.effortLevel,
                         onEffortChange = viewModel::setEffortLevel,
-                        onPlusClick = {
-                            if (inputText.isEmpty()) inputText = "/"
-                        },
+                        attachments = attachments,
+                        onAddAttachmentClick = { filePickerLauncher.launch("*/*") },
+                        onRemoveAttachment = { att -> attachments = attachments.filter { it.id != att.id } },
                         onValueChange = { inputText = it },
                         onSend = {
-                            if (inputText.isNotBlank()) {
-                                val trimmed = inputText.trim()
+                            val trimmed = inputText.trim()
+                            if (trimmed.isNotBlank() || attachments.isNotEmpty()) {
+                                val fullText = AttachmentHelper.formatAttachmentsForPrompt(trimmed, attachments)
                                 val matchingCmd = ALL_SLASH_COMMANDS.firstOrNull {
                                     trimmed.startsWith("${it.command} ", ignoreCase = true) || trimmed.equals(it.command, ignoreCase = true)
                                 }
                                 if (matchingCmd != null) {
                                     viewModel.selectSlashCommand(matchingCmd)
                                     val queryText = trimmed.removePrefix(matchingCmd.command).trim()
-                                    if (queryText.isNotBlank()) {
-                                        viewModel.sendMessage(queryText)
+                                    val promptToSend = AttachmentHelper.formatAttachmentsForPrompt(queryText, attachments)
+                                    if (promptToSend.isNotBlank()) {
+                                        viewModel.sendMessage(promptToSend)
                                     }
-                                    inputText = ""
                                 } else {
-                                    viewModel.sendMessage(trimmed)
-                                    inputText = ""
+                                    viewModel.sendMessage(fullText)
                                 }
+                                inputText = ""
+                                attachments = emptyList()
                             }
                         },
                         onMicClick = { handleMicClick() },
@@ -538,7 +492,7 @@ fun ChatScreen(
                                 LazyColumn(
                                     state = listState,
                                     modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(start = 20.dp, end = 68.dp, top = 8.dp, bottom = 12.dp),
+                                    contentPadding = PaddingValues(start = 20.dp, end = 68.dp, top = 136.dp, bottom = 12.dp),
                                     verticalArrangement = Arrangement.spacedBy(14.dp)
                                 ) {
                                     items(
@@ -594,7 +548,7 @@ fun ChatScreen(
                                 LazyColumn(
                                     state = listState,
                                     modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(start = 20.dp, end = 68.dp, top = 8.dp, bottom = 12.dp),
+                                    contentPadding = PaddingValues(start = 20.dp, end = 68.dp, top = 136.dp, bottom = 12.dp),
                                     verticalArrangement = Arrangement.spacedBy(14.dp)
                                 ) {
                                     if (uiState.messages.isEmpty()) {
@@ -643,14 +597,59 @@ fun ChatScreen(
                     }
                 }
 
-                // Apple Design Vertical Toggle docked on the right
-                VerticalModeToggle(
-                    selected = uiState.environmentMode,
-                    onSelect = viewModel::setEnvironmentMode,
+                // Top Control Bar: Hamburger menu (Left) and Apple Design Vertical Toggle (Right) aligned at the EXACT same vertical level
+                Row(
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 0.dp, end = 12.dp)
-                )
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(start = 8.dp, end = 12.dp, top = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = { coroutineScope.launch { drawerState.open() } },
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Icon(
+                                Icons.Filled.Menu,
+                                contentDescription = "Open Chat History",
+                                tint = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+
+                        if (uiState.messages.isNotEmpty()) {
+                            Spacer(Modifier.width(4.dp))
+                            IconButton(
+                                onClick = viewModel::startNewChat,
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Edit,
+                                    contentDescription = "New chat",
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+
+                        if (uiState.isAgentRunning) {
+                            Spacer(Modifier.width(8.dp))
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                color = if (uiState.isUnleashed) DettleGreen else MaterialTheme.colorScheme.primary,
+                                strokeWidth = 2.dp
+                            )
+                        }
+                    }
+
+                    // Apple Design Vertical Toggle docked on the right
+                    VerticalModeToggle(
+                        selected = uiState.environmentMode,
+                        onSelect = viewModel::setEnvironmentMode
+                    )
+                }
             }
         }
     }
@@ -1212,11 +1211,11 @@ fun ThinkingIndicator(
         Spacer(Modifier.width(8.dp))
         Text(
             if (!cognitiveStatus.isNullOrBlank()) {
-                "$cognitiveStatus (Step $step/$maxSteps)"
+                cognitiveStatus
             } else if (isUnleashed) {
-                "⚡ Unleashed Engine thinking... Step $step/$maxSteps"
+                "⚡ Unleashed Engine thinking..."
             } else {
-                "Thinking... Step $step/$maxSteps"
+                "Thinking..."
             },
             style = MaterialTheme.typography.labelSmall,
             color = if (isUnleashed) DettleGreen else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1277,11 +1276,13 @@ fun ChatInputBar(
     isListening: Boolean,
     voiceRmsFlow: StateFlow<Float>,
     focusRequester: FocusRequester? = null,
-    selectedModel: String = "Gemini 3.8 Flash",
-    onModelSelect: (String) -> Unit = {},
+    searchOrResearchMode: String = "Web Search",
+    onSearchOrResearchChange: (String) -> Unit = {},
     effortLevel: String = "Medium",
     onEffortChange: (String) -> Unit = {},
-    onPlusClick: () -> Unit = {},
+    attachments: List<ChatAttachment> = emptyList(),
+    onAddAttachmentClick: () -> Unit = {},
+    onRemoveAttachment: (ChatAttachment) -> Unit = {},
     onValueChange: (String) -> Unit,
     onSend: () -> Unit,
     onMicClick: () -> Unit,
@@ -1289,7 +1290,7 @@ fun ChatInputBar(
     onCancelVoiceClick: () -> Unit
 ) {
     val rmsValue by voiceRmsFlow.collectAsState()
-    var isModelMenuOpen by remember { mutableStateOf(false) }
+    var isModeMenuOpen by remember { mutableStateOf(false) }
     val efforts = remember { listOf("Low", "Medium", "Max Effort") }
 
     Box(
@@ -1308,6 +1309,58 @@ fun ChatInputBar(
             Column(
                 modifier = Modifier.fillMaxWidth()
             ) {
+                // Attached files preview carousel
+                if (attachments.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        attachments.forEach { att ->
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = if (att.isImage) Icons.Outlined.Edit else Icons.Outlined.Description,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        text = if (att.name.length > 15) att.name.take(12) + "..." else att.name,
+                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Medium),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        text = AttachmentHelper.formatFileSize(att.sizeBytes),
+                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Icon(
+                                        imageVector = Icons.Outlined.Close,
+                                        contentDescription = "Remove",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier
+                                            .size(14.dp)
+                                            .clickable { onRemoveAttachment(att) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Main Text Input Area or Voice Waveform Mode
                 AnimatedContent(
                     targetState = isListening,
@@ -1324,41 +1377,71 @@ fun ChatInputBar(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                         )
                     } else {
-                        BasicTextField(
-                            value = value,
-                            onValueChange = onValueChange,
-                            enabled = enabled,
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
-                                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 6.dp),
-                            textStyle = MaterialTheme.typography.bodyLarge.copy(
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontSize = 15.sp,
-                                lineHeight = 22.sp
-                            ),
-                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                            keyboardOptions = KeyboardOptions(
-                                capitalization = KeyboardCapitalization.Sentences,
-                                imeAction = ImeAction.Default
-                            ),
-                            maxLines = 5,
-                            decorationBox = { innerTextField ->
-                                Box(modifier = Modifier.fillMaxWidth()) {
-                                    if (value.isEmpty()) {
-                                        Text(
-                                            text = if (!enabled && isRunning) "Agent is working..." else "Ask anything...",
-                                            style = MaterialTheme.typography.bodyLarge.copy(
-                                                fontSize = 15.sp,
-                                                fontWeight = FontWeight.Medium,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                            )
+                                .padding(start = 6.dp, end = 12.dp, top = 6.dp, bottom = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Plus (+) Icon on the LEFT of the text field to upload documents & photos
+                            IconButton(
+                                onClick = onAddAttachmentClick,
+                                modifier = Modifier.size(34.dp)
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Default.Add,
+                                            contentDescription = "Upload document or photo",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(18.dp)
                                         )
                                     }
-                                    innerTextField()
                                 }
                             }
-                        )
+
+                            Spacer(Modifier.width(4.dp))
+
+                            BasicTextField(
+                                value = value,
+                                onValueChange = onValueChange,
+                                enabled = enabled,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+                                    .padding(vertical = 8.dp),
+                                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontSize = 15.sp,
+                                    lineHeight = 22.sp
+                                ),
+                                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                keyboardOptions = KeyboardOptions(
+                                    capitalization = KeyboardCapitalization.Sentences,
+                                    imeAction = ImeAction.Default
+                                ),
+                                maxLines = 5,
+                                decorationBox = { innerTextField ->
+                                    Box(modifier = Modifier.fillMaxWidth()) {
+                                        if (value.isEmpty() && attachments.isEmpty()) {
+                                            Text(
+                                                text = if (!enabled && isRunning) "Agent is working..." else "Ask anything...",
+                                                style = MaterialTheme.typography.bodyLarge.copy(
+                                                    fontSize = 15.sp,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                                )
+                                            )
+                                        }
+                                        innerTextField()
+                                    }
+                                }
+                            )
+                        }
                     }
                 }
 
@@ -1369,74 +1452,76 @@ fun ChatInputBar(
                         .padding(start = 10.dp, end = 10.dp, bottom = 8.dp, top = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Model Selector Pill
+                    // Web Search / Research Mode Pill
                     Box {
                         Surface(
-                            onClick = { isModelMenuOpen = true },
+                            onClick = {
+                                val nextMode = if (searchOrResearchMode == "Web Search") "Research" else "Web Search"
+                                onSearchOrResearchChange(nextMode)
+                            },
                             shape = RoundedCornerShape(16.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                             border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    imageVector = Icons.Outlined.Psychology,
+                                    imageVector = if (searchOrResearchMode.contains("Research", ignoreCase = true)) {
+                                        Icons.Outlined.Psychology
+                                    } else {
+                                        Icons.Outlined.Search
+                                    },
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(13.dp)
                                 )
                                 Spacer(Modifier.width(4.dp))
                                 Text(
-                                    text = selectedModel,
+                                    text = searchOrResearchMode,
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontWeight = FontWeight.SemiBold,
                                         fontSize = 11.sp
                                     ),
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
+                                Spacer(Modifier.width(2.dp))
                                 Icon(
                                     imageVector = Icons.Default.ArrowDropDown,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(14.dp)
                                 )
                             }
                         }
 
                         DropdownMenu(
-                            expanded = isModelMenuOpen,
-                            onDismissRequest = { isModelMenuOpen = false }
+                            expanded = isModeMenuOpen,
+                            onDismissRequest = { isModeMenuOpen = false }
                         ) {
-                            listOf(
-                                "Gemini 3.8 Flash",
-                                "GPT 5.5",
-                                "Claude 3.5 Sonnet",
-                                "DeepSeek R1",
-                                "Groq Llama 3.3",
-                                "Ollama (Local)"
-                            ).forEach { modelName ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            modelName,
-                                            fontWeight = if (modelName == selectedModel) FontWeight.Bold else FontWeight.Normal,
-                                            color = if (modelName == selectedModel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                        )
-                                    },
-                                    onClick = {
-                                        onModelSelect(modelName)
-                                        isModelMenuOpen = false
-                                    }
-                                )
-                            }
+                            DropdownMenuItem(
+                                leadingIcon = { Icon(Icons.Outlined.Search, null, tint = MaterialTheme.colorScheme.primary) },
+                                text = { Text("Web Search", fontWeight = if (searchOrResearchMode == "Web Search") FontWeight.Bold else FontWeight.Normal) },
+                                onClick = {
+                                    onSearchOrResearchChange("Web Search")
+                                    isModeMenuOpen = false
+                                }
+                            )
+                            DropdownMenuItem(
+                                leadingIcon = { Icon(Icons.Outlined.Psychology, null, tint = MaterialTheme.colorScheme.primary) },
+                                text = { Text("Research", fontWeight = if (searchOrResearchMode == "Research") FontWeight.Bold else FontWeight.Normal) },
+                                onClick = {
+                                    onSearchOrResearchChange("Research")
+                                    isModeMenuOpen = false
+                                }
+                            )
                         }
                     }
 
                     Spacer(Modifier.width(6.dp))
 
-                    // Effort Level Pill
+                    // Effort Level Pill (Low, Medium, Max Effort) - Clean display without showing step budget numbers
                     Surface(
                         onClick = {
                             val currentIndex = efforts.indexOf(effortLevel).coerceAtLeast(0)
@@ -1448,7 +1533,7 @@ fun ChatInputBar(
                         border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             DynamicBarsIcon(level = effortLevel, modifier = Modifier.size(14.dp))
@@ -1462,21 +1547,6 @@ fun ChatInputBar(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                         }
-                    }
-
-                    Spacer(Modifier.width(6.dp))
-
-                    // Plus (+) Button
-                    IconButton(
-                        onClick = onPlusClick,
-                        modifier = Modifier.size(28.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Options or commands",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp)
-                        )
                     }
 
                     Spacer(Modifier.weight(1f))
@@ -1506,9 +1576,10 @@ fun ChatInputBar(
                     }
 
                     // Circular Action Button (Mic / Stop / Send)
+                    val canSend = (value.isNotBlank() || attachments.isNotEmpty()) && enabled
                     val buttonState = when {
                         isListening -> ActionButtonState.HOLD
-                        value.isNotBlank() -> ActionButtonState.SEND
+                        canSend -> ActionButtonState.SEND
                         else -> ActionButtonState.MIC
                     }
 
@@ -1516,7 +1587,7 @@ fun ChatInputBar(
                         onClick = {
                             when (buttonState) {
                                 ActionButtonState.HOLD -> onStopVoiceClick()
-                                ActionButtonState.SEND -> if (enabled && value.isNotBlank()) onSend()
+                                ActionButtonState.SEND -> if (canSend) onSend()
                                 ActionButtonState.MIC -> onMicClick()
                             }
                         },

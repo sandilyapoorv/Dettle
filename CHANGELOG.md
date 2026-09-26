@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [v1.6.0] - 2026-09-26: Pure Pitch Black & Lavender Dark Theme, Top Bar Alignment, Web Search / Research Modes, Document/Photo Uploads & Hidden Step Budget
+
+### Direct APK Download
+- **Production Release APK (R8 Minified, Signed)**: [app-release.apk](https://github.com/sandilyapoorv/Dettle/releases/download/v1.6.0/app-release.apk)
+- **Debug APK**: [app-debug.apk](https://github.com/sandilyapoorv/Dettle/releases/download/v1.6.0/app-debug.apk)
+- **GitHub Release Page**: [https://github.com/sandilyapoorv/Dettle/releases/tag/v1.6.0](https://github.com/sandilyapoorv/Dettle/releases/tag/v1.6.0)
+- **CI/CD Workflow**: [https://github.com/sandilyapoorv/Dettle/actions](https://github.com/sandilyapoorv/Dettle/actions)
+
+### What Was Built & Changed
+1. **Vertical Alignment**: Unified top-left hamburger menu and top-right Chat/Build capsule in a single top control bar layer with exact same top inset and vertical positioning.
+2. **Search / Research Selector**: Replaced generic model dropdown with dedicated **Web Search** and **Research** mode selector in the input card.
+3. **Hidden Step Budget**: Dynamically mapped agent execution limits to effort levels:
+   - **Low**: 15 steps
+   - **Medium**: 30 steps
+   - **Max Effort**: 50 steps
+   - Step count numbers are completely hidden from the user interface.
+4. **Document & Photo Uploads (+)**: Added an attachment button on the left of the input field with multi-content picker support (`*/*`), file preview chips with size badges and deletion, and automatic context formatting for the AI prompt.
+5. **Pure Pitch Black & Lavender Dark Theme**: Uncompromising dark mode standardizing on `#000000` pitch black background and surfaces with vibrant, luminous Lavender accents (`#A78BFA`).
+
+---
+
 ## [v1.5.0] - 2026-09-25: Universal Full-State Backup & Restore Engine (APIs, Cookies, Cognitive Memories, Preferences)
 
 ### Direct APK Download

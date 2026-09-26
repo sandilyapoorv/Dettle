@@ -36,10 +36,10 @@ enum class AppTheme(
     ),
     OBSIDIAN(
         id = "obsidian",
-        displayName = "Linear Obsidian",
-        description = "Precision dark slate & electric indigo",
-        previewPrimary = Color(0xFF5E6AD2),
-        previewBackground = Color(0xFF0C0D10)
+        displayName = "Pitch Black & Lavender",
+        description = "Pure pitch black canvas & radiant luminous lavender",
+        previewPrimary = Color(0xFFA78BFA),
+        previewBackground = Color(0xFF000000)
     ),
     APPLE_LIGHT(
         id = "apple_light",
@@ -50,44 +50,44 @@ enum class AppTheme(
     ),
     TITANIUM(
         id = "titanium",
-        displayName = "Linear Obsidian",
-        description = "Precision dark slate & electric indigo",
-        previewPrimary = Color(0xFF5E6AD2),
-        previewBackground = Color(0xFF0C0D10)
+        displayName = "Pitch Black & Lavender",
+        description = "Pure pitch black canvas & radiant luminous lavender",
+        previewPrimary = Color(0xFFA78BFA),
+        previewBackground = Color(0xFF000000)
     ),
     CYBER_INDIGO(
         id = "cyber_indigo",
-        displayName = "Linear Obsidian",
-        description = "Precision dark slate & electric indigo",
-        previewPrimary = Color(0xFF5E6AD2),
-        previewBackground = Color(0xFF0C0D10)
+        displayName = "Pitch Black & Lavender",
+        description = "Pure pitch black canvas & radiant luminous lavender",
+        previewPrimary = Color(0xFFA78BFA),
+        previewBackground = Color(0xFF000000)
     ),
     EMERALD_MATRIX(
         id = "emerald_matrix",
-        displayName = "Linear Obsidian",
-        description = "Precision dark slate & electric indigo",
-        previewPrimary = Color(0xFF5E6AD2),
-        previewBackground = Color(0xFF0C0D10)
+        displayName = "Pitch Black & Lavender",
+        description = "Pure pitch black canvas & radiant luminous lavender",
+        previewPrimary = Color(0xFFA78BFA),
+        previewBackground = Color(0xFF000000)
     ),
     SUNSET_AMBER(
         id = "sunset_amber",
-        displayName = "Linear Obsidian",
-        description = "Precision dark slate & electric indigo",
-        previewPrimary = Color(0xFF5E6AD2),
-        previewBackground = Color(0xFF0C0D10)
+        displayName = "Pitch Black & Lavender",
+        description = "Pure pitch black canvas & radiant luminous lavender",
+        previewPrimary = Color(0xFFA78BFA),
+        previewBackground = Color(0xFF000000)
     ),
     TOKYO_NEON(
         id = "tokyo_neon",
-        displayName = "Linear Obsidian",
-        description = "Precision dark slate & electric indigo",
-        previewPrimary = Color(0xFF5E6AD2),
-        previewBackground = Color(0xFF0C0D10)
+        displayName = "Pitch Black & Lavender",
+        description = "Pure pitch black canvas & radiant luminous lavender",
+        previewPrimary = Color(0xFFA78BFA),
+        previewBackground = Color(0xFF000000)
     ),
     OLED_BLACK(
         id = "oled_black",
-        displayName = "Pure OLED Black",
-        description = "Absolute true black for AMOLED efficiency",
-        previewPrimary = Color(0xFF5E6AD2),
+        displayName = "Pure Pitch Black",
+        description = "Absolute true black with lavender highlights",
+        previewPrimary = Color(0xFFA78BFA),
         previewBackground = Color(0xFF000000)
     );
 

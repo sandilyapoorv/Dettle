@@ -9,29 +9,34 @@ import androidx.compose.ui.graphics.Color
 // Linear / Raycast / Apple Inspired Color Palettes
 // =============================================================================
 
-// Default Dark Theme Palette (Obsidian Void)
-val DettleDarkBackground = Color(0xFF0C0D10)
+// Pure Pitch Black & Lavender Dark Theme Palette
+val DettleDarkBackground = Color(0xFF000000)
 val DettleDarkOnBackground = Color(0xFFF3F4F6)
-val DettleDarkSurface = Color(0xFF13151A)
+val DettleDarkSurface = Color(0xFF070709)
 val DettleDarkOnSurface = Color(0xFFF3F4F6)
-val DettleDarkSurfaceVariant = Color(0xFF191C23)
-val DettleDarkOnSurfaceVariant = Color(0xFF8E95A2)
+val DettleDarkSurfaceVariant = Color(0xFF101014)
+val DettleDarkOnSurfaceVariant = Color(0xFF9E9EA8)
 
-val DettleDarkPrimary = Color(0xFF5E6AD2)
-val DettleDarkOnPrimary = Color(0xFFFFFFFF)
-val DettleDarkPrimaryContainer = Color(0xFF1F2338)
-val DettleDarkOnPrimaryContainer = Color(0xFFC5CBFF)
+val DettleLavenderPrimary = Color(0xFFA78BFA)
+val DettleLavenderOnPrimary = Color(0xFF130924)
+val DettleLavenderContainer = Color(0xFF26183B)
+val DettleLavenderOnContainer = Color(0xFFEDE9FE)
 
-val DettleDarkSecondary = Color(0xFF949AA4)
-val DettleDarkOnSecondary = Color(0xFF13151A)
-val DettleDarkSecondaryContainer = Color(0xFF222631)
-val DettleDarkOnSecondaryContainer = Color(0xFFE2E4E9)
+val DettleDarkPrimary = DettleLavenderPrimary
+val DettleDarkOnPrimary = DettleLavenderOnPrimary
+val DettleDarkPrimaryContainer = DettleLavenderContainer
+val DettleDarkOnPrimaryContainer = DettleLavenderOnContainer
+
+val DettleDarkSecondary = Color(0xFF9CA3AF)
+val DettleDarkOnSecondary = Color(0xFF000000)
+val DettleDarkSecondaryContainer = Color(0xFF181520)
+val DettleDarkOnSecondaryContainer = Color(0xFFE5E7EB)
 
 val DettleDarkTertiary = Color(0xFF38BDF8)
 val DettleDarkOnTertiary = Color(0xFF0B1926)
 
-val DettleDarkOutline = Color(0xFF2E333F)
-val DettleDarkOutlineVariant = Color(0xFF1E212A)
+val DettleDarkOutline = Color(0xFF2E2A38)
+val DettleDarkOutlineVariant = Color(0xFF1D1A24)
 
 val DettleDarkError = Color(0xFFEF4444)
 val DettleDarkOnError = Color(0xFF450A0A)
@@ -96,7 +101,7 @@ val DettleGreen = Color(0xFF10B981)
 val DettleGreenDim = Color(0xFF064E3B)
 val DettleOrange = Color(0xFFF59E0B)
 val DettleRed = Color(0xFFEF4444)
-val DettlePurple = Color(0xFF8B5CF6)
+val DettlePurple = Color(0xFFA78BFA)
 val DettleBlue = Color(0xFF38BDF8)
 
 // Backward-compatible semantic bridges & shortcuts
@@ -115,13 +120,13 @@ val DettleTextMuted = Color(0xFF5C6270)
 
 // Chat message bubbles
 val UserBubble = DettleDarkPrimaryContainer
-val UserBubbleBorder = Color(0xFF2E3554)
+val UserBubbleBorder = Color(0xFF352452)
 val AiBubble = DettleDarkSurface
 val AiBubbleBorder = DettleDarkOutlineVariant
 val ToolCallBg = DettleDarkSurfaceVariant
 val ToolCallBorder = DettleDarkOutlineVariant
-val ApprovalBg = Color(0xFF1B1D28)
-val ApprovalBorder = Color(0xFF3B4168)
+val ApprovalBg = Color(0xFF130924)
+val ApprovalBorder = Color(0xFF352452)
 
 // =============================================================================
 // Dynamic Color Scheme Builders for App Themes
@@ -133,234 +138,59 @@ fun createColorSchemeForTheme(
     isPureOled: Boolean,
     customAccent: Color?
 ): ColorScheme {
-    return when (theme) {
-        AppTheme.OBSIDIAN -> {
-            val primary = customAccent ?: DettleDarkPrimary
-            val bg = if (isPureOled && isDark) Color(0xFF000000) else DettleDarkBackground
-            val surface = if (isPureOled && isDark) Color(0xFF0D0E12) else DettleDarkSurface
-            darkColorScheme(
-                primary = primary,
-                onPrimary = Color.White,
-                primaryContainer = primary.copy(alpha = 0.22f),
-                onPrimaryContainer = Color(0xFFD6DCFF),
-                secondary = DettleDarkSecondary,
-                onSecondary = Color(0xFF13151A),
-                secondaryContainer = Color(0xFF222631),
-                onSecondaryContainer = Color(0xFFE2E4E9),
-                tertiary = DettleDarkTertiary,
-                onTertiary = Color(0xFF0B1926),
-                background = bg,
-                onBackground = DettleDarkOnBackground,
-                surface = surface,
-                onSurface = DettleDarkOnSurface,
-                surfaceVariant = if (isPureOled && isDark) Color(0xFF141720) else DettleDarkSurfaceVariant,
-                onSurfaceVariant = DettleDarkOnSurfaceVariant,
-                outline = DettleDarkOutline,
-                outlineVariant = DettleDarkOutlineVariant,
-                error = DettleDarkError,
-                onError = DettleDarkOnError,
-                errorContainer = DettleDarkErrorContainer,
-                onErrorContainer = DettleDarkOnErrorContainer
-            )
-        }
-        AppTheme.OAT_LIGHT, AppTheme.APPLE_LIGHT -> {
-            val primary = customAccent ?: DettlePlumPrimary
-            lightColorScheme(
-                primary = primary,
-                onPrimary = Color.White,
-                primaryContainer = DettlePlumPrimaryContainer,
-                onPrimaryContainer = DettlePlumOnPrimaryContainer,
-                secondary = DettleOatSecondary,
-                onSecondary = Color.White,
-                secondaryContainer = DettleOatSecondaryContainer,
-                onSecondaryContainer = DettleOatOnSecondaryContainer,
-                tertiary = DettleTangerineTertiary,
-                onTertiary = Color.White,
-                background = DettleOatBackground,
-                onBackground = DettleOatOnBackground,
-                surface = DettleOatSurface,
-                onSurface = DettleOatOnSurface,
-                surfaceVariant = DettleOatSurfaceVariant,
-                onSurfaceVariant = DettleOatOnSurfaceVariant,
-                outline = DettleOatOutline,
-                outlineVariant = DettleOatOutlineVariant,
-                error = DettleLightError,
-                onError = DettleLightOnError,
-                errorContainer = DettleLightErrorContainer,
-                onErrorContainer = DettleLightOnErrorContainer
-            )
-        }
-        AppTheme.TITANIUM -> {
-            val primary = customAccent ?: Color(0xFFB0B5C0)
-            val bg = if (isPureOled && isDark) Color(0xFF000000) else Color(0xFF141518)
-            val surface = if (isPureOled && isDark) Color(0xFF0E0F12) else Color(0xFF1A1C21)
-            darkColorScheme(
-                primary = primary,
-                onPrimary = Color(0xFF141518),
-                primaryContainer = Color(0xFF2A2D35),
-                onPrimaryContainer = Color(0xFFF0F2F6),
-                secondary = Color(0xFF8A909D),
-                onSecondary = Color(0xFF141518),
-                secondaryContainer = Color(0xFF242730),
-                onSecondaryContainer = Color(0xFFDFE2E8),
-                tertiary = Color(0xFF4A90E2),
-                onTertiary = Color.White,
-                background = bg,
-                onBackground = Color(0xFFF0F2F6),
-                surface = surface,
-                onSurface = Color(0xFFF0F2F6),
-                surfaceVariant = Color(0xFF23262E),
-                onSurfaceVariant = Color(0xFF9EA4B1),
-                outline = Color(0xFF353945),
-                outlineVariant = Color(0xFF242730),
-                error = DettleDarkError,
-                onError = DettleDarkOnError,
-                errorContainer = DettleDarkErrorContainer,
-                onErrorContainer = DettleDarkOnErrorContainer
-            )
-        }
-        AppTheme.CYBER_INDIGO -> {
-            val primary = customAccent ?: Color(0xFF7C3AED)
-            val bg = if (isPureOled && isDark) Color(0xFF000000) else Color(0xFF090D1A)
-            val surface = if (isPureOled && isDark) Color(0xFF0F1426) else Color(0xFF11172E)
-            darkColorScheme(
-                primary = primary,
-                onPrimary = Color.White,
-                primaryContainer = Color(0xFF26194D),
-                onPrimaryContainer = Color(0xFFDDD6FE),
-                secondary = Color(0xFF38BDF8),
-                onSecondary = Color(0xFF0B1926),
-                secondaryContainer = Color(0xFF1E2E4A),
-                onSecondaryContainer = Color(0xFFBAE6FD),
-                tertiary = Color(0xFFEC4899),
-                onTertiary = Color.White,
-                background = bg,
-                onBackground = Color(0xFFF8FAFC),
-                surface = surface,
-                onSurface = Color(0xFFF8FAFC),
-                surfaceVariant = Color(0xFF1A213D),
-                onSurfaceVariant = Color(0xFF94A3B8),
-                outline = Color(0xFF2E385D),
-                outlineVariant = Color(0xFF1C2442),
-                error = DettleDarkError,
-                onError = DettleDarkOnError,
-                errorContainer = DettleDarkErrorContainer,
-                onErrorContainer = DettleDarkOnErrorContainer
-            )
-        }
-        AppTheme.EMERALD_MATRIX -> {
-            val primary = customAccent ?: Color(0xFF10B981)
-            val bg = if (isPureOled && isDark) Color(0xFF000000) else Color(0xFF08100C)
-            val surface = if (isPureOled && isDark) Color(0xFF0E1A14) else Color(0xFF0F1F17)
-            darkColorScheme(
-                primary = primary,
-                onPrimary = Color(0xFF022C22),
-                primaryContainer = Color(0xFF064E3B),
-                onPrimaryContainer = Color(0xFFA7F3D0),
-                secondary = Color(0xFF34D399),
-                onSecondary = Color(0xFF064E3B),
-                secondaryContainer = Color(0xFF132F23),
-                onSecondaryContainer = Color(0xFFD1FAE5),
-                tertiary = Color(0xFF2DD4BF),
-                onTertiary = Color(0xFF042F2E),
-                background = bg,
-                onBackground = Color(0xFFF0FDF4),
-                surface = surface,
-                onSurface = Color(0xFFF0FDF4),
-                surfaceVariant = Color(0xFF152A20),
-                onSurfaceVariant = Color(0xFF86A594),
-                outline = Color(0xFF204433),
-                outlineVariant = Color(0xFF142B20),
-                error = DettleDarkError,
-                onError = DettleDarkOnError,
-                errorContainer = DettleDarkErrorContainer,
-                onErrorContainer = DettleDarkOnErrorContainer
-            )
-        }
-        AppTheme.SUNSET_AMBER -> {
-            val primary = customAccent ?: Color(0xFFF59E0B)
-            val bg = if (isPureOled && isDark) Color(0xFF000000) else Color(0xFF12100E)
-            val surface = if (isPureOled && isDark) Color(0xFF1A1612) else Color(0xFF1E1A15)
-            darkColorScheme(
-                primary = primary,
-                onPrimary = Color(0xFF451A03),
-                primaryContainer = Color(0xFF451A03),
-                onPrimaryContainer = Color(0xFFFDE68A),
-                secondary = Color(0xFFFB923C),
-                onSecondary = Color(0xFF431407),
-                secondaryContainer = Color(0xFF382012),
-                onSecondaryContainer = Color(0xFFFFEDD5),
-                tertiary = Color(0xFFF43F5E),
-                onTertiary = Color.White,
-                background = bg,
-                onBackground = Color(0xFFFFFBEB),
-                surface = surface,
-                onSurface = Color(0xFFFFFBEB),
-                surfaceVariant = Color(0xFF28221B),
-                onSurfaceVariant = Color(0xFFA89F91),
-                outline = Color(0xFF42372A),
-                outlineVariant = Color(0xFF292219),
-                error = DettleDarkError,
-                onError = DettleDarkOnError,
-                errorContainer = DettleDarkErrorContainer,
-                onErrorContainer = DettleDarkOnErrorContainer
-            )
-        }
-        AppTheme.TOKYO_NEON -> {
-            val primary = customAccent ?: Color(0xFF06B6D4)
-            val bg = if (isPureOled && isDark) Color(0xFF000000) else Color(0xFF100C1A)
-            val surface = if (isPureOled && isDark) Color(0xFF171126) else Color(0xFF1C1430)
-            darkColorScheme(
-                primary = primary,
-                onPrimary = Color(0xFF083344),
-                primaryContainer = Color(0xFF164E63),
-                onPrimaryContainer = Color(0xFFCFFAFE),
-                secondary = Color(0xFFEC4899),
-                onSecondary = Color(0xFF500724),
-                secondaryContainer = Color(0xFF451230),
-                onSecondaryContainer = Color(0xFFFCE7F3),
-                tertiary = Color(0xFFA855F7),
-                onTertiary = Color.White,
-                background = bg,
-                onBackground = Color(0xFFFAF5FF),
-                surface = surface,
-                onSurface = Color(0xFFFAF5FF),
-                surfaceVariant = Color(0xFF261B42),
-                onSurfaceVariant = Color(0xFFA197B8),
-                outline = Color(0xFF432E6E),
-                outlineVariant = Color(0xFF2B1C47),
-                error = DettleDarkError,
-                onError = DettleDarkOnError,
-                errorContainer = DettleDarkErrorContainer,
-                onErrorContainer = DettleDarkOnErrorContainer
-            )
-        }
-        AppTheme.OLED_BLACK -> {
-            val primary = customAccent ?: Color(0xFF5E6AD2)
-            darkColorScheme(
-                primary = primary,
-                onPrimary = Color.White,
-                primaryContainer = primary.copy(alpha = 0.25f),
-                onPrimaryContainer = Color(0xFFC5CBFF),
-                secondary = Color(0xFF9CA3AF),
-                onSecondary = Color.Black,
-                secondaryContainer = Color(0xFF161616),
-                onSecondaryContainer = Color(0xFFE5E7EB),
-                tertiary = Color(0xFF38BDF8),
-                onTertiary = Color.Black,
-                background = Color(0xFF000000),
-                onBackground = Color(0xFFFFFFFF),
-                surface = Color(0xFF080808),
-                onSurface = Color(0xFFFFFFFF),
-                surfaceVariant = Color(0xFF121212),
-                onSurfaceVariant = Color(0xFF9E9E9E),
-                outline = Color(0xFF282828),
-                outlineVariant = Color(0xFF1C1C1C),
-                error = DettleDarkError,
-                onError = DettleDarkOnError,
-                errorContainer = DettleDarkErrorContainer,
-                onErrorContainer = DettleDarkOnErrorContainer
-            )
-        }
+    if (isDark) {
+        // Pure Pitch Black (#000000) & Lavender (#A78BFA) Dark Theme
+        val primary = customAccent ?: DettleLavenderPrimary
+        return darkColorScheme(
+            primary = primary,
+            onPrimary = DettleLavenderOnPrimary,
+            primaryContainer = DettleLavenderContainer,
+            onPrimaryContainer = DettleLavenderOnContainer,
+            secondary = DettleDarkSecondary,
+            onSecondary = DettleDarkOnSecondary,
+            secondaryContainer = DettleDarkSecondaryContainer,
+            onSecondaryContainer = DettleDarkOnSecondaryContainer,
+            tertiary = DettleDarkTertiary,
+            onTertiary = DettleDarkOnTertiary,
+            background = DettleDarkBackground, // 0xFF000000 Pure Pitch Black
+            onBackground = DettleDarkOnBackground,
+            surface = DettleDarkSurface,       // 0xFF070709 Pitch Black Surface
+            onSurface = DettleDarkOnSurface,
+            surfaceVariant = DettleDarkSurfaceVariant, // 0xFF101014
+            onSurfaceVariant = DettleDarkOnSurfaceVariant,
+            outline = DettleDarkOutline,
+            outlineVariant = DettleDarkOutlineVariant,
+            error = DettleDarkError,
+            onError = DettleDarkOnError,
+            errorContainer = DettleDarkErrorContainer,
+            onErrorContainer = DettleDarkOnErrorContainer
+        )
     }
+
+    // Light Theme: Oat Canvas, Velvet Plum & Radiant Tangerine
+    val primary = customAccent ?: DettlePlumPrimary
+    return lightColorScheme(
+        primary = primary,
+        onPrimary = Color.White,
+        primaryContainer = DettlePlumPrimaryContainer,
+        onPrimaryContainer = DettlePlumOnPrimaryContainer,
+        secondary = DettleOatSecondary,
+        onSecondary = Color.White,
+        secondaryContainer = DettleOatSecondaryContainer,
+        onSecondaryContainer = DettleOatOnSecondaryContainer,
+        tertiary = DettleTangerineTertiary,
+        onTertiary = Color.White,
+        background = DettleOatBackground,
+        onBackground = DettleOatOnBackground,
+        surface = DettleOatSurface,
+        onSurface = DettleOatOnSurface,
+        surfaceVariant = DettleOatSurfaceVariant,
+        onSurfaceVariant = DettleOatOnSurfaceVariant,
+        outline = DettleOatOutline,
+        outlineVariant = DettleOatOutlineVariant,
+        error = DettleLightError,
+        onError = DettleLightOnError,
+        errorContainer = DettleLightErrorContainer,
+        onErrorContainer = DettleLightOnErrorContainer
+    )
 }

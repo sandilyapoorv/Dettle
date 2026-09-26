@@ -38,7 +38,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 private const val TAG = "ReActLoop"
-private const val MAX_STEPS = 8
+private const val DEFAULT_MAX_STEPS = 30
 
 /**
  * The central agent execution loop.
@@ -47,7 +47,7 @@ private const val MAX_STEPS = 8
  * 1. THINK  → Send messages + tools to AI, receive reasoning or tool call
  * 2. ACT    → Parse tool call, validate safety constraints
  * 3. OBSERVE → Tool executes, result fed back into conversation
- * 4. REPEAT → Until final_answer tool called or MAX_STEPS reached
+ * 4. REPEAT → Until final_answer tool called or maxSteps reached
  *
  * Emits [LoopEvent]s as a [Flow] so UI can render streaming tokens,
  * tool status badges, approvals, and completion gates live.
@@ -71,7 +71,8 @@ class ReActLoop @Inject constructor(
         taskContext: TaskContext = TaskContext(),
         mode: AgentMode? = null,
         goal: Goal? = null,
-        isUncensored: Boolean = taskContext.isUncensored
+        isUncensored: Boolean = taskContext.isUncensored,
+        maxSteps: Int = DEFAULT_MAX_STEPS
     ): Flow<LoopEvent> {
         
         // 1. Motor Cortex: Fast Reflex Intercept
@@ -88,6 +89,7 @@ class ReActLoop @Inject constructor(
                 return@flow
             }
 
+        val effectiveMaxSteps = if (maxSteps > 0) maxSteps else DEFAULT_MAX_STEPS
         val effectiveUncensored = isUncensored || taskContext.isUncensored
         val systemPrompt = skillInjector.buildSystemPrompt(
             context = taskContext,
@@ -100,12 +102,12 @@ class ReActLoop @Inject constructor(
         var steps = 0
         var done = false
 
-        while (!done && steps < MAX_STEPS) {
+        while (!done && steps < effectiveMaxSteps) {
             steps++
-            Log.d(TAG, "Step $steps/$MAX_STEPS")
+            Log.d(TAG, "Step $steps/$effectiveMaxSteps")
 
             // Emit "thinking" status
-            emit(LoopEvent.Thinking(step = steps, maxSteps = MAX_STEPS))
+            emit(LoopEvent.Thinking(step = steps, maxSteps = effectiveMaxSteps))
 
             var currentResponse = StringBuilder()
             var detectedToolCallJson: String? = null
@@ -265,9 +267,9 @@ class ReActLoop @Inject constructor(
             ))
         }
 
-        if (steps >= MAX_STEPS && !done) {
+        if (steps >= effectiveMaxSteps && !done) {
             emit(LoopEvent.StepLimitReached(
-                message = "I've reached the maximum of $MAX_STEPS steps. Here's what I've done so far. Please tell me how to proceed.",
+                message = "I've reached the maximum of $effectiveMaxSteps steps. Here's what I've done so far. Please tell me how to proceed.",
                 history = history
             ))
         }

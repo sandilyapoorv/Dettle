@@ -156,6 +156,18 @@ class ChatViewModel @Inject constructor(
         _uiState.update { it.copy(selectedModel = model) }
     }
 
+    fun setSearchOrResearchMode(mode: String) {
+        val targetModeId = if (mode.contains("Research", ignoreCase = true)) ModeId.RESEARCH else ModeId.WEB
+        lockedModeId = targetModeId
+        _uiState.update {
+            it.copy(
+                searchOrResearchMode = mode,
+                lockedModeId = targetModeId,
+                activeModeId = targetModeId
+            )
+        }
+    }
+
     fun setEffortLevel(effort: String) {
         _uiState.update { it.copy(effortLevel = effort) }
     }
@@ -315,14 +327,23 @@ class ChatViewModel @Inject constructor(
                     resolveGoal(text, effectiveMode)
                 } else null
 
-                // 4. Run the loop with Unleashed Mode enabled if toggled
+                // 4. Compute step budget according to effort level (Low=15, Medium=30, Max=50)
+                val stepBudget = when (_uiState.value.effortLevel) {
+                    "Low" -> 15
+                    "Medium" -> 30
+                    "Max Effort", "Max" -> 50
+                    else -> 30
+                }
+
+                // 5. Run the loop with dynamic step budget
                 reActLoop.run(
                     userMessage = text,
                     conversationHistory = conversationHistory.toList(),
                     taskContext = taskContext,
                     mode = effectiveMode,
                     goal = goal,
-                    isUncensored = isUnleashedMode
+                    isUncensored = isUnleashedMode,
+                    maxSteps = stepBudget
                 ).collect { event -> handleLoopEvent(event) }
             } catch (t: Throwable) {
                 Log.e("ChatViewModel", "Caught throwable in chat execution loop", t)
@@ -564,5 +585,6 @@ data class ChatUiState(
     val isUnleashed: Boolean = false,
     val cognitiveStatus: String? = null,
     val selectedModel: String = "Gemini 3.8 Flash",
+    val searchOrResearchMode: String = "Web Search",
     val effortLevel: String = "Medium"
 )
