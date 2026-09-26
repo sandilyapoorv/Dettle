@@ -1980,14 +1980,12 @@ fun ThemeAppearanceCard(
                                             .clip(CircleShape)
                                             .background(theme.previewPrimary)
                                     )
-                                    if (theme == AppTheme.OAT_LIGHT) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(10.dp)
-                                                .clip(CircleShape)
-                                                .background(Color(0xFFF97316))
-                                        )
-                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .size(10.dp)
+                                            .clip(CircleShape)
+                                            .background(if (theme == AppTheme.OAT_LIGHT) Color(0xFFD14F60) else Color(0xFFE87A82))
+                                    )
                                 }
                                 if (isSelected) {
                                     Icon(
@@ -2003,13 +2001,13 @@ fun ThemeAppearanceCard(
                                     theme.displayName,
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (theme == AppTheme.OAT_LIGHT || theme == AppTheme.APPLE_LIGHT) Color(0xFF1C1917) else Color(0xFFF3F4F6),
+                                    color = if (theme == AppTheme.OAT_LIGHT || theme == AppTheme.APPLE_LIGHT) Color(0xFF241E24) else Color(0xFFF6F3EE),
                                     maxLines = 1
                                 )
                                 Text(
                                     theme.description,
                                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                    color = if (theme == AppTheme.OAT_LIGHT || theme == AppTheme.APPLE_LIGHT) Color(0xFF78716C) else Color(0xFF8E95A2),
+                                    color = if (theme == AppTheme.OAT_LIGHT || theme == AppTheme.APPLE_LIGHT) Color(0xFF6B6258) else Color(0xFFA3A8BF),
                                     maxLines = 1
                                 )
                             }

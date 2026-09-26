@@ -9,63 +9,68 @@ import androidx.compose.ui.graphics.Color
 // Linear / Raycast / Apple Inspired Color Palettes
 // =============================================================================
 
-// Pure Pitch Black & Lavender Dark Theme Palette
+// Pure Pitch Black & Mascot Periwinkle Dark Theme Palette
 val DettleDarkBackground = Color(0xFF000000)
-val DettleDarkOnBackground = Color(0xFFF3F4F6)
-val DettleDarkSurface = Color(0xFF070709)
-val DettleDarkOnSurface = Color(0xFFF3F4F6)
-val DettleDarkSurfaceVariant = Color(0xFF101014)
-val DettleDarkOnSurfaceVariant = Color(0xFF9E9EA8)
+val DettleDarkOnBackground = Color(0xFFF6F3EE)
+val DettleDarkSurface = Color(0xFF08090E)
+val DettleDarkOnSurface = Color(0xFFF6F3EE)
+val DettleDarkSurfaceVariant = Color(0xFF131522)
+val DettleDarkOnSurfaceVariant = Color(0xFFA3A8BF)
 
-val DettleLavenderPrimary = Color(0xFFA78BFA)
-val DettleLavenderOnPrimary = Color(0xFF130924)
-val DettleLavenderContainer = Color(0xFF26183B)
-val DettleLavenderOnContainer = Color(0xFFEDE9FE)
+// Periwinkle Lavender (from the mascot's floral pajamas)
+val DettleLavenderPrimary = Color(0xFFA4B0E8)
+val DettleLavenderOnPrimary = Color(0xFF14172B)
+val DettleLavenderContainer = Color(0xFF1E2338) // Midnight indigo from the cozy sofa
+val DettleLavenderOnContainer = Color(0xFFE5E9FF)
 
 val DettleDarkPrimary = DettleLavenderPrimary
 val DettleDarkOnPrimary = DettleLavenderOnPrimary
 val DettleDarkPrimaryContainer = DettleLavenderContainer
 val DettleDarkOnPrimaryContainer = DettleLavenderOnContainer
 
-val DettleDarkSecondary = Color(0xFF9CA3AF)
-val DettleDarkOnSecondary = Color(0xFF000000)
-val DettleDarkSecondaryContainer = Color(0xFF181520)
-val DettleDarkOnSecondaryContainer = Color(0xFFE5E7EB)
+// Sweet Blush Rose (from the floating hearts and rosy cheeks)
+val DettleHeartRose = Color(0xFFE87A82)
+val DettleDarkSecondary = DettleHeartRose
+val DettleDarkOnSecondary = Color(0xFF2E0E14)
+val DettleDarkSecondaryContainer = Color(0xFF2C161C)
+val DettleDarkOnSecondaryContainer = Color(0xFFFFDADE)
 
-val DettleDarkTertiary = Color(0xFF38BDF8)
-val DettleDarkOnTertiary = Color(0xFF0B1926)
+// Warm Honey Gold (from the golden bangle and savory curry plate)
+val DettleHoneyGold = Color(0xFFF5B041)
+val DettleDarkTertiary = DettleHoneyGold
+val DettleDarkOnTertiary = Color(0xFF2C1B03)
 
-val DettleDarkOutline = Color(0xFF2E2A38)
-val DettleDarkOutlineVariant = Color(0xFF1D1A24)
+val DettleDarkOutline = Color(0xFF282D42)
+val DettleDarkOutlineVariant = Color(0xFF1B1E2E)
 
-val DettleDarkError = Color(0xFFEF4444)
-val DettleDarkOnError = Color(0xFF450A0A)
-val DettleDarkErrorContainer = Color(0xFF2D1214)
-val DettleDarkOnErrorContainer = Color(0xFFFCA5A5)
+val DettleDarkError = Color(0xFFE87A82)
+val DettleDarkOnError = Color(0xFF2E0E14)
+val DettleDarkErrorContainer = Color(0xFF2C161C)
+val DettleDarkOnErrorContainer = Color(0xFFFFDADE)
 
-// Light Theme Palette (Oat, Plum Purple & Tangerine)
-val DettleOatBackground = Color(0xFFF7F4EE)
-val DettleOatOnBackground = Color(0xFF1C1917)
+// Light Theme Palette (Warm Cream Ivory Canvas from mascot badge)
+val DettleOatBackground = Color(0xFFFAF0E3)
+val DettleOatOnBackground = Color(0xFF241E24)
 val DettleOatSurface = Color(0xFFFFFFFF)
-val DettleOatOnSurface = Color(0xFF1C1917)
-val DettleOatSurfaceVariant = Color(0xFFEDE8DF)
-val DettleOatOnSurfaceVariant = Color(0xFF78716C)
+val DettleOatOnSurface = Color(0xFF241E24)
+val DettleOatSurfaceVariant = Color(0xFFF2E6D5)
+val DettleOatOnSurfaceVariant = Color(0xFF6B6258)
 
-val DettlePlumPrimary = Color(0xFF6B21A8)
+val DettlePlumPrimary = Color(0xFF52609A) // Deep periwinkle
 val DettlePlumOnPrimary = Color(0xFFFFFFFF)
-val DettlePlumPrimaryContainer = Color(0xFFF3E8FF)
-val DettlePlumOnPrimaryContainer = Color(0xFF3B0764)
+val DettlePlumPrimaryContainer = Color(0xFFE0E4FC)
+val DettlePlumOnPrimaryContainer = Color(0xFF0F1738)
 
-val DettleTangerineTertiary = Color(0xFFF97316)
+val DettleTangerineTertiary = Color(0xFFD97706) // Golden honey
 val DettleTangerineOnTertiary = Color(0xFFFFFFFF)
 
-val DettleOatSecondary = Color(0xFF78716C)
+val DettleOatSecondary = Color(0xFFD14F60) // Heart coral rose
 val DettleOatOnSecondary = Color(0xFFFFFFFF)
-val DettleOatSecondaryContainer = Color(0xFFE7E1D5)
-val DettleOatOnSecondaryContainer = Color(0xFF292524)
+val DettleOatSecondaryContainer = Color(0xFFFFD9DC)
+val DettleOatOnSecondaryContainer = Color(0xFF3F0410)
 
-val DettleOatOutline = Color(0xFFD4CEBF)
-val DettleOatOutlineVariant = Color(0xFFE2DDD2)
+val DettleOatOutline = Color(0xFFD8CEBF)
+val DettleOatOutlineVariant = Color(0xFFE8DFD1)
 
 // Backward-compatible semantic aliases
 val DettleLightBackground = DettleOatBackground
@@ -91,18 +96,18 @@ val DettleLightOnTertiary = DettleTangerineOnTertiary
 val DettleLightOutline = DettleOatOutline
 val DettleLightOutlineVariant = DettleOatOutlineVariant
 
-val DettleLightError = Color(0xFFFF3B30)
+val DettleLightError = Color(0xFFD14F60)
 val DettleLightOnError = Color(0xFFFFFFFF)
-val DettleLightErrorContainer = Color(0xFFFFE5E5)
+val DettleLightErrorContainer = Color(0xFFFFD9DC)
 val DettleLightOnErrorContainer = Color(0xFF8B0000)
 
-// Status & Accents (Vibrant yet disciplined developer tones)
+// Status & Accents (Extracted from the mascot illustration)
 val DettleGreen = Color(0xFF10B981)
 val DettleGreenDim = Color(0xFF064E3B)
-val DettleOrange = Color(0xFFF59E0B)
-val DettleRed = Color(0xFFEF4444)
-val DettlePurple = Color(0xFFA78BFA)
-val DettleBlue = Color(0xFF38BDF8)
+val DettleOrange = Color(0xFFF5B041)
+val DettleRed = Color(0xFFE87A82)
+val DettlePurple = Color(0xFFA4B0E8)
+val DettleBlue = Color(0xFF7986CB)
 
 // Backward-compatible semantic bridges & shortcuts
 val DettleDark = DettleDarkBackground
@@ -116,17 +121,17 @@ val DettleCyanDim = DettleDarkPrimaryContainer
 
 val DettleTextPrimary = DettleDarkOnBackground
 val DettleTextSecondary = DettleDarkOnSurfaceVariant
-val DettleTextMuted = Color(0xFF5C6270)
+val DettleTextMuted = Color(0xFF6B7288)
 
 // Chat message bubbles
 val UserBubble = DettleDarkPrimaryContainer
-val UserBubbleBorder = Color(0xFF352452)
+val UserBubbleBorder = Color(0xFF353D5C)
 val AiBubble = DettleDarkSurface
 val AiBubbleBorder = DettleDarkOutlineVariant
 val ToolCallBg = DettleDarkSurfaceVariant
 val ToolCallBorder = DettleDarkOutlineVariant
-val ApprovalBg = Color(0xFF130924)
-val ApprovalBorder = Color(0xFF352452)
+val ApprovalBg = Color(0xFF24151C)
+val ApprovalBorder = Color(0xFF4A242E)
 
 // =============================================================================
 // Dynamic Color Scheme Builders for App Themes
@@ -139,7 +144,7 @@ fun createColorSchemeForTheme(
     customAccent: Color?
 ): ColorScheme {
     if (isDark) {
-        // Pure Pitch Black (#000000) & Lavender (#A78BFA) Dark Theme
+        // Pure Pitch Black (#000000) & Mascot Palette (Periwinkle #A4B0E8 + Blush #E87A82 + Midnight #1E2338)
         val primary = customAccent ?: DettleLavenderPrimary
         return darkColorScheme(
             primary = primary,
@@ -154,9 +159,9 @@ fun createColorSchemeForTheme(
             onTertiary = DettleDarkOnTertiary,
             background = DettleDarkBackground, // 0xFF000000 Pure Pitch Black
             onBackground = DettleDarkOnBackground,
-            surface = DettleDarkSurface,       // 0xFF070709 Pitch Black Surface
+            surface = DettleDarkSurface,       // 0xFF08090E Obsidian Surface
             onSurface = DettleDarkOnSurface,
-            surfaceVariant = DettleDarkSurfaceVariant, // 0xFF101014
+            surfaceVariant = DettleDarkSurfaceVariant, // 0xFF131522 Midnight Sofa
             onSurfaceVariant = DettleDarkOnSurfaceVariant,
             outline = DettleDarkOutline,
             outlineVariant = DettleDarkOutlineVariant,
@@ -167,7 +172,7 @@ fun createColorSchemeForTheme(
         )
     }
 
-    // Light Theme: Oat Canvas, Velvet Plum & Radiant Tangerine
+    // Light Theme: Warm Mascot Ivory Canvas, Rich Periwinkle & Sweet Coral Rose
     val primary = customAccent ?: DettlePlumPrimary
     return lightColorScheme(
         primary = primary,

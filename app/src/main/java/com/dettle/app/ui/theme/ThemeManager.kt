@@ -29,65 +29,65 @@ enum class AppTheme(
 ) {
     OAT_LIGHT(
         id = "oat_light",
-        displayName = "Oat & Plum",
-        description = "Warm oat canvas, velvet plum & radiant tangerine",
-        previewPrimary = Color(0xFF6B21A8),
-        previewBackground = Color(0xFFF7F4EE)
+        displayName = "Mascot Ivory & Periwinkle",
+        description = "Warm cream canvas, periwinkle blue & sweet coral rose",
+        previewPrimary = Color(0xFF52609A),
+        previewBackground = Color(0xFFFAF0E3)
     ),
     OBSIDIAN(
         id = "obsidian",
-        displayName = "Pitch Black & Lavender",
-        description = "Pure pitch black canvas & radiant luminous lavender",
-        previewPrimary = Color(0xFFA78BFA),
+        displayName = "Mascot Pitch Black",
+        description = "Pure pitch black OLED, periwinkle lavender & blush rose",
+        previewPrimary = Color(0xFFA4B0E8),
         previewBackground = Color(0xFF000000)
     ),
     APPLE_LIGHT(
         id = "apple_light",
-        displayName = "Oat & Plum",
-        description = "Warm oat canvas, velvet plum & radiant tangerine",
-        previewPrimary = Color(0xFF6B21A8),
-        previewBackground = Color(0xFFF7F4EE)
+        displayName = "Mascot Ivory & Periwinkle",
+        description = "Warm cream canvas, periwinkle blue & sweet coral rose",
+        previewPrimary = Color(0xFF52609A),
+        previewBackground = Color(0xFFFAF0E3)
     ),
     TITANIUM(
         id = "titanium",
-        displayName = "Pitch Black & Lavender",
-        description = "Pure pitch black canvas & radiant luminous lavender",
-        previewPrimary = Color(0xFFA78BFA),
+        displayName = "Mascot Pitch Black",
+        description = "Pure pitch black OLED, periwinkle lavender & blush rose",
+        previewPrimary = Color(0xFFA4B0E8),
         previewBackground = Color(0xFF000000)
     ),
     CYBER_INDIGO(
         id = "cyber_indigo",
-        displayName = "Pitch Black & Lavender",
-        description = "Pure pitch black canvas & radiant luminous lavender",
-        previewPrimary = Color(0xFFA78BFA),
+        displayName = "Mascot Pitch Black",
+        description = "Pure pitch black OLED, periwinkle lavender & blush rose",
+        previewPrimary = Color(0xFFA4B0E8),
         previewBackground = Color(0xFF000000)
     ),
     EMERALD_MATRIX(
         id = "emerald_matrix",
-        displayName = "Pitch Black & Lavender",
-        description = "Pure pitch black canvas & radiant luminous lavender",
-        previewPrimary = Color(0xFFA78BFA),
+        displayName = "Mascot Pitch Black",
+        description = "Pure pitch black OLED, periwinkle lavender & blush rose",
+        previewPrimary = Color(0xFFA4B0E8),
         previewBackground = Color(0xFF000000)
     ),
     SUNSET_AMBER(
         id = "sunset_amber",
-        displayName = "Pitch Black & Lavender",
-        description = "Pure pitch black canvas & radiant luminous lavender",
-        previewPrimary = Color(0xFFA78BFA),
+        displayName = "Mascot Pitch Black",
+        description = "Pure pitch black OLED, periwinkle lavender & blush rose",
+        previewPrimary = Color(0xFFA4B0E8),
         previewBackground = Color(0xFF000000)
     ),
     TOKYO_NEON(
         id = "tokyo_neon",
-        displayName = "Pitch Black & Lavender",
-        description = "Pure pitch black canvas & radiant luminous lavender",
-        previewPrimary = Color(0xFFA78BFA),
+        displayName = "Mascot Pitch Black",
+        description = "Pure pitch black OLED, periwinkle lavender & blush rose",
+        previewPrimary = Color(0xFFA4B0E8),
         previewBackground = Color(0xFF000000)
     ),
     OLED_BLACK(
         id = "oled_black",
         displayName = "Pure Pitch Black",
-        description = "Absolute true black with lavender highlights",
-        previewPrimary = Color(0xFFA78BFA),
+        description = "Absolute pitch black with mascot periwinkle highlights",
+        previewPrimary = Color(0xFFA4B0E8),
         previewBackground = Color(0xFF000000)
     );
 
