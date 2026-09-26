@@ -1386,7 +1386,7 @@ fun ChatInputBar(
     onCancelVoiceClick: () -> Unit
 ) {
     val rmsValue by voiceRmsFlow.collectAsState()
-    var isModeMenuOpen by remember { mutableStateOf(false) }
+    var isModeBarOpen by remember { mutableStateOf(false) }
     val efforts = remember { listOf("Low", "Medium", "Max Effort") }
 
     Box(
