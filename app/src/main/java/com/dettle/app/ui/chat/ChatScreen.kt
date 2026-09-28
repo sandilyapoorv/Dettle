@@ -386,12 +386,8 @@ fun ChatScreen(
                         isListening = isVoiceListening,
                         voiceRmsFlow = voiceTypingManager.rmsDb,
                         focusRequester = focusRequester,
-                        selectedChatModes = uiState.selectedChatModes,
-                        onToggleChatMode = viewModel::toggleChatMode,
-                        searchOrResearchMode = uiState.searchOrResearchMode,
-                        onSearchOrResearchChange = viewModel::setSearchOrResearchMode,
-                        effortLevel = uiState.effortLevel,
-                        onEffortChange = viewModel::setEffortLevel,
+                        activeChatMode = uiState.activeChatMode,
+                        onModeSelect = viewModel::selectChatMode,
                         attachments = attachments,
                         onAddAttachmentClick = { filePickerLauncher.launch("*/*") },
                         onRemoveAttachment = { att -> attachments = attachments.filter { it.id != att.id } },
@@ -1823,12 +1819,17 @@ fun ChatInputBar(
     isListening: Boolean,
     voiceRmsFlow: StateFlow<Float>,
     focusRequester: FocusRequester? = null,
+    // ── New streamlined mode selector ───────────────────────────────────
+    activeChatMode: SimpleChatMode = SimpleChatMode.NORMAL,
+    onModeSelect: (SimpleChatMode) -> Unit = {},
+    // ── Legacy params (kept for call-site compatibility) ─────────────────
     selectedChatModes: Set<String> = setOf("Normal"),
     onToggleChatMode: (String) -> Unit = {},
     searchOrResearchMode: String = "Normal",
     onSearchOrResearchChange: (String) -> Unit = {},
     effortLevel: String = "Medium",
     onEffortChange: (String) -> Unit = {},
+    // ──────────────────────────────────────────────────────────────────────
     attachments: List<ChatAttachment> = emptyList(),
     onAddAttachmentClick: () -> Unit = {},
     onRemoveAttachment: (ChatAttachment) -> Unit = {},
@@ -1994,177 +1995,58 @@ fun ChatInputBar(
                     }
                 }
 
-                // Expandable Mode Selection Bar with Tick Marks (Normal, Web Search, Research)
-                AnimatedVisibility(
-                    visible = isModeBarOpen,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
+                // ── Streamlined 3-pill Mode Selector ────────────────────────────────
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 10.dp, vertical = 4.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState())
-                                .padding(horizontal = 8.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            val modeItems = listOf(
-                                Triple("Normal", Icons.Outlined.AutoAwesome, "Normal"),
-                                Triple("Web Search", Icons.Outlined.Search, "Web Search"),
-                                Triple("Research", Icons.Outlined.Psychology, "Research")
+                    SimpleChatMode.entries.forEach { mode ->
+                        val isSelected = activeChatMode == mode
+                        Surface(
+                            onClick = { onModeSelect(mode) },
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isSelected)
+                                MaterialTheme.colorScheme.primaryContainer
+                            else
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                            border = BorderStroke(
+                                0.5.dp,
+                                if (isSelected)
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                                else
+                                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
                             )
-
-                            modeItems.forEach { (modeId, icon, label) ->
-                                val isSelected = selectedChatModes.contains(modeId)
-                                Surface(
-                                    onClick = { onToggleChatMode(modeId) },
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                                    border = BorderStroke(
-                                        1.dp,
-                                        if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
-                                    )
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        // Tick mark box
-                                        Box(
-                                            modifier = Modifier
-                                                .size(16.dp)
-                                                .clip(RoundedCornerShape(4.dp))
-                                                .background(
-                                                    if (isSelected) MaterialTheme.colorScheme.primary
-                                                    else Color.Transparent
-                                                )
-                                                .border(
-                                                    1.dp,
-                                                    if (isSelected) MaterialTheme.colorScheme.primary
-                                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                                    RoundedCornerShape(4.dp)
-                                                ),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            if (isSelected) {
-                                                Icon(
-                                                    imageVector = Icons.Outlined.Check,
-                                                    contentDescription = "Checked",
-                                                    tint = MaterialTheme.colorScheme.onPrimary,
-                                                    modifier = Modifier.size(12.dp)
-                                                )
-                                            }
-                                        }
-
-                                        Spacer(Modifier.width(6.dp))
-
-                                        Icon(
-                                            imageVector = icon,
-                                            contentDescription = null,
-                                            tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(13.dp)
-                                        )
-
-                                        Spacer(Modifier.width(5.dp))
-
-                                        Text(
-                                            text = label,
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                fontSize = 11.sp
-                                            ),
-                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
-                                }
-                            }
+                        ) {
+                            Text(
+                                text = when (mode) {
+                                    SimpleChatMode.NORMAL -> "Normal"
+                                    SimpleChatMode.WEB    -> "🌐 Web"
+                                    SimpleChatMode.SWARM  -> "⚡ Swarm"
+                                },
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    fontSize = 11.sp
+                                ),
+                                color = if (isSelected)
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                else
+                                    MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                            )
                         }
                     }
                 }
 
-                // Bottom toolbar inside the box
+                // Bottom toolbar — just send/mic button
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(start = 10.dp, end = 10.dp, bottom = 8.dp, top = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Mode Summary Pill (Opens/Closes the Mode Selection Bar)
-                    val modeIcon = when {
-                        selectedChatModes.contains("Research") && selectedChatModes.contains("Web Search") -> Icons.Outlined.Psychology
-                        selectedChatModes.contains("Research") -> Icons.Outlined.Psychology
-                        selectedChatModes.contains("Web Search") -> Icons.Outlined.Search
-                        else -> Icons.Outlined.AutoAwesome
-                    }
-                    val modeSummaryText = when {
-                        selectedChatModes.contains("Research") && selectedChatModes.contains("Web Search") -> "Web & Research"
-                        selectedChatModes.contains("Research") -> "Research"
-                        selectedChatModes.contains("Web Search") -> "Web Search"
-                        else -> "Normal"
-                    }
-
-                    Surface(
-                        onClick = { isModeBarOpen = !isModeBarOpen },
-                        shape = RoundedCornerShape(14.dp),
-                        color = if (isModeBarOpen) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        border = BorderStroke(
-                            0.5.dp,
-                            if (isModeBarOpen) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = modeIcon,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(13.dp)
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            Text(
-                                text = modeSummaryText,
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 11.sp
-                                ),
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(Modifier.width(2.dp))
-                            val arrowRotation by animateFloatAsState(
-                                targetValue = if (isModeBarOpen) 180f else 0f,
-                                animationSpec = tween(200),
-                                label = "modeArrowRot"
-                            )
-                            Icon(
-                                imageVector = Icons.Default.ArrowDropDown,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier
-                                    .size(14.dp)
-                                    .graphicsLayer { rotationZ = arrowRotation }
-                            )
-                        }
-                    }
-
-                    Spacer(Modifier.width(6.dp))
-
-                    // Slide bar with 3 main components: Low, Medium, Max
-                    EffortSlideBar(
-                        effortLevel = effortLevel,
-                        onEffortChange = onEffortChange,
-                        modifier = Modifier.width(136.dp)
-                    )
-
                     Spacer(Modifier.weight(1f))
 
                     // Audio wave visualizer overlay when recording

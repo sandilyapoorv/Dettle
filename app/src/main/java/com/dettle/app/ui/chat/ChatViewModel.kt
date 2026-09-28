@@ -37,6 +37,7 @@ import com.dettle.app.data.db.entity.ConversationEntity
 import com.dettle.app.data.db.entity.ConversationMessageEntity
 import com.dettle.app.orchestrator.mode.EnvironmentMode
 import com.dettle.app.orchestrator.mode.SlashCommand
+import com.dettle.app.orchestrator.swarm.SwarmOrchestrator
 import java.util.UUID
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,6 +49,13 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/** The three streamlined chat modes exposed in the Chat UI */
+enum class SimpleChatMode(val displayName: String, val emoji: String) {
+    NORMAL("Normal", ""),
+    WEB("Web", "🌐"),
+    SWARM("Swarm", "⚡")
+}
+
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val reActLoop: ReActLoop,
@@ -57,7 +65,8 @@ class ChatViewModel @Inject constructor(
     private val learningEngine: LearningEngine,
     private val conversationDao: ConversationDao,
     private val apiKeyStore: ApiKeyStore,
-    private val cognitiveBrain: CognitiveBrain
+    private val cognitiveBrain: CognitiveBrain,
+    private val swarmOrchestrator: SwarmOrchestrator
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -86,6 +95,23 @@ class ChatViewModel @Inject constructor(
         return newState
     }
 
+    /** Switch between the 3 streamlined chat modes */
+    fun selectChatMode(mode: SimpleChatMode) {
+        val lockedId = when (mode) {
+            SimpleChatMode.NORMAL -> null          // Sally auto-classifies
+            SimpleChatMode.WEB    -> ModeId.WEB    // Lock to web search
+            SimpleChatMode.SWARM  -> ModeId.SWARM  // Swarm orchestrator
+        }
+        lockedModeId = lockedId
+        _uiState.update {
+            it.copy(
+                activeChatMode = mode,
+                lockedModeId = lockedId,
+                activeModeId = lockedId ?: ModeId.CHAT
+            )
+        }
+    }
+
     /** All modes with their effective (default + user) configs — live-updating from DataStore */
     val allModes: StateFlow<List<AgentMode>> = modeRepository.observeAllModes()
         .stateIn(viewModelScope, SharingStarted.Eagerly, AgentModes.ALL)
@@ -101,7 +127,7 @@ class ChatViewModel @Inject constructor(
     private var activeConversationId: String? = null
     private var traceStartTimeMs: Long = 0L
     private val currentTraceSteps = mutableListOf<TraceStep>()
-    private var activeAiModel: String = "AI Assistant"
+    private var activeAiModel: String = "Dettle AI"
 
     // ── Environment & Mode control ─────────────────────────────────────────
 
@@ -435,54 +461,77 @@ class ChatViewModel @Inject constructor(
                     )
                 }
 
-                // 2. Classify intent (or use locked mode)
-                val effectiveMode = resolveMode(text)
-                _uiState.update { it.copy(activeModeId = effectiveMode.id) }
-                val modeOffset = System.currentTimeMillis() - traceStartTimeMs
-                currentTraceSteps.add(
-                    TraceStep(
-                        timestampMs = System.currentTimeMillis(),
-                        offsetMs = modeOffset,
-                        icon = "🧭",
-                        title = "Intent Mode Classified",
-                        description = "Mode selected: ${effectiveMode.displayName} (${effectiveMode.id.name})",
-                        status = TraceStatus.SUCCESS
-                    )
-                )
-                _uiState.update {
-                    it.copy(
-                        activeExecutionTrace = ExecutionTrace(
-                            startTimeMs = traceStartTimeMs,
-                            steps = currentTraceSteps.toList(),
-                            modelUsed = activeAiModel
+                // 2. Dispatch to the right engine based on the selected chat mode
+                when (_uiState.value.activeChatMode) {
+
+                    // ── Swarm Mode: 20 parallel agents, Sally judges winner ──────
+                    SimpleChatMode.SWARM -> {
+                        _uiState.update { it.copy(activeModeId = ModeId.SWARM) }
+                        currentTraceSteps.add(
+                            TraceStep(
+                                timestampMs = System.currentTimeMillis(),
+                                offsetMs = System.currentTimeMillis() - traceStartTimeMs,
+                                icon = "⚡",
+                                title = "Swarm Mode Activated",
+                                description = "Launching 20 parallel agents — Sally will judge the winner",
+                                status = TraceStatus.SUCCESS
+                            )
                         )
-                    )
+                        _uiState.update {
+                            it.copy(
+                                activeExecutionTrace = ExecutionTrace(
+                                    startTimeMs = traceStartTimeMs,
+                                    steps = currentTraceSteps.toList(),
+                                    modelUsed = "Swarm (20 agents)"
+                                )
+                            )
+                        }
+                        swarmOrchestrator.executeChatSwarm(
+                            userMessage = text,
+                            conversationHistory = conversationHistory.toList()
+                        ).collect { event -> handleLoopEvent(event) }
+                    }
+
+                    // ── Normal + Web Mode: Sally routes or locks to WEB ──────────
+                    SimpleChatMode.NORMAL, SimpleChatMode.WEB -> {
+                        val effectiveMode = resolveMode(text)
+                        _uiState.update { it.copy(activeModeId = effectiveMode.id) }
+                        currentTraceSteps.add(
+                            TraceStep(
+                                timestampMs = System.currentTimeMillis(),
+                                offsetMs = System.currentTimeMillis() - traceStartTimeMs,
+                                icon = "🧭",
+                                title = "Intent Mode Classified",
+                                description = "Mode selected: ${effectiveMode.displayName} (${effectiveMode.id.name})",
+                                status = TraceStatus.SUCCESS
+                            )
+                        )
+                        _uiState.update {
+                            it.copy(
+                                activeExecutionTrace = ExecutionTrace(
+                                    startTimeMs = traceStartTimeMs,
+                                    steps = currentTraceSteps.toList(),
+                                    modelUsed = activeAiModel
+                                )
+                            )
+                        }
+
+                        val goal = if (effectiveMode.id == ModeId.GOAL) {
+                            resolveGoal(text, effectiveMode)
+                        } else null
+
+                        reActLoop.run(
+                            userMessage = text,
+                            conversationHistory = conversationHistory.toList(),
+                            taskContext = taskContext,
+                            mode = effectiveMode,
+                            goal = goal,
+                            isUncensored = isUnleashedMode,
+                            maxSteps = 30,
+                            startTimeMs = traceStartTimeMs
+                        ).collect { event -> handleLoopEvent(event) }
+                    }
                 }
-
-                // 3. For GOAL mode: create or resume a persistent goal
-                val goal = if (effectiveMode.id == ModeId.GOAL) {
-                    resolveGoal(text, effectiveMode)
-                } else null
-
-                // 4. Compute step budget according to effort level (Low=15, Medium=30, Max=50)
-                val stepBudget = when (_uiState.value.effortLevel) {
-                    "Low" -> 15
-                    "Medium" -> 30
-                    "Max Effort", "Max" -> 50
-                    else -> 30
-                }
-
-                // 5. Run the loop with dynamic step budget and trace start timestamp
-                reActLoop.run(
-                    userMessage = text,
-                    conversationHistory = conversationHistory.toList(),
-                    taskContext = taskContext,
-                    mode = effectiveMode,
-                    goal = goal,
-                    isUncensored = isUnleashedMode,
-                    maxSteps = stepBudget,
-                    startTimeMs = traceStartTimeMs
-                ).collect { event -> handleLoopEvent(event) }
             } catch (t: Throwable) {
                 Log.e("ChatViewModel", "Caught throwable in chat execution loop", t)
                 val endMs = System.currentTimeMillis()
@@ -795,9 +844,13 @@ data class ChatUiState(
     val activeConversationId: String? = null,
     val isUnleashed: Boolean = false,
     val cognitiveStatus: String? = null,
-    val selectedModel: String = "Gemini 3.8 Flash",
+    val selectedModel: String = "Dettle AI",
+    // ── Streamlined 3-mode chat selector ──────────────────────────────────
+    val activeChatMode: SimpleChatMode = SimpleChatMode.NORMAL,
+    // Legacy fields kept for backward-compat with existing UI code that reads them
     val selectedChatModes: Set<String> = setOf("Normal"),
     val searchOrResearchMode: String = "Normal",
     val effortLevel: String = "Medium",
+    // ──────────────────────────────────────────────────────────────────────
     val activeExecutionTrace: ExecutionTrace? = null
 )

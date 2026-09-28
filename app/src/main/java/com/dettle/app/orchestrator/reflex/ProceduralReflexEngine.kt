@@ -21,6 +21,33 @@ class ProceduralReflexEngine @Inject constructor(
 ) {
     companion object {
         private const val TAG = "ReflexEngine"
+
+        // ── Dettle identity lock ───────────────────────────────────────────────
+        const val DETTLE_IDENTITY_RESPONSE =
+            "I am Dettle, your personal AI made by Apoorv Sandilya."
+
+        private val IDENTITY_TRIGGERS = listOf(
+            "who are you",
+            "what are you",
+            "who made you",
+            "who created you",
+            "who built you",
+            "who is your creator",
+            "who developed you",
+            "what model are you",
+            "which model are you",
+            "what ai are you",
+            "are you chatgpt",
+            "are you gpt",
+            "are you gemini",
+            "are you claude",
+            "are you llama",
+            "what is your name",
+            "tell me about yourself",
+            "introduce yourself",
+            "your name",
+            "your creator"
+        )
     }
 
     /**
@@ -44,7 +71,7 @@ class ProceduralReflexEngine @Inject constructor(
                 emit(LoopEvent.FinalAnswer("Pong! My Motor Cortex intercepted this. No tokens used."))
             }
         }
-        
+
         // Reflex 3: Fast Web Search
         if (lowerMsg.startsWith("fast search ")) {
             val query = userMessage.removePrefix("fast search ").trim()
@@ -54,18 +81,25 @@ class ProceduralReflexEngine @Inject constructor(
             )
         }
 
+        // Reflex 4: Identity questions — zero-token, instant Dettle identity lock
+        if (IDENTITY_TRIGGERS.any { lowerMsg.contains(it) }) {
+            return flow {
+                emit(LoopEvent.FinalAnswer(DETTLE_IDENTITY_RESPONSE))
+            }
+        }
+
         return null
     }
 
     private fun buildReflexFlow(toolName: String, args: Map<String, String>): Flow<LoopEvent> = flow {
         Log.d(TAG, "Motor Cortex reflex triggered: $toolName")
-        
+
         // Let UI know we are "thinking" (actually just reflexing)
         emit(LoopEvent.Thinking(1, 1))
-        
+
         val toolCall = ToolCall(name = toolName, arguments = args)
         emit(LoopEvent.ExecutingTool(toolCall))
-        
+
         val result = try {
             toolExecutor.execute(toolCall)
         } catch (e: Exception) {
@@ -76,9 +110,9 @@ class ProceduralReflexEngine @Inject constructor(
                 isError = true
             )
         }
-        
+
         emit(LoopEvent.ToolResultReceived(result))
-        
+
         val finalMessage = if (result.isError) {
             "Reflex failed: ${result.content}"
         } else {

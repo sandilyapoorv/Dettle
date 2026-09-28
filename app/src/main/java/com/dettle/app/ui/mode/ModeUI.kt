@@ -118,6 +118,7 @@ fun getModeVectorIcon(id: ModeId): ImageVector = when (id) {
     ModeId.WEB -> Icons.Outlined.Public
     ModeId.REVIEW -> Icons.Outlined.RateReview
     ModeId.DEPLOY -> Icons.Outlined.CloudUpload
+    ModeId.SWARM -> Icons.Outlined.SmartToy
 }
 
 // ─── Mode Pill Bar ────────────────────────────────────────────────────────────

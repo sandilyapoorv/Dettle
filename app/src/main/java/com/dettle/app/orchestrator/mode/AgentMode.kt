@@ -61,11 +61,15 @@ enum class ModeId(val displayName: String, val emoji: String, val description: S
     DEPLOY(
         "Deploy",     "",
         "Build → test → release. CI trigger, APK upload, GitHub Release."
+    ),
+    SWARM(
+        "Swarm",      "⚡",
+        "20 parallel agents battle it out — Sally picks the best answer. Maximum quality."
     );
 
     val environment: EnvironmentMode
         get() = when (this) {
-            CHAT, RESEARCH, WEB -> EnvironmentMode.CHAT
+            CHAT, RESEARCH, WEB, SWARM -> EnvironmentMode.CHAT
             CODE, PLAN, GOAL, REVIEW, DEPLOY -> EnvironmentMode.BUILD
         }
 }
@@ -249,8 +253,20 @@ object AgentModes {
         )
     )
 
+    val SWARM = AgentMode(
+        id = ModeId.SWARM,
+        accentHex = 0xFFAB47BC,
+        defaultConfig = ModeConfig(
+            enabledTools = listOf("web_search", "read_url", "memory_recall", "final_answer"),
+            modelWaterfall = ModelSets.ALL.ids(),
+            maxSteps = 4,
+            customInstructions = "You are one of many competing agents. Give your single BEST answer. " +
+                "Be concise, accurate, and confident. Do not hedge — the judge will pick the winner."
+        )
+    )
+
     /** All modes in pill-bar display order */
-    val ALL: List<AgentMode> = listOf(CHAT, RESEARCH, CODE, PLAN, GOAL, WEB, REVIEW, DEPLOY)
+    val ALL: List<AgentMode> = listOf(CHAT, RESEARCH, CODE, PLAN, GOAL, WEB, REVIEW, DEPLOY, SWARM)
 
     fun forId(id: ModeId): AgentMode = ALL.first { it.id == id }
     fun forIdOrNull(id: ModeId): AgentMode? = ALL.firstOrNull { it.id == id }
