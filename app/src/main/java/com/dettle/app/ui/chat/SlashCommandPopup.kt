@@ -182,7 +182,6 @@ private fun SlashCommandItem(
                 Text(
                     text = command.command,
                     style = MaterialTheme.typography.bodyMedium,
-                    fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )

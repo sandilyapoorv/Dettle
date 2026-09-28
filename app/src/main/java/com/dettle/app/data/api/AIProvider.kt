@@ -28,6 +28,7 @@ interface AIProvider {
 
 /** A single chunk emitted from a streaming response */
 sealed class StreamChunk {
+    data class ProviderSelected(val modelId: String, val displayName: String) : StreamChunk()
     data class Token(val text: String) : StreamChunk()
     data class ToolCallDetected(val rawJson: String) : StreamChunk()  // Provider returned a tool call
     data class Done(val finishReason: String = "stop", val usage: TokenUsage? = null) : StreamChunk()

@@ -251,7 +251,7 @@ fun ReposScreen(
                             }
                             Text(
                                 state.repoSummary,
-                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 8
                             )
@@ -348,7 +348,7 @@ fun RepoFileRow(file: RepoFile, onClick: () -> Unit) {
             )
             Text(
                 fileName,
-                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.weight(1f)
@@ -419,13 +419,13 @@ fun FileViewerScreen(file: RepoFileView, onClose: () -> Unit) {
                     Row(modifier = Modifier.padding(vertical = 1.dp)) {
                         Text(
                             text = "%4d".format(idx + 1),
-                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                             modifier = Modifier.width(40.dp)
                         )
                         Text(
                             text = lines[idx],
-                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     }

@@ -17,6 +17,9 @@ import com.dettle.app.domain.model.ToolCall
 import com.dettle.app.domain.model.ToolResult
 import com.dettle.app.domain.model.TaskContext
 import com.dettle.app.domain.model.TaskType
+import com.dettle.app.domain.model.TraceStep
+import com.dettle.app.domain.model.TraceStatus
+import com.dettle.app.data.api.TokenUsage
 import com.dettle.app.orchestrator.mode.AgentMode
 import com.dettle.app.orchestrator.mode.Goal
 import com.dettle.app.orchestrator.policy.EvaluationResult
@@ -72,7 +75,8 @@ class ReActLoop @Inject constructor(
         mode: AgentMode? = null,
         goal: Goal? = null,
         isUncensored: Boolean = taskContext.isUncensored,
-        maxSteps: Int = DEFAULT_MAX_STEPS
+        maxSteps: Int = DEFAULT_MAX_STEPS,
+        startTimeMs: Long = System.currentTimeMillis()
     ): Flow<LoopEvent> {
         
         // 1. Motor Cortex: Fast Reflex Intercept
@@ -85,6 +89,15 @@ class ReActLoop @Inject constructor(
             // 2. Amygdala: Threat/Salience Check
             val salience = salienceEvaluator.evaluate(userMessage, SalienceType.USER_MESSAGE)
             if (salience.requiresInterrupt) {
+                emit(LoopEvent.TraceStepEmitted(
+                    TraceStep(
+                        icon = "🚨",
+                        title = "Salience Interrupt Triggered",
+                        description = salience.reason,
+                        offsetMs = System.currentTimeMillis() - startTimeMs,
+                        status = TraceStatus.ERROR
+                    )
+                ))
                 emit(LoopEvent.Error("URGENT INTERRUPT: ${salience.reason}"))
                 return@flow
             }
@@ -96,6 +109,14 @@ class ReActLoop @Inject constructor(
             userPrompt = userMessage,
             isUncensored = effectiveUncensored
         )
+        emit(LoopEvent.TraceStepEmitted(
+            TraceStep(
+                icon = "📝",
+                title = "System Prompt Assembled",
+                description = "${tools.size} tools registered, context: ${systemPrompt.length} chars",
+                offsetMs = System.currentTimeMillis() - startTimeMs
+            )
+        ))
         val history = conversationHistory.toMutableList()
         history.add(ApiMessage(role = "user", content = userMessage))
 
@@ -120,7 +141,28 @@ class ReActLoop @Inject constructor(
                 systemPrompt = systemPrompt
             ).collect { chunk ->
                 when (chunk) {
+                    is StreamChunk.ProviderSelected -> {
+                        emit(LoopEvent.TraceStepEmitted(
+                            TraceStep(
+                                icon = "⚡",
+                                title = "AI Provider Dispatched",
+                                description = "${chunk.displayName} (${chunk.modelId})",
+                                offsetMs = System.currentTimeMillis() - startTimeMs
+                            )
+                        ))
+                    }
                     is StreamChunk.Token -> {
+                        if (currentResponse.isEmpty()) {
+                            val ttft = System.currentTimeMillis() - startTimeMs
+                            emit(LoopEvent.TraceStepEmitted(
+                                TraceStep(
+                                    icon = "⏱️",
+                                    title = "First Token Received (TTFT)",
+                                    description = "Latency to first token: ${ttft}ms",
+                                    offsetMs = ttft
+                                )
+                            ))
+                        }
                         currentResponse.append(chunk.text)
                         emit(LoopEvent.TokenStreamed(
                             messageId = streamingMessageId,
@@ -132,6 +174,17 @@ class ReActLoop @Inject constructor(
                         detectedToolCallJson = chunk.rawJson
                     }
                     is StreamChunk.Done -> {
+                        val elapsed = System.currentTimeMillis() - startTimeMs
+                        val usage = chunk.usage as? TokenUsage
+                        val totalTokens = usage?.totalTokens ?: 0
+                        emit(LoopEvent.TraceStepEmitted(
+                            TraceStep(
+                                icon = "✅",
+                                title = "Stream Completed",
+                                description = if (totalTokens > 0) "$totalTokens tokens in ${elapsed}ms" else "Finished in ${elapsed}ms",
+                                offsetMs = elapsed
+                            )
+                        ))
                         emit(LoopEvent.StreamComplete(
                             messageId = streamingMessageId,
                             fullText = currentResponse.toString(),
@@ -140,6 +193,15 @@ class ReActLoop @Inject constructor(
                     }
                     is StreamChunk.Error -> {
                         salienceEvaluator.evaluate(chunk.message, if (chunk.isRateLimit) SalienceType.API_LIMIT else SalienceType.SYSTEM_ERROR)
+                        emit(LoopEvent.TraceStepEmitted(
+                            TraceStep(
+                                icon = "❌",
+                                title = "Provider Error",
+                                description = chunk.message,
+                                offsetMs = System.currentTimeMillis() - startTimeMs,
+                                status = TraceStatus.ERROR
+                            )
+                        ))
                         emit(LoopEvent.Error(chunk.message))
                         if (!chunk.isRateLimit) done = true
                     }
@@ -181,7 +243,16 @@ class ReActLoop @Inject constructor(
 
                 // No tool call → AI is done
                 done = true
-                emit(LoopEvent.FinalAnswer(assistantText))
+                val finalAnswer = if (assistantText.isNotBlank()) assistantText else "Hello! How can I help you today?"
+                emit(LoopEvent.TraceStepEmitted(
+                    TraceStep(
+                        icon = "🏁",
+                        title = "Final Answer Ready",
+                        description = "Response generated in ${System.currentTimeMillis() - startTimeMs}ms",
+                        offsetMs = System.currentTimeMillis() - startTimeMs
+                    )
+                ))
+                emit(LoopEvent.FinalAnswer(finalAnswer))
                 break
             }
 
@@ -192,6 +263,14 @@ class ReActLoop @Inject constructor(
                 done = true
                 val summary = toolCall.arguments["summary"] ?: assistantText
                 val details = toolCall.arguments["details"] ?: ""
+                emit(LoopEvent.TraceStepEmitted(
+                    TraceStep(
+                        icon = "🏁",
+                        title = "Final Answer Tool Ready",
+                        description = "Completed in ${System.currentTimeMillis() - startTimeMs}ms",
+                        offsetMs = System.currentTimeMillis() - startTimeMs
+                    )
+                ))
                 emit(LoopEvent.FinalAnswer("$summary\n\n$details".trim()))
                 break
             }
@@ -243,6 +322,14 @@ class ReActLoop @Inject constructor(
             }
 
             // ── Execute tool ───────────────────────────────────────────────
+            emit(LoopEvent.TraceStepEmitted(
+                TraceStep(
+                    icon = "🛠️",
+                    title = "Tool Call Proposed: ${toolCall.name}",
+                    description = toolCall.arguments.entries.take(3).joinToString { "${it.key}: ${it.value.take(30)}" },
+                    offsetMs = System.currentTimeMillis() - startTimeMs
+                )
+            ))
             emit(LoopEvent.ExecutingTool(toolCall))
 
             val toolResult = try {
@@ -256,6 +343,15 @@ class ReActLoop @Inject constructor(
                 )
             }
 
+            emit(LoopEvent.TraceStepEmitted(
+                TraceStep(
+                    icon = if (toolResult.isError) "⚠️" else "📥",
+                    title = "Tool Finished: ${toolResult.toolName}",
+                    description = if (toolResult.isError) "Error: ${toolResult.content.take(60)}" else "Output received (${toolResult.content.length} chars)",
+                    offsetMs = System.currentTimeMillis() - startTimeMs,
+                    status = if (toolResult.isError) TraceStatus.ERROR else TraceStatus.SUCCESS
+                )
+            ))
             emit(LoopEvent.ToolResultReceived(toolResult))
 
             // Add tool result to history for next iteration
@@ -276,27 +372,58 @@ class ReActLoop @Inject constructor(
     }.flowOn(Dispatchers.IO)
     }
 
-    /** Parse a structured JSON tool call from OpenAI-compatible providers */
+    /** Parse a structured JSON tool call from OpenAI-compatible or Gemini providers */
     private fun parseToolCall(rawJson: String): ToolCall? {
         return try {
-            val obj = json.parseToJsonElement(rawJson).jsonObject
-            // Handle both array format [{"id":...}] and direct format
-            val first = if (rawJson.trimStart().startsWith("[")) {
-                json.parseToJsonElement(rawJson).let {
-                    // it's an array
-                    val arr = rawJson.trimStart().trimStart('[').trimEnd(']')
-                    json.parseToJsonElement(arr).jsonObject
-                }
-            } else obj
+            val element = json.parseToJsonElement(rawJson)
+            val first = if (element is kotlinx.serialization.json.JsonArray) {
+                element.firstOrNull()?.jsonObject ?: return null
+            } else {
+                element.jsonObject
+            }
 
-            val name = first["function"]?.jsonObject?.get("name")?.jsonPrimitive?.content ?: return null
-            val argsStr = first["function"]?.jsonObject?.get("arguments")?.jsonPrimitive?.content ?: "{}"
-            val args = json.parseToJsonElement(argsStr).jsonObject
-                .entries.associate { it.key to it.value.jsonPrimitive.content }
+            val functionObj = first["function"]?.jsonObject
+            val name = functionObj?.get("name")?.jsonPrimitive?.content
+                ?: first["name"]?.jsonPrimitive?.content
+                ?: return null
+
+            val args: Map<String, String> = when {
+                functionObj?.containsKey("arguments") == true -> {
+                    val argsElement = functionObj["arguments"]
+                    if (argsElement is kotlinx.serialization.json.JsonPrimitive) {
+                        runCatching {
+                            json.parseToJsonElement(argsElement.content).jsonObject.entries.associate { it.key to it.value.jsonPrimitive.content }
+                        }.getOrDefault(emptyMap())
+                    } else if (argsElement is kotlinx.serialization.json.JsonObject) {
+                        argsElement.entries.associate { it.key to it.value.jsonPrimitive.content }
+                    } else emptyMap()
+                }
+                first.containsKey("args") -> {
+                    val argsElement = first["args"]
+                    if (argsElement is kotlinx.serialization.json.JsonObject) {
+                        argsElement.entries.associate { it.key to it.value.jsonPrimitive.content }
+                    } else if (argsElement is kotlinx.serialization.json.JsonPrimitive) {
+                        runCatching {
+                            json.parseToJsonElement(argsElement.content).jsonObject.entries.associate { it.key to it.value.jsonPrimitive.content }
+                        }.getOrDefault(emptyMap())
+                    } else emptyMap()
+                }
+                first.containsKey("arguments") -> {
+                    val argsElement = first["arguments"]
+                    if (argsElement is kotlinx.serialization.json.JsonObject) {
+                        argsElement.entries.associate { it.key to it.value.jsonPrimitive.content }
+                    } else if (argsElement is kotlinx.serialization.json.JsonPrimitive) {
+                        runCatching {
+                            json.parseToJsonElement(argsElement.content).jsonObject.entries.associate { it.key to it.value.jsonPrimitive.content }
+                        }.getOrDefault(emptyMap())
+                    } else emptyMap()
+                }
+                else -> emptyMap()
+            }
 
             ToolCall(name = name, arguments = args)
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to parse structured tool call: $e")
+            Log.w(TAG, "Failed to parse structured tool call: $e\nJSON input: $rawJson")
             null
         }
     }
@@ -395,4 +522,9 @@ sealed class LoopEvent {
         val passed: Boolean,
         val reason: String? = null
     ) : LoopEvent()
+
+    /**
+     * Diagnostic execution trace step emitted for live timeline inspector.
+     */
+    data class TraceStepEmitted(val step: com.dettle.app.domain.model.TraceStep) : LoopEvent()
 }

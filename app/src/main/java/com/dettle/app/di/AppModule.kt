@@ -46,8 +46,10 @@ object AppModule {
     @Provides
     @Singleton
     fun provideOkHttpClient(): OkHttpClient {
-        val logging = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.HEADERS  // Don't log bodies (contains API keys + prompts)
+        val logging = HttpLoggingInterceptor { message ->
+            android.util.Log.d("DettleHttp", message)
+        }.apply {
+            level = HttpLoggingInterceptor.Level.BODY
         }
         return OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
@@ -234,9 +236,10 @@ object AppModule {
     @Provides
     @Singleton
     fun provideModeRouter(
-        keyPoolManager: KeyPoolManager
+        keyPoolManager: KeyPoolManager,
+        embeddingEngine: com.dettle.app.orchestrator.memory.EmbeddingEngine
     ): com.dettle.app.orchestrator.mode.ModeRouter =
-        com.dettle.app.orchestrator.mode.ModeRouter(keyPoolManager)
+        com.dettle.app.orchestrator.mode.ModeRouter(keyPoolManager, embeddingEngine)
 
     @Provides
     @Singleton

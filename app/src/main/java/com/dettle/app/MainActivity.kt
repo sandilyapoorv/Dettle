@@ -25,6 +25,16 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+        } else {
+            @Suppress("DEPRECATION")
+            window.addFlags(
+                android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+            )
+        }
         enableEdgeToEdge()
         setContent {
             val themeConfig by themeManager.themeConfig.collectAsState()
@@ -34,5 +44,17 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        when (ev.actionMasked) {
+            android.view.MotionEvent.ACTION_DOWN -> {
+                android.util.Log.d("DettleTouch", "👇 TOUCH_DOWN at (${ev.x.toInt()}, ${ev.y.toInt()})")
+            }
+            android.view.MotionEvent.ACTION_UP -> {
+                android.util.Log.d("DettleClick", "👆 TAP / CLICK at (${ev.x.toInt()}, ${ev.y.toInt()})")
+            }
+        }
+        return super.dispatchTouchEvent(ev)
     }
 }

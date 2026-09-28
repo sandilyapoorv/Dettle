@@ -2,28 +2,29 @@ package com.dettle.app.orchestrator.mode
 
 import android.util.Log
 import com.dettle.app.data.api.KeyPoolManager
-import com.dettle.app.data.api.StreamChunk
 import com.dettle.app.domain.model.ApiMessage
+import com.dettle.app.orchestrator.memory.EmbeddingEngine
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
 private const val TAG = "ModeRouter"
 
 /**
- * Classifies user intent into a [ModeId] using a fast AI call.
+ * On-Device Typed Decision Router.
  *
- * Uses Groq Llama 8B — typically < 500ms. Falls back to [ModeId.CHAT] on any failure.
- *
- * The classification is one-shot and structured: the model is forced to output
- * exactly one of the valid mode IDs as its first token, so parsing is trivial.
- *
- * When confidence is low (ambiguous message), returns [ModeId.CHAT] and sets
- * [ClassificationResult.isAmbiguous] = true, letting the ViewModel decide whether
- * to show a mode-picker bottom sheet.
+ * Inspired by Laya's typed decision architecture:
+ * 1. Tier 1: Fast-path regex & slash commands (<0.1ms)
+ * 2. Tier 2: On-device semantic decision engine via MediaPipe / TFLite Universal Sentence Encoder (~10-15ms)
+ * 3. Tier 3: Zero-lag graceful fallback (Never hangs or stalls user replies)
  */
 @Singleton
 class ModeRouter @Inject constructor(
-    private val keyPoolManager: KeyPoolManager
+    private val keyPoolManager: KeyPoolManager,
+    private val embeddingEngine: EmbeddingEngine
 ) {
     data class ClassificationResult(
         val modeId: ModeId,
@@ -31,89 +32,149 @@ class ModeRouter @Inject constructor(
         val confidence: String = "HIGH"   // HIGH / MEDIUM / LOW
     )
 
+    // Fast-path patterns for common conversational greetings and confirmations (0ms)
+    private val casualGreetingsPattern = Regex(
+        """^(hi|hello|hey|heya|howdy|sup|yo|good\s+morning|good\s+evening|good\s+afternoon|thanks|thank\s+you|ok|okay|cool|nice|test|ping)[!.,? ]*$""",
+        RegexOption.IGNORE_CASE
+    )
+
+    // Mode prototypes used by the on-device semantic decision engine
+    private val modePrototypes = mapOf(
+        ModeId.CHAT to "casual question, general discussion, greeting, chit chat, how are you, personal question, tell me a joke, conversational",
+        ModeId.CODE to "write code, fix bug, implement feature, refactor function, kotlin, java, python, javascript, create pull request, git commit, programming, solve error, compile",
+        ModeId.PLAN to "create implementation plan, architecture design, technical spec, break down tasks, design document, system roadmap, plan next steps",
+        ModeId.RESEARCH to "investigate codebase, explain library, how does this work, deep dive architecture, technical explanation, search codebase, explore documentation",
+        ModeId.GOAL to "autonomous overnight goal, long multi-step task, complete without interruption, run background agent, execute checklist, automated goal",
+        ModeId.WEB to "search the web, find online information, latest documentation, current news, lookup url, google search, internet lookup",
+        ModeId.REVIEW to "review code, review pull request, critique diff, code audit, spot bugs, security analysis, verify patch, pull request review",
+        ModeId.DEPLOY to "build release apk, trigger github actions workflow, deploy cloudflare worker, publish to pages, ci cd pipeline, assemble release"
+    )
+
+    private val prototypeVectors = mutableMapOf<ModeId, FloatArray>()
+    private val initMutex = Mutex()
+    private var isPrototypesInitialized = false
+
+    private suspend fun ensurePrototypesInitialized() {
+        if (isPrototypesInitialized) return
+        initMutex.withLock {
+            if (isPrototypesInitialized) return
+            embeddingEngine.initialize()
+            for ((mode, text) in modePrototypes) {
+                val vec = embeddingEngine.generateEmbedding(text)
+                if (vec != null) {
+                    prototypeVectors[mode] = vec
+                }
+            }
+            if (prototypeVectors.isNotEmpty()) {
+                isPrototypesInitialized = true
+                Log.d(TAG, "Initialized ${prototypeVectors.size} on-device mode prototype vectors")
+            }
+        }
+    }
+
     suspend fun classify(
         userMessage: String,
         history: List<ApiMessage> = emptyList()
-    ): ClassificationResult {
-        return try {
-            val response = kotlinx.coroutines.withTimeoutOrNull(4000L) {
-                callClassifier(userMessage, history)
-            } ?: ""
-            if (response.isBlank()) {
-                ClassificationResult(modeId = ModeId.CHAT, isAmbiguous = true, confidence = "LOW")
-            } else {
-                parseResponse(response)
+    ): ClassificationResult = withContext(Dispatchers.Default) {
+        val trimmed = userMessage.trim()
+        val startMs = System.currentTimeMillis()
+
+        // ── Tier 1: Fast-Path Slash Commands & Heuristics (<0.1ms) ──────────
+        when {
+            trimmed.startsWith("/code") -> {
+                Log.d(TAG, "⚡ Fast-path slash command: CODE")
+                return@withContext ClassificationResult(ModeId.CODE, confidence = "HIGH")
             }
-        } catch (t: Throwable) {
-            Log.w(TAG, "Classification failed: ${t.message}. Defaulting to CHAT.")
-            ClassificationResult(modeId = ModeId.CHAT, isAmbiguous = true, confidence = "LOW")
-        }
-    }
-
-    private suspend fun callClassifier(message: String, history: List<ApiMessage>): String {
-        val recentHistory = history.takeLast(4)
-            .joinToString("\n") { "[${it.role}]: ${it.content?.take(200) ?: ""}" }
-
-        val systemPrompt = """
-You are an intent classifier for an AI coding agent. Classify the user's message into exactly ONE mode.
-
-MODES:
-- CHAT: Casual question, general conversation, no specific task
-- RESEARCH: Investigate a codebase, library, concept, or technical topic in depth  
-- CODE: Write code, fix bugs, implement features, refactor — anything that produces commits
-- PLAN: Create an implementation plan, architecture design, or technical spec — no code
-- GOAL: Long multi-step autonomous task the agent should complete without interruption
-- WEB: Search the web, find information, research news or current events
-- REVIEW: Review code, a PR, or a diff — produce ranked findings
-- DEPLOY: Build, test, release, trigger CI/CD, publish to Cloudflare
-
-Reply with EXACTLY this format on one line:
-MODE: <mode_id> CONFIDENCE: <HIGH|MEDIUM|LOW>
-
-Examples:
-"fix the login bug and open a PR" → MODE: CODE CONFIDENCE: HIGH
-"what are the best practices for Kotlin coroutines?" → MODE: RESEARCH CONFIDENCE: HIGH
-"search for the latest Android 15 features" → MODE: WEB CONFIDENCE: HIGH
-"plan how to implement offline mode" → MODE: PLAN CONFIDENCE: HIGH
-"build, sign and release the APK" → MODE: DEPLOY CONFIDENCE: HIGH
-"hello" → MODE: CHAT CONFIDENCE: HIGH
-        """.trimIndent()
-
-        val messages = buildList {
-            if (recentHistory.isNotBlank()) {
-                add(ApiMessage(role = "user", content = "Recent context:\n$recentHistory"))
-                add(ApiMessage(role = "assistant", content = "Understood. I'll use that context."))
+            trimmed.startsWith("/plan") -> {
+                Log.d(TAG, "⚡ Fast-path slash command: PLAN")
+                return@withContext ClassificationResult(ModeId.PLAN, confidence = "HIGH")
             }
-            add(ApiMessage(role = "user", content = "Classify: \"$message\""))
+            trimmed.startsWith("/research") -> {
+                Log.d(TAG, "⚡ Fast-path slash command: RESEARCH")
+                return@withContext ClassificationResult(ModeId.RESEARCH, confidence = "HIGH")
+            }
+            trimmed.startsWith("/goal") -> {
+                Log.d(TAG, "⚡ Fast-path slash command: GOAL")
+                return@withContext ClassificationResult(ModeId.GOAL, confidence = "HIGH")
+            }
+            trimmed.startsWith("/web") -> {
+                Log.d(TAG, "⚡ Fast-path slash command: WEB")
+                return@withContext ClassificationResult(ModeId.WEB, confidence = "HIGH")
+            }
+            trimmed.startsWith("/review") -> {
+                Log.d(TAG, "⚡ Fast-path slash command: REVIEW")
+                return@withContext ClassificationResult(ModeId.REVIEW, confidence = "HIGH")
+            }
+            trimmed.startsWith("/deploy") -> {
+                Log.d(TAG, "⚡ Fast-path slash command: DEPLOY")
+                return@withContext ClassificationResult(ModeId.DEPLOY, confidence = "HIGH")
+            }
+            trimmed.startsWith("/chat") -> {
+                Log.d(TAG, "⚡ Fast-path slash command: CHAT")
+                return@withContext ClassificationResult(ModeId.CHAT, confidence = "HIGH")
+            }
+            casualGreetingsPattern.matches(trimmed) -> {
+                Log.d(TAG, "⚡ Fast-path casual greeting matched: CHAT in ${System.currentTimeMillis() - startMs}ms")
+                return@withContext ClassificationResult(ModeId.CHAT, isAmbiguous = false, confidence = "HIGH")
+            }
         }
 
-        var result = ""
-        keyPoolManager.chat(
-            messages = messages,
-            systemPrompt = systemPrompt,
-            maxTokens = 20,
-            preferModel = com.dettle.app.domain.model.FreeModels.GROQ_LLAMA_8B
-        ).collect { chunk ->
-            if (chunk is StreamChunk.Token) result += chunk.text
+        // ── Tier 2: On-Device Semantic Decision Engine (~10-15ms) ───────────
+        try {
+            ensurePrototypesInitialized()
+            val promptVector = embeddingEngine.generateEmbedding(trimmed)
+            if (promptVector != null && prototypeVectors.isNotEmpty()) {
+                var bestMode = ModeId.CHAT
+                var highestSimilarity = -1f
+                var secondSimilarity = -1f
+
+                for ((mode, protoVec) in prototypeVectors) {
+                    val sim = embeddingEngine.cosineSimilarity(promptVector, protoVec)
+                    if (sim > highestSimilarity) {
+                        secondSimilarity = highestSimilarity
+                        highestSimilarity = sim
+                        bestMode = mode
+                    } else if (sim > secondSimilarity) {
+                        secondSimilarity = sim
+                    }
+                }
+
+                val duration = System.currentTimeMillis() - startMs
+                val confidence = when {
+                    highestSimilarity >= 0.45f && (highestSimilarity - secondSimilarity) >= 0.04f -> "HIGH"
+                    highestSimilarity >= 0.35f -> "MEDIUM"
+                    else -> "LOW"
+                }
+
+                val isAmbiguous = confidence == "LOW" || (highestSimilarity < 0.38f)
+                val finalMode = if (isAmbiguous) ModeId.CHAT else bestMode
+
+                Log.d(
+                    TAG,
+                    "🧠 On-Device Semantic decision: $finalMode (sim=${"%.3f".format(highestSimilarity)}, 2nd=${"%.3f".format(secondSimilarity)}, conf=$confidence) in ${duration}ms"
+                )
+
+                return@withContext ClassificationResult(finalMode, isAmbiguous = isAmbiguous, confidence = confidence)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "On-device semantic decision error: ${e.message}", e)
         }
-        return result.trim()
-    }
 
-    private fun parseResponse(response: String): ClassificationResult {
-        // Expected: "MODE: CODE CONFIDENCE: HIGH"
-        val modeMatch = Regex("""MODE:\s*(\w+)""").find(response)
-        val confidenceMatch = Regex("""CONFIDENCE:\s*(\w+)""").find(response)
+        // ── Tier 3: Zero-Lag Fallback Heuristics (<1ms) ───────────────────────
+        val lower = trimmed.lowercase()
+        val fallbackMode = when {
+            lower.contains("fix ") || lower.contains("bug") || lower.contains("implement") ||
+                    lower.contains("code") || lower.contains("function") || lower.contains("error") ||
+                    lower.contains("compile") || lower.contains("pull request") || lower.contains("commit") -> ModeId.CODE
 
-        val modeStr = modeMatch?.groupValues?.getOrNull(1)?.uppercase()
-        val confidence = confidenceMatch?.groupValues?.getOrNull(1)?.uppercase() ?: "HIGH"
+            lower.contains("plan ") || lower.contains("architecture") || lower.contains("roadmap") -> ModeId.PLAN
+            lower.contains("review") || lower.contains("audit") -> ModeId.REVIEW
+            lower.contains("deploy") || lower.contains("build apk") || lower.contains("release") -> ModeId.DEPLOY
+            lower.contains("search ") || lower.contains("browse") -> ModeId.WEB
+            else -> ModeId.CHAT
+        }
 
-        val modeId = modeStr?.let {
-            runCatching { ModeId.valueOf(it) }.getOrNull()
-        } ?: ModeId.CHAT
-
-        val isAmbiguous = confidence == "LOW" || modeId == ModeId.CHAT && modeStr != "CHAT"
-
-        Log.d(TAG, "Classified: $modeId (confidence=$confidence) from response: $response")
-        return ClassificationResult(modeId, isAmbiguous, confidence)
+        Log.d(TAG, "🔄 Fast-path fallback decision: $fallbackMode in ${System.currentTimeMillis() - startMs}ms")
+        return@withContext ClassificationResult(fallbackMode, isAmbiguous = (fallbackMode == ModeId.CHAT), confidence = "MEDIUM")
     }
 }

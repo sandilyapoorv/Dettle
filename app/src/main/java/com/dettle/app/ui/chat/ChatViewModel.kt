@@ -14,6 +14,9 @@ import com.dettle.app.domain.model.TaskContext
 import com.dettle.app.domain.model.TaskType
 import com.dettle.app.domain.model.ToolCall
 import com.dettle.app.domain.model.ToolResult
+import com.dettle.app.domain.model.ExecutionTrace
+import com.dettle.app.domain.model.TraceStep
+import com.dettle.app.domain.model.TraceStatus
 import com.dettle.app.domain.model.toApiMessage
 import com.dettle.app.orchestrator.LoopEvent
 import com.dettle.app.orchestrator.ReActLoop
@@ -96,6 +99,9 @@ class ChatViewModel @Inject constructor(
     private var lockedModeId: ModeId? = null  // null = auto-classify; set = user-locked
     private var activeGoalId: String? = null
     private var activeConversationId: String? = null
+    private var traceStartTimeMs: Long = 0L
+    private val currentTraceSteps = mutableListOf<TraceStep>()
+    private var activeAiModel: String = "AI Assistant"
 
     // ── Environment & Mode control ─────────────────────────────────────────
 
@@ -321,7 +327,31 @@ class ChatViewModel @Inject constructor(
 
         val userMessage = ChatMessage(role = MessageRole.USER, content = text, type = MessageType.TEXT)
         addMessage(userMessage)
-        _uiState.update { it.copy(isAgentRunning = true, inputEnabled = false) }
+
+        traceStartTimeMs = System.currentTimeMillis()
+        currentTraceSteps.clear()
+        activeAiModel = _uiState.value.selectedModel
+        val initialStep = TraceStep(
+            timestampMs = traceStartTimeMs,
+            offsetMs = 0L,
+            icon = "✉️",
+            title = "User Message Dispatched",
+            description = "Prompt dispatched to orchestrator (${text.length} chars)",
+            status = TraceStatus.SUCCESS
+        )
+        currentTraceSteps.add(initialStep)
+
+        _uiState.update {
+            it.copy(
+                isAgentRunning = true,
+                inputEnabled = false,
+                activeExecutionTrace = ExecutionTrace(
+                    startTimeMs = traceStartTimeMs,
+                    steps = currentTraceSteps.toList(),
+                    modelUsed = activeAiModel
+                )
+            )
+        }
 
         val convId = activeConversationId ?: UUID.randomUUID().toString().also { newId ->
             activeConversationId = newId
@@ -354,12 +384,21 @@ class ChatViewModel @Inject constructor(
 
         val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
             Log.e("ChatViewModel", "Unhandled exception in sendMessage coroutine", throwable)
-            _uiState.update { it.copy(isAgentRunning = false, inputEnabled = true, thinkingStep = 0) }
+            val endMs = System.currentTimeMillis()
+            val errorTrace = ExecutionTrace(
+                startTimeMs = traceStartTimeMs,
+                endTimeMs = endMs,
+                totalDurationMs = (endMs - traceStartTimeMs).coerceAtLeast(0L),
+                modelUsed = activeAiModel,
+                steps = currentTraceSteps.toList()
+            )
+            _uiState.update { it.copy(isAgentRunning = false, inputEnabled = true, thinkingStep = 0, activeExecutionTrace = errorTrace) }
             addMessage(
                 ChatMessage(
                     role = MessageRole.ASSISTANT,
                     type = MessageType.ERROR,
-                    content = "System Error: ${throwable.localizedMessage ?: "Unexpected error occurred. Please verify your API keys and network."}"
+                    content = "System Error: ${throwable.localizedMessage ?: "Unexpected error occurred. Please verify your API keys and network."}",
+                    executionTrace = errorTrace
                 )
             )
         }
@@ -375,10 +414,50 @@ class ChatViewModel @Inject constructor(
                     taskContext = taskContext,
                     isUncensored = isUnleashedMode
                 )
+                val cogOffset = System.currentTimeMillis() - traceStartTimeMs
+                currentTraceSteps.add(
+                    TraceStep(
+                        timestampMs = System.currentTimeMillis(),
+                        offsetMs = cogOffset,
+                        icon = "🧠",
+                        title = "Cognitive Recall & Amygdala",
+                        description = "Episodic memory & cognitive context prepared",
+                        status = TraceStatus.SUCCESS
+                    )
+                )
+                _uiState.update {
+                    it.copy(
+                        activeExecutionTrace = ExecutionTrace(
+                            startTimeMs = traceStartTimeMs,
+                            steps = currentTraceSteps.toList(),
+                            modelUsed = activeAiModel
+                        )
+                    )
+                }
 
                 // 2. Classify intent (or use locked mode)
                 val effectiveMode = resolveMode(text)
                 _uiState.update { it.copy(activeModeId = effectiveMode.id) }
+                val modeOffset = System.currentTimeMillis() - traceStartTimeMs
+                currentTraceSteps.add(
+                    TraceStep(
+                        timestampMs = System.currentTimeMillis(),
+                        offsetMs = modeOffset,
+                        icon = "🧭",
+                        title = "Intent Mode Classified",
+                        description = "Mode selected: ${effectiveMode.displayName} (${effectiveMode.id.name})",
+                        status = TraceStatus.SUCCESS
+                    )
+                )
+                _uiState.update {
+                    it.copy(
+                        activeExecutionTrace = ExecutionTrace(
+                            startTimeMs = traceStartTimeMs,
+                            steps = currentTraceSteps.toList(),
+                            modelUsed = activeAiModel
+                        )
+                    )
+                }
 
                 // 3. For GOAL mode: create or resume a persistent goal
                 val goal = if (effectiveMode.id == ModeId.GOAL) {
@@ -393,7 +472,7 @@ class ChatViewModel @Inject constructor(
                     else -> 30
                 }
 
-                // 5. Run the loop with dynamic step budget
+                // 5. Run the loop with dynamic step budget and trace start timestamp
                 reActLoop.run(
                     userMessage = text,
                     conversationHistory = conversationHistory.toList(),
@@ -401,15 +480,25 @@ class ChatViewModel @Inject constructor(
                     mode = effectiveMode,
                     goal = goal,
                     isUncensored = isUnleashedMode,
-                    maxSteps = stepBudget
+                    maxSteps = stepBudget,
+                    startTimeMs = traceStartTimeMs
                 ).collect { event -> handleLoopEvent(event) }
             } catch (t: Throwable) {
                 Log.e("ChatViewModel", "Caught throwable in chat execution loop", t)
+                val endMs = System.currentTimeMillis()
+                val errorTrace = ExecutionTrace(
+                    startTimeMs = traceStartTimeMs,
+                    endTimeMs = endMs,
+                    totalDurationMs = (endMs - traceStartTimeMs).coerceAtLeast(0L),
+                    modelUsed = activeAiModel,
+                    steps = currentTraceSteps.toList()
+                )
                 addMessage(
                     ChatMessage(
                         role = MessageRole.ASSISTANT,
                         type = MessageType.ERROR,
-                        content = "Execution failed: ${t.localizedMessage ?: "Check API settings and connectivity."}"
+                        content = "Execution failed: ${t.localizedMessage ?: "Check API settings and connectivity."}",
+                        executionTrace = errorTrace
                     )
                 )
             } finally {
@@ -466,8 +555,26 @@ class ChatViewModel @Inject constructor(
                 }
             }
 
+            is LoopEvent.TraceStepEmitted -> {
+                currentTraceSteps.add(event.step)
+                if (event.step.icon == "⚡" && !event.step.description.isNullOrBlank()) {
+                    activeAiModel = event.step.description
+                }
+                _uiState.update {
+                    it.copy(
+                        activeExecutionTrace = ExecutionTrace(
+                            startTimeMs = traceStartTimeMs,
+                            steps = currentTraceSteps.toList(),
+                            modelUsed = activeAiModel
+                        )
+                    )
+                }
+            }
+
             is LoopEvent.StreamComplete -> {
-                updateMessage(event.messageId) { it.copy(isStreaming = false) }
+                updateMessage(event.messageId) {
+                    it.copy(isStreaming = false, providerName = activeAiModel)
+                }
                 conversationHistory.add(ApiMessage(role = "assistant", content = event.fullText))
                 activeConversationId?.let { convId ->
                     viewModelScope.launch {
@@ -512,37 +619,83 @@ class ChatViewModel @Inject constructor(
             }
 
             is LoopEvent.FinalAnswer -> {
-                val lastAiMsg = _uiState.value.messages.lastOrNull { it.isStreaming }
-                updateMessage(lastAiMsg?.id ?: "") {
-                    it.copy(isStreaming = false)
+                val endMs = System.currentTimeMillis()
+                val totalDurationMs = (endMs - traceStartTimeMs).coerceAtLeast(0L)
+                val finalTrace = ExecutionTrace(
+                    startTimeMs = traceStartTimeMs,
+                    endTimeMs = endMs,
+                    totalDurationMs = totalDurationMs,
+                    modelUsed = activeAiModel,
+                    steps = currentTraceSteps.toList()
+                )
+
+                val lastAiMsg = _uiState.value.messages.findLast { it.role == MessageRole.ASSISTANT && (it.isStreaming || it.type == MessageType.TEXT) }
+                if (lastAiMsg != null) {
+                    updateMessage(lastAiMsg.id) {
+                        it.copy(
+                            isStreaming = false,
+                            content = if (it.content.isNotBlank()) it.content else event.text,
+                            executionTrace = finalTrace,
+                            providerName = activeAiModel
+                        )
+                    }
+                } else {
+                    addMessage(
+                        ChatMessage(
+                            role = MessageRole.ASSISTANT,
+                            type = MessageType.TEXT,
+                            content = event.text,
+                            executionTrace = finalTrace,
+                            providerName = activeAiModel
+                        )
+                    )
                 }
                 
                 // --- Cognitive Brain: Autonomous Memory Consolidation ---
                 val lastUserMsg = _uiState.value.messages.lastOrNull { it.role == MessageRole.USER }
-                if (lastUserMsg != null && lastAiMsg != null) {
+                if (lastUserMsg != null) {
+                    val respContent = lastAiMsg?.content?.ifBlank { event.text } ?: event.text
                     cognitiveBrain.consolidateExperience(
                         userMessage = lastUserMsg.content,
-                        assistantResponse = lastAiMsg.content,
+                        assistantResponse = respContent,
                         projectId = null
                     )
                 }
 
-                _uiState.update { it.copy(isAgentRunning = false, inputEnabled = true, thinkingStep = 0) }
+                _uiState.update { it.copy(isAgentRunning = false, inputEnabled = true, thinkingStep = 0, activeExecutionTrace = finalTrace) }
             }
 
             is LoopEvent.StepLimitReached -> {
+                val endMs = System.currentTimeMillis()
+                val limitTrace = ExecutionTrace(
+                    startTimeMs = traceStartTimeMs,
+                    endTimeMs = endMs,
+                    totalDurationMs = (endMs - traceStartTimeMs).coerceAtLeast(0L),
+                    modelUsed = activeAiModel,
+                    steps = currentTraceSteps.toList()
+                )
                 addMessage(ChatMessage(
                     role = MessageRole.SYSTEM, type = MessageType.SYSTEM,
-                    content = "[Step Limit] ${event.message}"
+                    content = "[Step Limit] ${event.message}",
+                    executionTrace = limitTrace
                 ))
-                _uiState.update { it.copy(isAgentRunning = false, inputEnabled = true, thinkingStep = 0) }
+                _uiState.update { it.copy(isAgentRunning = false, inputEnabled = true, thinkingStep = 0, activeExecutionTrace = limitTrace) }
             }
 
             is LoopEvent.Error -> {
+                val endMs = System.currentTimeMillis()
+                val errorTrace = ExecutionTrace(
+                    startTimeMs = traceStartTimeMs,
+                    endTimeMs = endMs,
+                    totalDurationMs = (endMs - traceStartTimeMs).coerceAtLeast(0L),
+                    modelUsed = activeAiModel,
+                    steps = currentTraceSteps.toList()
+                )
                 addMessage(ChatMessage(
-                    role = MessageRole.SYSTEM, type = MessageType.ERROR, content = "[Error] ${event.message}"
+                    role = MessageRole.SYSTEM, type = MessageType.ERROR, content = "[Error] ${event.message}",
+                    executionTrace = errorTrace
                 ))
-                _uiState.update { it.copy(isAgentRunning = false, inputEnabled = true, thinkingStep = 0) }
+                _uiState.update { it.copy(isAgentRunning = false, inputEnabled = true, thinkingStep = 0, activeExecutionTrace = errorTrace) }
             }
 
             is LoopEvent.PolicyBlocked -> {
@@ -645,5 +798,6 @@ data class ChatUiState(
     val selectedModel: String = "Gemini 3.8 Flash",
     val selectedChatModes: Set<String> = setOf("Normal"),
     val searchOrResearchMode: String = "Normal",
-    val effortLevel: String = "Medium"
+    val effortLevel: String = "Medium",
+    val activeExecutionTrace: ExecutionTrace? = null
 )

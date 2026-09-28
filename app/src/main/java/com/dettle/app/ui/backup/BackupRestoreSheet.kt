@@ -435,7 +435,7 @@ fun BackupRestoreSheet(
                             focusedBorderColor = MaterialTheme.colorScheme.primary,
                             unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
                         ),
-                        textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                        textStyle = MaterialTheme.typography.bodySmall,
                         maxLines = 6
                     )
 
@@ -507,7 +507,6 @@ fun BackupRestoreSheet(
                                     Text(
                                         "Restored: ${res.apisRestored} APIs, ${res.subscriptionsRestored} subs, ${res.cookiesRestored} cookies, ${res.memoriesRestored} memories, ${res.projectsRestored} projects, ${res.chatsRestored} chats, ${res.logsRestored} logs, ${res.preferencesRestored} prefs",
                                         style = MaterialTheme.typography.labelSmall,
-                                        fontFamily = FontFamily.Monospace,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                 }

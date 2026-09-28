@@ -168,6 +168,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.dettle.app.ui.theme.PatrickHand
 import com.dettle.app.audio.VoiceTypingManager
 import com.dettle.app.domain.model.ChatMessage
 import com.dettle.app.domain.model.MessageRole
@@ -177,6 +178,19 @@ import com.dettle.app.ui.mode.GoalProgressCard
 import com.dettle.app.ui.mode.ModeCustomizationSheet
 import com.dettle.app.ui.mode.ModePillBar
 import com.dettle.app.ui.mode.VerticalModeToggle
+import androidx.compose.runtime.produceState
+import com.dettle.app.domain.model.ExecutionTrace
+import com.dettle.app.domain.model.TraceStep
+import com.dettle.app.domain.model.TraceStatus
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import com.dettle.app.ui.theme.DettleGreen
 import com.dettle.app.ui.theme.DettleOrange
 import com.dettle.app.ui.theme.DettleRed
@@ -502,7 +516,7 @@ fun ChatScreen(
                                     Text(
                                         text = "hello Monsieur",
                                         style = MaterialTheme.typography.headlineMedium.copy(
-                                            fontFamily = FontFamily.Serif,
+                                            fontFamily = PatrickHand,
                                             fontStyle = FontStyle.Italic,
                                             fontSize = 34.sp,
                                             fontWeight = FontWeight.Normal,
@@ -542,13 +556,14 @@ fun ChatScreen(
                                     }
                                 }
 
-                                if (uiState.isAgentRunning && uiState.thinkingStep > 0) {
+                                if (uiState.isAgentRunning) {
                                     item(key = "thinking_indicator") {
                                         ThinkingIndicator(
                                             step = uiState.thinkingStep,
                                             maxSteps = uiState.maxSteps,
                                             cognitiveStatus = uiState.cognitiveStatus,
-                                            isUnleashed = uiState.isUnleashed
+                                            isUnleashed = uiState.isUnleashed,
+                                            activeTrace = uiState.activeExecutionTrace
                                         )
                                     }
                                 }
@@ -608,13 +623,14 @@ fun ChatScreen(
                                         }
                                     }
 
-                                    if (uiState.isAgentRunning && uiState.thinkingStep > 0) {
+                                    if (uiState.isAgentRunning) {
                                         item(key = "thinking_indicator_build") {
                                             ThinkingIndicator(
                                                 step = uiState.thinkingStep,
                                                 maxSteps = uiState.maxSteps,
                                                 cognitiveStatus = uiState.cognitiveStatus,
-                                                isUnleashed = uiState.isUnleashed
+                                                isUnleashed = uiState.isUnleashed,
+                                                activeTrace = uiState.activeExecutionTrace
                                             )
                                         }
                                     }
@@ -713,7 +729,7 @@ fun ChatWelcomeHero(onPromptSelected: (String) -> Unit) {
         Text(
             text = "hello Monsieur",
             style = MaterialTheme.typography.headlineMedium.copy(
-                fontFamily = FontFamily.Serif,
+                fontFamily = PatrickHand,
                 fontStyle = FontStyle.Italic,
                 fontSize = 34.sp,
                 fontWeight = FontWeight.Normal,
@@ -735,7 +751,7 @@ fun BuildWelcomeHero(onPromptSelected: (String) -> Unit) {
         Text(
             text = "hello Monsieur",
             style = MaterialTheme.typography.headlineMedium.copy(
-                fontFamily = FontFamily.Serif,
+                fontFamily = PatrickHand,
                 fontStyle = FontStyle.Italic,
                 fontSize = 34.sp,
                 fontWeight = FontWeight.Normal,
@@ -854,7 +870,10 @@ fun TextMessageBubble(message: ChatMessage) {
                 }
             }
 
-            if (message.providerName != null) {
+            if (!isUser && message.executionTrace != null) {
+                Spacer(Modifier.height(4.dp))
+                ExecutionTimelineCard(trace = message.executionTrace)
+            } else if (message.providerName != null) {
                 Text(
                     message.providerName,
                     style = MaterialTheme.typography.labelSmall,
@@ -915,14 +934,14 @@ fun ToolCallCard(message: ChatMessage) {
                     message.content,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface,
-                    fontFamily = FontFamily.Monospace
+                    fontFamily = PatrickHand
                 )
                 message.toolCall?.arguments?.entries?.forEach { (k, v) ->
                     Text(
                         "$k: ${v.take(60)}${if (v.length > 60) "..." else ""}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = PatrickHand
                     )
                 }
             }
@@ -968,7 +987,7 @@ fun ToolResultCard(message: ChatMessage) {
                 message.content.take(500) + if (message.content.length > 500) "\n...(truncated)" else "",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontFamily = if (message.content.startsWith("{") || message.content.startsWith("[")) FontFamily.Monospace else FontFamily.Default
+                fontFamily = PatrickHand
             )
         }
     }
@@ -1026,8 +1045,8 @@ fun ApprovalCard(
                 Spacer(Modifier.height(8.dp))
                 request.details.entries.take(4).forEach { (k, v) ->
                     Row {
-                        Text("$k: ", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = FontFamily.Monospace)
-                        Text(v.take(80), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface, fontFamily = FontFamily.Monospace)
+                        Text("$k: ", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = PatrickHand)
+                        Text(v.take(80), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface, fontFamily = PatrickHand)
                     }
                 }
             }
@@ -1079,9 +1098,9 @@ fun ApprovalCard(
 @Composable
 fun SystemMessage(message: ChatMessage) {
     val isError = message.type == MessageType.ERROR
-    Row(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Center
+        horizontalAlignment = if (isError) Alignment.Start else Alignment.CenterHorizontally
     ) {
         Surface(
             shape = MaterialTheme.shapes.extraSmall,
@@ -1094,6 +1113,10 @@ fun SystemMessage(message: ChatMessage) {
                 color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
             )
+        }
+        if (message.executionTrace != null) {
+            Spacer(Modifier.height(4.dp))
+            ExecutionTimelineCard(trace = message.executionTrace)
         }
     }
 }
@@ -1131,7 +1154,7 @@ fun PolicyBlockedCard(message: ChatMessage) {
                             "rule: ${message.policyId}",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
-                            fontFamily = FontFamily.Monospace
+                            fontFamily = PatrickHand
                         )
                     }
                 }
@@ -1215,42 +1238,472 @@ fun ThinkingIndicator(
     step: Int,
     maxSteps: Int,
     cognitiveStatus: String? = null,
-    isUnleashed: Boolean = false
+    isUnleashed: Boolean = false,
+    activeTrace: ExecutionTrace? = null
+) {
+    var isExpanded by remember { mutableStateOf(false) }
+
+    val liveElapsedMs by produceState(initialValue = 0L, key1 = activeTrace?.startTimeMs) {
+        val start = activeTrace?.startTimeMs ?: System.currentTimeMillis()
+        while (true) {
+            value = (System.currentTimeMillis() - start).coerceAtLeast(0L)
+            delay(80L)
+        }
+    }
+
+    val latestStep = activeTrace?.steps?.lastOrNull()
+    val timeFormatter = remember { SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault()) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 36.dp, end = 16.dp, top = 4.dp, bottom = 4.dp)
+    ) {
+        Surface(
+            onClick = {
+                if (activeTrace != null && activeTrace.steps.isNotEmpty()) {
+                    isExpanded = !isExpanded
+                    android.util.Log.d("ThinkingIndicator", "Tapped live trace, isExpanded=$isExpanded")
+                }
+            },
+            shape = RoundedCornerShape(12.dp),
+            color = if (isUnleashed) DettleGreen.copy(alpha = 0.12f)
+            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+            border = BorderStroke(
+                1.dp,
+                if (isUnleashed) DettleGreen.copy(alpha = 0.4f)
+                else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+            )
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+            val transition = rememberInfiniteTransition(label = "thinking")
+            val alpha = transition.animateFloat(
+                1f, 0.3f,
+                infiniteRepeatable(tween(800), RepeatMode.Reverse), label = "pulse"
+            )
+
+            repeat(3) {
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 2.dp)
+                        .size(6.dp)
+                        .graphicsLayer { this.alpha = alpha.value }
+                        .clip(CircleShape)
+                        .background(if (isUnleashed) DettleGreen else MaterialTheme.colorScheme.primary)
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+
+            Column(modifier = Modifier.weight(1f, fill = false)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = if (!cognitiveStatus.isNullOrBlank()) {
+                            cognitiveStatus
+                        } else if (isUnleashed) {
+                            "⚡ Unleashed Engine thinking..."
+                        } else {
+                            "Thinking..."
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (isUnleashed) DettleGreen else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "⏱️ ${liveElapsedMs}ms",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                if (latestStep != null) {
+                    Text(
+                        text = "${latestStep.icon} ${latestStep.title} (+${latestStep.offsetMs}ms)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                        maxLines = 1
+                    )
+                }
+            }
+
+            if (activeTrace != null && activeTrace.steps.isNotEmpty()) {
+                Spacer(Modifier.width(6.dp))
+                Icon(
+                    imageVector = if (isExpanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+
+    AnimatedVisibility(
+            visible = isExpanded && activeTrace != null && activeTrace.steps.isNotEmpty(),
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
+        ) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            ) {
+                Column(modifier = Modifier.padding(10.dp)) {
+                    Text(
+                        text = "Live Execution Steps (${activeTrace?.steps?.size ?: 0})",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    activeTrace?.steps?.forEachIndexed { index, step ->
+                        LiveStepRow(
+                            step = step,
+                            isLast = index == (activeTrace.steps.size - 1),
+                            timeFormatter = timeFormatter
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ExecutionTimelineCard(
+    trace: ExecutionTrace,
+    modifier: Modifier = Modifier
+) {
+    var isExpanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
+    val timeFormatter = remember { SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault()) }
+
+    val durationText = remember(trace.totalDurationMs) {
+        val totalMs = trace.totalDurationMs ?: 0L
+        if (totalMs >= 1000L) {
+            String.format(Locale.getDefault(), "%.2fs (%dms)", totalMs / 1000.0, totalMs)
+        } else {
+            "${totalMs}ms"
+        }
+    }
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        Surface(
+            onClick = {
+                isExpanded = !isExpanded
+                android.util.Log.d("TimelineCard", "Tapped execution trace pill, isExpanded=$isExpanded")
+            },
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+            border = BorderStroke(
+                1.dp,
+                if (isExpanded) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+            )
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Schedule,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = "⏱️ $durationText",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = " • ${trace.steps.size} steps",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (!trace.modelUsed.isNullOrBlank()) {
+                    Text(
+                        text = " • ${trace.modelUsed}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                        maxLines = 1
+                    )
+                }
+                Spacer(Modifier.weight(1f))
+                Icon(
+                    imageVector = if (isExpanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                    contentDescription = if (isExpanded) "Collapse timeline" else "Expand timeline",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        // Expanded Timeline Detail Card
+        AnimatedVisibility(
+            visible = isExpanded,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
+        ) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    // Header with title, copy button, and collapse button
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "Execution Trace",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                                    modifier = Modifier.padding(horizontal = 2.dp)
+                                ) {
+                                    Text(
+                                        text = durationText,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                            Text(
+                                text = "Started: ${timeFormatter.format(Date(trace.startTimeMs))}${if (trace.modelUsed != null) " • " + trace.modelUsed else ""}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        IconButton(
+                            onClick = {
+                                val summary = buildString {
+                                    appendLine("=== DETTLE EXECUTION TRACE ===")
+                                    appendLine("Started: ${timeFormatter.format(Date(trace.startTimeMs))}")
+                                    appendLine("Total Duration: ${trace.totalDurationMs}ms")
+                                    appendLine("Model: ${trace.modelUsed ?: "Unknown"}")
+                                    appendLine("Steps (${trace.steps.size}):")
+                                    trace.steps.forEach { step ->
+                                        appendLine("  [+${step.offsetMs}ms] ${step.icon} ${step.title} (${timeFormatter.format(Date(step.timestampMs))})")
+                                        if (!step.description.isNullOrBlank()) {
+                                            appendLine("     -> ${step.description}")
+                                        }
+                                    }
+                                }
+                                clipboardManager.setText(AnnotatedString(summary))
+                                Toast.makeText(context, "Execution trace copied!", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.ContentCopy,
+                                contentDescription = "Copy trace",
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+
+                    // Vertical Timeline Steps
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(0.dp)
+                    ) {
+                        trace.steps.forEachIndexed { index, step ->
+                            TimelineStepItem(
+                                step = step,
+                                isFirst = index == 0,
+                                isLast = index == trace.steps.size - 1,
+                                timeFormatter = timeFormatter
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TimelineStepItem(
+    step: TraceStep,
+    isFirst: Boolean,
+    isLast: Boolean,
+    timeFormatter: SimpleDateFormat
+) {
+    val statusColor = when (step.status) {
+        TraceStatus.SUCCESS -> Color(0xFF2E7D32)
+        TraceStatus.ERROR -> MaterialTheme.colorScheme.error
+        TraceStatus.WARNING -> Color(0xFFE65100)
+        TraceStatus.RUNNING -> MaterialTheme.colorScheme.primary
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp)
+    ) {
+        // Vertical line + node indicator
+        Box(
+            modifier = Modifier
+                .width(24.dp)
+                .height(if (step.description.isNullOrBlank()) 44.dp else 58.dp),
+            contentAlignment = Alignment.TopCenter
+        ) {
+            // Connecting vertical line
+            if (!isLast) {
+                Box(
+                    modifier = Modifier
+                        .width(2.dp)
+                        .fillMaxHeight()
+                        .offset(y = 12.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                )
+            }
+            // Center node dot
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .clip(CircleShape)
+                    .background(statusColor.copy(alpha = 0.2f))
+                    .border(1.5.dp, statusColor, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(5.dp)
+                        .clip(CircleShape)
+                        .background(statusColor)
+                )
+            }
+        }
+
+        Spacer(Modifier.width(6.dp))
+
+        // Step info
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(bottom = 6.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f, fill = false)
+                ) {
+                    Text(
+                        text = "${step.icon} ",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = step.title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1
+                    )
+                }
+
+                // Relative offset pill (+0ms, +24ms)
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(start = 6.dp)
+                ) {
+                    Text(
+                        text = "+${step.offsetMs}ms",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
+
+            // Wall-clock timestamp
+            Text(
+                text = timeFormatter.format(Date(step.timestampMs)),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            )
+
+            // Step description / metadata
+            if (!step.description.isNullOrBlank()) {
+                Text(
+                    text = step.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun LiveStepRow(
+    step: TraceStep,
+    isLast: Boolean,
+    timeFormatter: SimpleDateFormat
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 36.dp),
+            .padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        val transition = rememberInfiniteTransition(label = "thinking")
-        val alpha = transition.animateFloat(
-            1f, 0.3f,
-            infiniteRepeatable(tween(800), RepeatMode.Reverse), label = "pulse"
-        )
-
-        repeat(3) {
-            Box(
-                modifier = Modifier
-                    .padding(horizontal = 2.dp)
-                    .size(6.dp)
-                    .graphicsLayer { this.alpha = alpha.value }
-                    .clip(CircleShape)
-                    .background(if (isUnleashed) DettleGreen else MaterialTheme.colorScheme.primary)
-            )
-        }
-        Spacer(Modifier.width(8.dp))
         Text(
-            if (!cognitiveStatus.isNullOrBlank()) {
-                cognitiveStatus
-            } else if (isUnleashed) {
-                "⚡ Unleashed Engine thinking..."
-            } else {
-                "Thinking..."
-            },
+            text = "${step.icon} ",
+            style = MaterialTheme.typography.labelSmall
+        )
+        Text(
+            text = step.title,
             style = MaterialTheme.typography.labelSmall,
-            color = if (isUnleashed) DettleGreen else MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = if (isUnleashed) FontWeight.SemiBold else FontWeight.Normal
+            fontWeight = if (isLast) FontWeight.Bold else FontWeight.Normal,
+            color = if (isLast) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+            maxLines = 1
+        )
+        Text(
+            text = "+${step.offsetMs}ms",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -1865,7 +2318,7 @@ fun VoiceWaveformBar(
                 text = timeFormatted,
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = PatrickHand,
                 color = MaterialTheme.colorScheme.onSurface
             )
 

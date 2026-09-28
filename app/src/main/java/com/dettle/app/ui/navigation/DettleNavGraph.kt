@@ -38,6 +38,12 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
 fun DettleNavGraph() {
     val navController = rememberNavController()
 
+    androidx.compose.runtime.LaunchedEffect(navController) {
+        navController.currentBackStackEntryFlow.collect { entry ->
+            android.util.Log.d("DettleNav", "🚀 [NAV] Current Screen: ${entry.destination.route}")
+        }
+    }
+
     NavHost(
         navController = navController,
         startDestination = Screen.Chat.route,

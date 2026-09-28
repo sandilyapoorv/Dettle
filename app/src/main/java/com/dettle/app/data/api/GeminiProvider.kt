@@ -13,6 +13,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -277,10 +279,18 @@ class GeminiProvider(
     /** Extract functionCall tool invocation if emitted by Gemini */
     private fun extractGeminiToolCall(rawJson: String): String? {
         return try {
-            if (rawJson.contains("\"functionCall\"")) {
-                val callRegex = """"functionCall"\s*:\s*(\{[^}]+\})""".toRegex()
-                callRegex.find(rawJson)?.groupValues?.get(1)
-            } else null
+            val root = json.parseToJsonElement(rawJson).jsonObject
+            val candidates = root["candidates"]?.jsonArray ?: return null
+            for (candidate in candidates) {
+                val parts = candidate.jsonObject["content"]?.jsonObject?.get("parts")?.jsonArray ?: continue
+                for (part in parts) {
+                    val functionCall = part.jsonObject["functionCall"]?.jsonObject
+                    if (functionCall != null) {
+                        return functionCall.toString()
+                    }
+                }
+            }
+            null
         } catch (_: Exception) { null }
     }
 

@@ -263,8 +263,7 @@ fun GoalProgressCard(
                         "$passed / ${gates.size}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                        fontFamily = FontFamily.Monospace
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                     )
                 }
             }
@@ -432,7 +431,6 @@ fun ModeCustomizationSheet(
                     Text(
                         toolName,
                         style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
                         color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f)
                     )
@@ -582,8 +580,7 @@ fun ModelWaterfallRow(
                 Text(
                     "${contextWindow / 1000}k ctx",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontFamily = FontFamily.Monospace
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
             Spacer(Modifier.width(8.dp))
@@ -662,15 +659,13 @@ fun ModelPickerSheet(
                                     Text(
                                         "${model.contextWindow / 1000}k ctx",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        fontFamily = FontFamily.Monospace
+                                        color = MaterialTheme.colorScheme.primary
                                     )
                                     if (model.dailyRequestLimit > 0) {
                                         Text(
                                             "${model.dailyRequestLimit} req/day",
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            fontFamily = FontFamily.Monospace
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }

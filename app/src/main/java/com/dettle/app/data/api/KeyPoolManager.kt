@@ -106,6 +106,8 @@ class KeyPoolManager @Inject constructor(
             val messagesStr = messages.joinToString("\n") { "[${it.role.uppercase()}]: ${it.content?.take(500)}" }
             agentLogger.logPrompt(state.model.modelId, systemPrompt, messagesStr)
 
+            emit(StreamChunk.ProviderSelected(state.model.modelId, state.model.displayName))
+
             try {
                 provider.chat(messages, tools, systemPrompt, maxTokens)
                     .onEach { chunk ->

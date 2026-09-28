@@ -32,7 +32,8 @@ data class ChatMessage(
     // Policy enforcement fields
     val policyId: String? = null,
     val policyReason: String? = null,
-    val policyFix: String? = null
+    val policyFix: String? = null,
+    val executionTrace: ExecutionTrace? = null
 )
 
 // ─── Tool Calling ──────────────────────────────────────────────────────────

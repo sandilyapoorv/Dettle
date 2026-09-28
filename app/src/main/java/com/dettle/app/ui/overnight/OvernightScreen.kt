@@ -246,9 +246,7 @@ fun OvernightScreen(
                             logs.forEach { (cleanMsg, colorType) ->
                                 Text(
                                     "> $cleanMsg",
-                                    style = MaterialTheme.typography.bodySmall.copy(
-                                        fontFamily = FontFamily.Monospace
-                                    ),
+                                    style = MaterialTheme.typography.bodySmall,
                                     color = when (colorType) {
                                         1 -> DettleGreen
                                         2 -> MaterialTheme.colorScheme.error
