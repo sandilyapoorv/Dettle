@@ -47,7 +47,8 @@ class ModeRouter @Inject constructor(
         ModeId.GOAL to "autonomous overnight goal, long multi-step task, complete without interruption, run background agent, execute checklist, automated goal",
         ModeId.WEB to "search the web, find online information, latest documentation, current news, lookup url, google search, internet lookup",
         ModeId.REVIEW to "review code, review pull request, critique diff, code audit, spot bugs, security analysis, verify patch, pull request review",
-        ModeId.DEPLOY to "build release apk, trigger github actions workflow, deploy cloudflare worker, publish to pages, ci cd pipeline, assemble release"
+        ModeId.DEPLOY to "build release apk, trigger github actions workflow, deploy cloudflare worker, publish to pages, ci cd pipeline, assemble release",
+        ModeId.SWARM to "launch swarm, parallel agents, teamwork, many models working together, consensus, collaborative problem solving, brainstorm with multiple agents"
     )
 
     private val prototypeVectors = mutableMapOf<ModeId, FloatArray>()
@@ -108,6 +109,10 @@ class ModeRouter @Inject constructor(
             trimmed.startsWith("/deploy") -> {
                 Log.d(TAG, "⚡ Fast-path slash command: DEPLOY")
                 return@withContext ClassificationResult(ModeId.DEPLOY, confidence = "HIGH")
+            }
+            trimmed.startsWith("/swarm") -> {
+                Log.d(TAG, "⚡ Fast-path slash command: SWARM")
+                return@withContext ClassificationResult(ModeId.SWARM, confidence = "HIGH")
             }
             trimmed.startsWith("/chat") -> {
                 Log.d(TAG, "⚡ Fast-path slash command: CHAT")

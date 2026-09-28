@@ -490,11 +490,11 @@ object OpenRouterModels {
         bestFor = "General free fallback when primary provider is rate-limited"
     )
 
-    val QWEN_2_5_72B_FREE = AIModel(
+    val QWEN_2_5_CODER_32B_FREE = AIModel(
         provider = AIProviderType.OPENROUTER,
-        modelId = "qwen/qwen-2.5-72b-instruct:free",
-        displayName = "Qwen 2.5 72B (OpenRouter Free)",
-        contextWindow = 131_072,
+        modelId = "qwen/qwen-2.5-coder-32b-instruct:free",
+        displayName = "Qwen 2.5 Coder 32B (OpenRouter Free)",
+        contextWindow = 32_768,
         dailyRequestLimit = 1_000,
         rpmLimit = 20,
         supportsToolCalling = true,
@@ -697,7 +697,7 @@ object FreeModels {
 
     // OpenRouter free models
     val OPENROUTER_LLAMA = OpenRouterModels.LLAMA_3_3_70B_FREE
-    val OPENROUTER_QWEN = OpenRouterModels.QWEN_2_5_72B_FREE
+    val OPENROUTER_QWEN = OpenRouterModels.QWEN_2_5_CODER_32B_FREE
     val OPENROUTER_DEEPSEEK_R1 = OpenRouterModels.DEEPSEEK_R1_FREE
     val OPENROUTER_NEMOTRON = OpenRouterModels.NEMOTRON_3_5_FREE
 
@@ -842,7 +842,7 @@ val ALL_KNOWN_MODELS: Map<String, AIModel> = listOf(
 
     // OpenRouter
     OpenRouterModels.LLAMA_3_3_70B_FREE,
-    OpenRouterModels.QWEN_2_5_72B_FREE,
+    OpenRouterModels.QWEN_2_5_CODER_32B_FREE,
     OpenRouterModels.DEEPSEEK_R1_FREE,
     OpenRouterModels.NEMOTRON_3_5_FREE,
 

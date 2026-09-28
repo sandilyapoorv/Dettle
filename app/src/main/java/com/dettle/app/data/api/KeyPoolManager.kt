@@ -146,9 +146,13 @@ class KeyPoolManager @Inject constructor(
                         if (chunk is StreamChunk.Error) {
                             lastError = chunk.message
                             if (!streamBegan) {
-                                return@collect  // Will try next provider in pool
+                                return@collect  // Swallow error and try next provider silently
                             }
+                            // If stream already began, we must emit the error so user sees it
+                            emit(chunk)
+                            return@collect
                         }
+                        // Always forward non-error chunks
                         emit(chunk)
                     }
 
