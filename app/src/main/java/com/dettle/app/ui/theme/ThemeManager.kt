@@ -29,65 +29,65 @@ enum class AppTheme(
 ) {
     OAT_LIGHT(
         id = "oat_light",
-        displayName = "Mascot Ivory & Periwinkle",
-        description = "Warm cream canvas, periwinkle blue & sweet coral rose",
-        previewPrimary = Color(0xFF52609A),
-        previewBackground = Color(0xFFFAF0E3)
+        displayName = "Apple Liquid Frost",
+        description = "Light translucent glass, crisp typography & Apple blue",
+        previewPrimary = Color(0xFF007AFF),
+        previewBackground = Color(0xFFF2F2F7)
     ),
     OBSIDIAN(
         id = "obsidian",
-        displayName = "Mascot Pitch Black",
-        description = "Pure pitch black OLED, periwinkle lavender & blush rose",
-        previewPrimary = Color(0xFFA4B0E8),
+        displayName = "Apple Liquid Glass",
+        description = "Deep space black, frosted glass layers & vibrant iOS accents",
+        previewPrimary = Color(0xFF0A84FF),
         previewBackground = Color(0xFF000000)
     ),
     APPLE_LIGHT(
         id = "apple_light",
-        displayName = "Mascot Ivory & Periwinkle",
-        description = "Warm cream canvas, periwinkle blue & sweet coral rose",
-        previewPrimary = Color(0xFF52609A),
-        previewBackground = Color(0xFFFAF0E3)
+        displayName = "Apple Liquid Frost",
+        description = "Light translucent glass, crisp typography & Apple blue",
+        previewPrimary = Color(0xFF007AFF),
+        previewBackground = Color(0xFFF2F2F7)
     ),
     TITANIUM(
         id = "titanium",
-        displayName = "Mascot Pitch Black",
-        description = "Pure pitch black OLED, periwinkle lavender & blush rose",
-        previewPrimary = Color(0xFFA4B0E8),
-        previewBackground = Color(0xFF000000)
+        displayName = "Natural Titanium",
+        description = "Sleek metallic gray with frosted glass highlights",
+        previewPrimary = Color(0xFF8E8E93),
+        previewBackground = Color(0xFF1C1C1E)
     ),
     CYBER_INDIGO(
         id = "cyber_indigo",
-        displayName = "Mascot Pitch Black",
-        description = "Pure pitch black OLED, periwinkle lavender & blush rose",
-        previewPrimary = Color(0xFFA4B0E8),
+        displayName = "Liquid Indigo",
+        description = "Midnight violet glass with luminous electric indigo",
+        previewPrimary = Color(0xFF5E5CE6),
         previewBackground = Color(0xFF000000)
     ),
     EMERALD_MATRIX(
         id = "emerald_matrix",
-        displayName = "Mascot Pitch Black",
-        description = "Pure pitch black OLED, periwinkle lavender & blush rose",
-        previewPrimary = Color(0xFFA4B0E8),
+        displayName = "Liquid Mint",
+        description = "Apple neon mint over dark glass",
+        previewPrimary = Color(0xFF32D74B),
         previewBackground = Color(0xFF000000)
     ),
     SUNSET_AMBER(
         id = "sunset_amber",
-        displayName = "Mascot Pitch Black",
-        description = "Pure pitch black OLED, periwinkle lavender & blush rose",
-        previewPrimary = Color(0xFFA4B0E8),
+        displayName = "Liquid Amber",
+        description = "Warm golden glass with high-contrast obsidian",
+        previewPrimary = Color(0xFFFF9F0A),
         previewBackground = Color(0xFF000000)
     ),
     TOKYO_NEON(
         id = "tokyo_neon",
-        displayName = "Mascot Pitch Black",
-        description = "Pure pitch black OLED, periwinkle lavender & blush rose",
-        previewPrimary = Color(0xFFA4B0E8),
+        displayName = "Liquid Magenta",
+        description = "Vibrant iOS pink with deep translucent obsidian",
+        previewPrimary = Color(0xFFFF375F),
         previewBackground = Color(0xFF000000)
     ),
     OLED_BLACK(
         id = "oled_black",
-        displayName = "Pure Pitch Black",
-        description = "Absolute pitch black with mascot periwinkle highlights",
-        previewPrimary = Color(0xFFA4B0E8),
+        displayName = "Deep Space Black",
+        description = "Pure OLED pitch black with Apple blue glass highlights",
+        previewPrimary = Color(0xFF0A84FF),
         previewBackground = Color(0xFF000000)
     );
 

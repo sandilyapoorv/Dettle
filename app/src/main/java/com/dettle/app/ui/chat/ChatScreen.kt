@@ -169,6 +169,8 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dettle.app.ui.theme.PatrickHand
+import com.dettle.app.ui.theme.liquidGlass
+import com.dettle.app.ui.theme.LiquidGlassTokens
 import com.dettle.app.audio.VoiceTypingManager
 import com.dettle.app.domain.model.ChatMessage
 import com.dettle.app.domain.model.MessageRole
@@ -506,20 +508,11 @@ fun ChatScreen(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .padding(bottom = 60.dp),
+                                        .statusBarsPadding()
+                                        .padding(top = 80.dp, bottom = 40.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text(
-                                        text = "hello Monsieur",
-                                        style = MaterialTheme.typography.headlineMedium.copy(
-                                            fontFamily = PatrickHand,
-                                            fontStyle = FontStyle.Italic,
-                                            fontSize = 34.sp,
-                                            fontWeight = FontWeight.Normal,
-                                            letterSpacing = (-0.02).sp
-                                        ),
-                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.88f)
-                                    )
+                                    ChatWelcomeHero(onPromptSelected = onPromptSelected)
                                 }
                             } else {
                                 LazyColumn(
@@ -716,72 +709,109 @@ fun WelcomeCard(onPromptSelected: (String) -> Unit) {
 
 @Composable
 fun ChatWelcomeHero(onPromptSelected: (String) -> Unit) {
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 48.dp),
-        contentAlignment = Alignment.Center
+            .padding(horizontal = 24.dp, vertical = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text(
-            text = "hello Monsieur",
-            style = MaterialTheme.typography.headlineMedium.copy(
-                fontFamily = PatrickHand,
-                fontStyle = FontStyle.Italic,
-                fontSize = 34.sp,
-                fontWeight = FontWeight.Normal,
-                letterSpacing = (-0.02).sp
-            ),
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.9f)
-        )
+        // Glowing Apple Liquid Glass Orb
+        Box(
+            modifier = Modifier
+                .size(68.dp)
+                .liquidGlass(shape = CircleShape, elevation = 6.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.AutoAwesome,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(32.dp)
+            )
+        }
+
+        // Apple Typography Display
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "Dettle",
+                style = MaterialTheme.typography.displayMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-0.8).sp
+                ),
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "Autonomous AI Engineering Partner",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // Quick Starter Prompts in Liquid Glass Cards
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            QuickActionCard(
+                icon = Icons.Outlined.Security,
+                text = "Audit repo for security vulnerabilities & architecture",
+                onClick = { onPromptSelected("Audit repository architecture, dependencies, and security boundaries. Report findings ranked P0 to P3.") }
+            )
+            QuickActionCard(
+                icon = Icons.Outlined.Code,
+                text = "Scaffold feature implementation with TDD unit tests",
+                onClick = { onPromptSelected("Plan and scaffold the requested feature using strict test-driven development.") }
+            )
+            QuickActionCard(
+                icon = Icons.Outlined.Search,
+                text = "Deep-dive research across web documentation & APIs",
+                onClick = { onPromptSelected("/research Synthesize latest documentation and official best practices for our stack.") }
+            )
+        }
     }
 }
 
 @Composable
 fun BuildWelcomeHero(onPromptSelected: (String) -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 48.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = "hello Monsieur",
-            style = MaterialTheme.typography.headlineMedium.copy(
-                fontFamily = PatrickHand,
-                fontStyle = FontStyle.Italic,
-                fontSize = 34.sp,
-                fontWeight = FontWeight.Normal,
-                letterSpacing = (-0.02).sp
-            ),
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.9f)
-        )
-    }
+    ChatWelcomeHero(onPromptSelected = onPromptSelected)
 }
 
 @Composable
 fun QuickActionCard(icon: ImageVector, text: String, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
             Text(
                 text = text,
                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
             )
         }
     }

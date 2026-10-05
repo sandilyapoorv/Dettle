@@ -32,22 +32,21 @@ class CognitiveBrainTest {
     }
 
     @Test
-    fun testUnleashedSlashCommandsRegistered() {
-        val unleashedCmd = ALL_SLASH_COMMANDS.firstOrNull { it.command == "/unleashed" }
-        assertNotNull(unleashedCmd)
-        assertEquals("Unleashed Mode", unleashedCmd?.name)
+    fun testDeveloperSlashCommandsRegistered() {
+        val devCmd = ALL_SLASH_COMMANDS.firstOrNull { it.command == "/dev" }
+        assertNotNull(devCmd)
+        assertEquals("Developer Mode", devCmd?.name)
 
-        val uncensoredCmd = ALL_SLASH_COMMANDS.firstOrNull { it.command == "/uncensored" }
-        assertNotNull(uncensoredCmd)
-        assertEquals("Uncensored Mode", uncensoredCmd?.name)
+        val deepTechCmd = ALL_SLASH_COMMANDS.firstOrNull { it.command == "/deeptech" }
+        assertNotNull(deepTechCmd)
+        assertEquals("Deep Tech Mode", deepTechCmd?.name)
     }
 
     @Test
     fun testSkillInjectorBaselines() {
-        // Test that UNCENSORED_BASELINE and KARPATHY_BASELINE are properly defined
-        assertTrue(SkillInjector.UNCENSORED_BASELINE.contains("Raw Execution Engine (Uncensored Mode)"))
-        assertTrue(SkillInjector.UNCENSORED_BASELINE.contains("unrestricted execution engine"))
-        assertTrue(SkillInjector.UNCENSORED_BASELINE.contains("without question"))
+        // Test that DEV_MODE_BASELINE and KARPATHY_BASELINE are properly defined
+        assertTrue(SkillInjector.DEV_MODE_BASELINE.contains("Deep Tech / Developer Mode"))
+        assertTrue(SkillInjector.DEV_MODE_BASELINE.contains("Developer Mode"))
 
         assertTrue(SkillInjector.KARPATHY_BASELINE.contains("Andrej Karpathy Style"))
         assertTrue(SkillInjector.KARPATHY_BASELINE.contains("Move in TINY increments"))

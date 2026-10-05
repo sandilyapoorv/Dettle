@@ -1,200 +1,195 @@
 package com.dettle.app.ui.theme
 
-import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 
 // =============================================================================
-// Linear / Raycast / Apple Inspired Color Palettes
+// Apple Liquid Glass Design System Palette
+// Clean, luminous, translucent materials with system-grade precision
 // =============================================================================
 
-// Pure Pitch Black & Mascot Periwinkle Dark Theme Palette
-val DettleDarkBackground = Color(0xFF000000)
-val DettleDarkOnBackground = Color(0xFFF6F3EE)
-val DettleDarkSurface = Color(0xFF08090E)
-val DettleDarkOnSurface = Color(0xFFF6F3EE)
-val DettleDarkSurfaceVariant = Color(0xFF131522)
-val DettleDarkOnSurfaceVariant = Color(0xFFA3A8BF)
+// Apple System Accent Colors
+val AppleBlue = Color(0xFF0A84FF)
+val AppleBlueLight = Color(0xFF007AFF)
+val AppleIndigo = Color(0xFF5E5CE6)
+val ApplePurple = Color(0xFFBF5AF2)
+val ApplePink = Color(0xFFFF375F)
+val AppleRed = Color(0xFFFF453A)
+val AppleOrange = Color(0xFFFF9F0A)
+val AppleYellow = Color(0xFFFFD60A)
+val AppleGreen = Color(0xFF30D158)
+val AppleMint = Color(0xFF63E6E2)
+val AppleTeal = Color(0xFF40C8E0)
+val AppleCyan = Color(0xFF64D2FF)
 
-// Periwinkle Lavender (from the mascot's floral pajamas)
-val DettleLavenderPrimary = Color(0xFFA4B0E8)
-val DettleLavenderOnPrimary = Color(0xFF14172B)
-val DettleLavenderContainer = Color(0xFF1E2338) // Midnight indigo from the cozy sofa
-val DettleLavenderOnContainer = Color(0xFFE5E9FF)
+// Semantic Accent Aliases for Backward Compatibility
+val DettleGreen = AppleGreen
+val DettleGreenDim = Color(0xFF0A3D1B)
+val DettleOrange = AppleOrange
+val DettleRed = AppleRed
+val DettlePurple = ApplePurple
+val DettleBlue = AppleBlue
+val DettleCyan = AppleCyan
+val DettleCyanDim = Color(0xFF0A3044)
 
-val DettleDarkPrimary = DettleLavenderPrimary
-val DettleDarkOnPrimary = DettleLavenderOnPrimary
-val DettleDarkPrimaryContainer = DettleLavenderContainer
-val DettleDarkOnPrimaryContainer = DettleLavenderOnContainer
+// Dark Theme: Deep Space Black & Translucent Glass Surfaces
+val AppleDarkBackground = Color(0xFF000000)
+val AppleDarkOnBackground = Color(0xFFFFFFFF)
+val AppleDarkSurface = Color(0xFF1C1C1E) // System Gray 6
+val AppleDarkOnSurface = Color(0xFFFFFFFF)
+val AppleDarkSurfaceVariant = Color(0xFF2C2C2E) // System Gray 5
+val AppleDarkOnSurfaceVariant = Color(0xFF8E8E93) // System Gray 2
 
-// Sweet Blush Rose (from the floating hearts and rosy cheeks)
-val DettleHeartRose = Color(0xFFE87A82)
-val DettleDarkSecondary = DettleHeartRose
-val DettleDarkOnSecondary = Color(0xFF2E0E14)
-val DettleDarkSecondaryContainer = Color(0xFF2C161C)
-val DettleDarkOnSecondaryContainer = Color(0xFFFFDADE)
+val AppleDarkOutline = Color(0xFF38383A)
+val AppleDarkOutlineVariant = Color(0xFF48484A)
+val AppleDarkError = AppleRed
 
-// Warm Honey Gold (from the golden bangle and savory curry plate)
-val DettleHoneyGold = Color(0xFFF5B041)
-val DettleDarkTertiary = DettleHoneyGold
-val DettleDarkOnTertiary = Color(0xFF2C1B03)
+// Light Theme: Frosted Silver & Crisp Snow
+val AppleLightBackground = Color(0xFFF2F2F7) // System Gray 6 Light
+val AppleLightOnBackground = Color(0xFF000000)
+val AppleLightSurface = Color(0xFFFFFFFF)
+val AppleLightOnSurface = Color(0xFF000000)
+val AppleLightSurfaceVariant = Color(0xFFE5E5EA) // System Gray 5 Light
+val AppleLightOnSurfaceVariant = Color(0xFF8E8E93)
 
-val DettleDarkOutline = Color(0xFF282D42)
-val DettleDarkOutlineVariant = Color(0xFF1B1E2E)
+val AppleLightOutline = Color(0xFFC6C6C8)
+val AppleLightOutlineVariant = Color(0xFFD1D1D6)
+val AppleLightError = Color(0xFFFF3B30)
 
-val DettleDarkError = Color(0xFFE87A82)
-val DettleDarkOnError = Color(0xFF2E0E14)
-val DettleDarkErrorContainer = Color(0xFF2C161C)
-val DettleDarkOnErrorContainer = Color(0xFFFFDADE)
+// Backward-compatible semantic bridges
+val DettleDarkBackground = AppleDarkBackground
+val DettleDarkOnBackground = AppleDarkOnBackground
+val DettleDarkSurface = AppleDarkSurface
+val DettleDarkOnSurface = AppleDarkOnSurface
+val DettleDarkSurfaceVariant = AppleDarkSurfaceVariant
+val DettleDarkOnSurfaceVariant = AppleDarkOnSurfaceVariant
 
-// Light Theme Palette (Warm Cream Ivory Canvas from mascot badge)
-val DettleOatBackground = Color(0xFFFAF0E3)
-val DettleOatOnBackground = Color(0xFF241E24)
-val DettleOatSurface = Color(0xFFFFFFFF)
-val DettleOatOnSurface = Color(0xFF241E24)
-val DettleOatSurfaceVariant = Color(0xFFF2E6D5)
-val DettleOatOnSurfaceVariant = Color(0xFF6B6258)
+val DettleDarkPrimary = AppleBlue
+val DettleDarkOnPrimary = Color.White
+val DettleDarkPrimaryContainer = Color(0xFF1E2640)
+val DettleDarkOnPrimaryContainer = AppleBlue
+val DettleDarkSecondary = AppleIndigo
+val DettleDarkOnSecondary = Color.White
+val DettleDarkSecondaryContainer = Color(0xFF262244)
+val DettleDarkOnSecondaryContainer = AppleIndigo
+val DettleDarkTertiary = AppleOrange
+val DettleDarkOnTertiary = Color.Black
+val DettleDarkOutline = AppleDarkOutline
+val DettleDarkOutlineVariant = AppleDarkOutlineVariant
+val DettleDarkError = AppleDarkError
+val DettleDarkOnError = Color.White
+val DettleDarkErrorContainer = Color(0xFF3D1618)
+val DettleDarkOnErrorContainer = AppleRed
 
-val DettlePlumPrimary = Color(0xFF52609A) // Deep periwinkle
-val DettlePlumOnPrimary = Color(0xFFFFFFFF)
-val DettlePlumPrimaryContainer = Color(0xFFE0E4FC)
-val DettlePlumOnPrimaryContainer = Color(0xFF0F1738)
+val DettleLightBackground = AppleLightBackground
+val DettleLightOnBackground = AppleLightOnBackground
+val DettleLightSurface = AppleLightSurface
+val DettleLightOnSurface = AppleLightOnSurface
+val DettleLightSurfaceVariant = AppleLightSurfaceVariant
+val DettleLightOnSurfaceVariant = AppleLightOnSurfaceVariant
 
-val DettleTangerineTertiary = Color(0xFFD97706) // Golden honey
-val DettleTangerineOnTertiary = Color(0xFFFFFFFF)
+val DettleLightPrimary = AppleBlueLight
+val DettleLightOnPrimary = Color.White
+val DettleLightPrimaryContainer = Color(0xFFE5F1FF)
+val DettleLightOnPrimaryContainer = AppleBlueLight
+val DettleLightSecondary = AppleIndigo
+val DettleLightOnSecondary = Color.White
+val DettleLightSecondaryContainer = Color(0xFFECEBFC)
+val DettleLightOnSecondaryContainer = AppleIndigo
+val DettleLightTertiary = AppleOrange
+val DettleLightOnTertiary = Color.White
+val DettleLightOutline = AppleLightOutline
+val DettleLightOutlineVariant = AppleLightOutlineVariant
+val DettleLightError = AppleLightError
+val DettleLightOnError = Color.White
+val DettleLightErrorContainer = Color(0xFFFFE5E5)
+val DettleLightOnErrorContainer = AppleLightError
 
-val DettleOatSecondary = Color(0xFFD14F60) // Heart coral rose
-val DettleOatOnSecondary = Color(0xFFFFFFFF)
-val DettleOatSecondaryContainer = Color(0xFFFFD9DC)
-val DettleOatOnSecondaryContainer = Color(0xFF3F0410)
-
-val DettleOatOutline = Color(0xFFD8CEBF)
-val DettleOatOutlineVariant = Color(0xFFE8DFD1)
-
-// Backward-compatible semantic aliases
-val DettleLightBackground = DettleOatBackground
-val DettleLightOnBackground = DettleOatOnBackground
-val DettleLightSurface = DettleOatSurface
-val DettleLightOnSurface = DettleOatOnSurface
-val DettleLightSurfaceVariant = DettleOatSurfaceVariant
-val DettleLightOnSurfaceVariant = DettleOatOnSurfaceVariant
-
-val DettleLightPrimary = DettlePlumPrimary
-val DettleLightOnPrimary = DettlePlumOnPrimary
-val DettleLightPrimaryContainer = DettlePlumPrimaryContainer
-val DettleLightOnPrimaryContainer = DettlePlumOnPrimaryContainer
-
-val DettleLightSecondary = DettleOatSecondary
-val DettleLightOnSecondary = DettleOatOnSecondary
-val DettleLightSecondaryContainer = DettleOatSecondaryContainer
-val DettleLightOnSecondaryContainer = DettleOatOnSecondaryContainer
-
-val DettleLightTertiary = DettleTangerineTertiary
-val DettleLightOnTertiary = DettleTangerineOnTertiary
-
-val DettleLightOutline = DettleOatOutline
-val DettleLightOutlineVariant = DettleOatOutlineVariant
-
-val DettleLightError = Color(0xFFD14F60)
-val DettleLightOnError = Color(0xFFFFFFFF)
-val DettleLightErrorContainer = Color(0xFFFFD9DC)
-val DettleLightOnErrorContainer = Color(0xFF8B0000)
-
-// Status & Accents (Extracted from the mascot illustration)
-val DettleGreen = Color(0xFF10B981)
-val DettleGreenDim = Color(0xFF064E3B)
-val DettleOrange = Color(0xFFF5B041)
-val DettleRed = Color(0xFFE87A82)
-val DettlePurple = Color(0xFFA4B0E8)
-val DettleBlue = Color(0xFF7986CB)
-
-// Backward-compatible semantic bridges & shortcuts
-val DettleDark = DettleDarkBackground
-val DettleSurface = DettleDarkSurface
-val DettleSurfaceVariant = DettleDarkSurfaceVariant
-val DettleCard = DettleDarkSurface
-val DettleCardBorder = DettleDarkOutlineVariant
-
-val DettleCyan = DettleDarkPrimary
-val DettleCyanDim = DettleDarkPrimaryContainer
-
-val DettleTextPrimary = DettleDarkOnBackground
-val DettleTextSecondary = DettleDarkOnSurfaceVariant
-val DettleTextMuted = Color(0xFF6B7288)
+// Additional UI bridges
+val DettleDark = AppleDarkBackground
+val DettleSurface = AppleDarkSurface
+val DettleSurfaceVariant = AppleDarkSurfaceVariant
+val DettleCard = AppleDarkSurface
+val DettleCardBorder = AppleDarkOutlineVariant
+val DettleTextPrimary = AppleDarkOnBackground
+val DettleTextSecondary = AppleDarkOnSurfaceVariant
+val DettleTextMuted = Color(0xFF636366)
 
 // Chat message bubbles
-val UserBubble = DettleDarkPrimaryContainer
-val UserBubbleBorder = Color(0xFF353D5C)
-val AiBubble = DettleDarkSurface
-val AiBubbleBorder = DettleDarkOutlineVariant
-val ToolCallBg = DettleDarkSurfaceVariant
-val ToolCallBorder = DettleDarkOutlineVariant
-val ApprovalBg = Color(0xFF24151C)
-val ApprovalBorder = Color(0xFF4A242E)
+val UserBubble = AppleBlue
+val UserBubbleBorder = AppleBlue
+val AiBubble = AppleDarkSurfaceVariant
+val AiBubbleBorder = AppleDarkOutline
+val ToolCallBg = Color(0xFF242426)
+val ToolCallBorder = AppleDarkOutlineVariant
+val ApprovalBg = Color(0xFF1C2834)
+val ApprovalBorder = AppleBlue.copy(alpha = 0.4f)
 
-// =============================================================================
-// Dynamic Color Scheme Builders for App Themes
-// =============================================================================
-
+// Theme Color Scheme Generator
 fun createColorSchemeForTheme(
     theme: AppTheme,
     isDark: Boolean,
     isPureOled: Boolean,
     customAccent: Color?
-): ColorScheme {
+): androidx.compose.material3.ColorScheme {
     if (isDark) {
-        // Pure Pitch Black (#000000) & Mascot Palette (Periwinkle #A4B0E8 + Blush #E87A82 + Midnight #1E2338)
-        val primary = customAccent ?: DettleLavenderPrimary
+        val primary = customAccent ?: when (theme) {
+            AppTheme.CYBER_INDIGO -> AppleIndigo
+            AppTheme.EMERALD_MATRIX -> AppleGreen
+            AppTheme.SUNSET_AMBER -> AppleOrange
+            AppTheme.TOKYO_NEON -> ApplePink
+            AppTheme.TITANIUM -> Color(0xFF8E8E93)
+            else -> AppleBlue
+        }
         return darkColorScheme(
             primary = primary,
-            onPrimary = DettleLavenderOnPrimary,
-            primaryContainer = DettleLavenderContainer,
-            onPrimaryContainer = DettleLavenderOnContainer,
-            secondary = DettleDarkSecondary,
-            onSecondary = DettleDarkOnSecondary,
-            secondaryContainer = DettleDarkSecondaryContainer,
-            onSecondaryContainer = DettleDarkOnSecondaryContainer,
-            tertiary = DettleDarkTertiary,
-            onTertiary = DettleDarkOnTertiary,
-            background = DettleDarkBackground, // 0xFF000000 Pure Pitch Black
-            onBackground = DettleDarkOnBackground,
-            surface = DettleDarkSurface,       // 0xFF08090E Obsidian Surface
-            onSurface = DettleDarkOnSurface,
-            surfaceVariant = DettleDarkSurfaceVariant, // 0xFF131522 Midnight Sofa
-            onSurfaceVariant = DettleDarkOnSurfaceVariant,
-            outline = DettleDarkOutline,
-            outlineVariant = DettleDarkOutlineVariant,
-            error = DettleDarkError,
-            onError = DettleDarkOnError,
+            onPrimary = Color.White,
+            primaryContainer = primary.copy(alpha = 0.22f),
+            onPrimaryContainer = primary,
+            secondary = AppleIndigo,
+            onSecondary = Color.White,
+            secondaryContainer = AppleIndigo.copy(alpha = 0.2f),
+            onSecondaryContainer = AppleIndigo,
+            tertiary = AppleOrange,
+            onTertiary = Color.Black,
+            background = if (isPureOled || theme == AppTheme.OLED_BLACK) Color.Black else AppleDarkBackground,
+            onBackground = AppleDarkOnBackground,
+            surface = AppleDarkSurface,
+            onSurface = AppleDarkOnSurface,
+            surfaceVariant = AppleDarkSurfaceVariant,
+            onSurfaceVariant = AppleDarkOnSurfaceVariant,
+            outline = AppleDarkOutline,
+            outlineVariant = AppleDarkOutlineVariant,
+            error = AppleDarkError,
+            onError = Color.White,
             errorContainer = DettleDarkErrorContainer,
             onErrorContainer = DettleDarkOnErrorContainer
         )
     }
 
-    // Light Theme: Warm Mascot Ivory Canvas, Rich Periwinkle & Sweet Coral Rose
-    val primary = customAccent ?: DettlePlumPrimary
+    val primary = customAccent ?: AppleBlueLight
     return lightColorScheme(
         primary = primary,
         onPrimary = Color.White,
-        primaryContainer = DettlePlumPrimaryContainer,
-        onPrimaryContainer = DettlePlumOnPrimaryContainer,
-        secondary = DettleOatSecondary,
+        primaryContainer = primary.copy(alpha = 0.15f),
+        onPrimaryContainer = primary,
+        secondary = AppleIndigo,
         onSecondary = Color.White,
-        secondaryContainer = DettleOatSecondaryContainer,
-        onSecondaryContainer = DettleOatOnSecondaryContainer,
-        tertiary = DettleTangerineTertiary,
+        secondaryContainer = AppleIndigo.copy(alpha = 0.15f),
+        onSecondaryContainer = AppleIndigo,
+        tertiary = AppleOrange,
         onTertiary = Color.White,
-        background = DettleOatBackground,
-        onBackground = DettleOatOnBackground,
-        surface = DettleOatSurface,
-        onSurface = DettleOatOnSurface,
-        surfaceVariant = DettleOatSurfaceVariant,
-        onSurfaceVariant = DettleOatOnSurfaceVariant,
-        outline = DettleOatOutline,
-        outlineVariant = DettleOatOutlineVariant,
-        error = DettleLightError,
-        onError = DettleLightOnError,
+        background = AppleLightBackground,
+        onBackground = AppleLightOnBackground,
+        surface = AppleLightSurface,
+        onSurface = AppleLightOnSurface,
+        surfaceVariant = AppleLightSurfaceVariant,
+        onSurfaceVariant = AppleLightOnSurfaceVariant,
+        outline = AppleLightOutline,
+        outlineVariant = AppleLightOutlineVariant,
+        error = AppleLightError,
+        onError = Color.White,
         errorContainer = DettleLightErrorContainer,
         onErrorContainer = DettleLightOnErrorContainer
     )
