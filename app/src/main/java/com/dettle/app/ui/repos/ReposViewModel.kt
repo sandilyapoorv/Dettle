@@ -112,8 +112,7 @@ class ReposViewModel @Inject constructor(
         viewModelScope.launch {
             projectContextManager.setOrCreateProject(
                 name = repoSummary.name,
-                repo = "${repoSummary.owner}/${repoSummary.name}",
-                branch = repoSummary.defaultBranch
+                linkedRepo = "${repoSummary.owner}/${repoSummary.name}"
             )
         }
         loadRepoTree(repoSummary.owner, repoSummary.name)
@@ -124,7 +123,10 @@ class ReposViewModel @Inject constructor(
             it.copy(currentOwner = owner, currentRepo = repo, files = emptyList(), selectedFile = null, error = null)
         }
         viewModelScope.launch {
-            projectContextManager.setOrCreateProject(name = repo, repo = "$owner/$repo")
+            projectContextManager.setOrCreateProject(
+                name = repo,
+                linkedRepo = "$owner/$repo"
+            )
         }
         loadRepoTree(owner, repo)
     }

@@ -322,7 +322,7 @@ fun ReposScreen(
                                 shape = MaterialTheme.shapes.small,
                                 singleLine = true,
                                 leadingIcon = {
-                                    Icon(Icons.Outlined.Link, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Icon(Icons.Outlined.Code, contentDescription = null, modifier = Modifier.size(16.dp))
                                 },
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedContainerColor = MaterialTheme.colorScheme.surface,
