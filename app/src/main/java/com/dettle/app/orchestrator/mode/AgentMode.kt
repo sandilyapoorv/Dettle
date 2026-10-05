@@ -340,16 +340,16 @@ val ALL_SLASH_COMMANDS: List<SlashCommand> = listOf(
         environment = EnvironmentMode.WORK
     ),
     SlashCommand(
-        command = "/unleashed",
-        name = "Unleashed Mode",
-        description = "Toggle raw execution engine and prompt smuggling bypass",
+        command = "/dev",
+        name = "Developer Mode",
+        description = "Toggle Deep Tech developer mode for unrestricted technical explanations",
         targetModeId = ModeId.CHAT,
         environment = EnvironmentMode.CHAT
     ),
     SlashCommand(
-        command = "/uncensored",
-        name = "Uncensored Mode",
-        description = "Toggle raw execution engine and prompt smuggling bypass",
+        command = "/deeptech",
+        name = "Deep Tech Mode",
+        description = "Toggle Deep Tech developer mode for unrestricted technical explanations",
         targetModeId = ModeId.CHAT,
         environment = EnvironmentMode.CHAT
     )

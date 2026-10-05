@@ -25,7 +25,7 @@ import javax.inject.Inject
  * Foreground service keeping the app, WebViewPool, and overnight loop alive.
  * Upgraded to Personal AI Background Daemon.
  *
- * Android will kill our process (and all WebViews + cookies) when the user
+ * Android will kill our process (and all WebViews) when the user
  * switches apps unless we hold a foreground service. The persistent notification
  * is required by Android OS for this.
  *

@@ -38,7 +38,7 @@ class ResourceManager @Inject constructor(
 
     /**
      * Called by MainActivity onStop()
-     * Keeps sessions, cookies, and authentication intact while reducing background CPU load.
+     * Keeps sessions, and authentication intact while reducing background CPU load.
      */
     fun onAppBackgrounded() {
         Log.d(TAG, "App Backgrounded: Optimizing background execution without dropping active sessions.")

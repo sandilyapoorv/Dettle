@@ -20,7 +20,7 @@
 - [x] SelectorRegistry — remote Gist JSON, 8 provider defaults, 6hr cache
 - [x] DOMAutomationBridge — JavascriptInterface (chunk/complete/error/login/toolCall/ready)
 - [x] WebViewAutomationScript — JS: React synthetic events, ProseMirror, MutationObserver, XML tool call detection
-- [x] WebViewSession — per-provider hidden WebView, cookie persistence, login detection, rate limit handling
+- [x] WebViewSession — per-provider hidden WebView, login detection, rate limit handling
 - [x] WebViewPool — singleton pool for all 8 providers, needsReauth StateFlow, priority waterfall
 - [x] ApiKeyStore — isWebViewProviderEnabled() / setWebViewProviderEnabled() per provider
 - [x] AgentForegroundService — WebViewPool starts on onCreate, destroys on onDestroy

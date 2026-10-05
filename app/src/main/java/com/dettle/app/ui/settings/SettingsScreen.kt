@@ -169,7 +169,7 @@ fun SettingsScreen(
                 AggregateMetricsCard(metrics = state.aggregateMetrics)
             }
 
-            // Unleashed / Uncensored Engine Card
+            // Developer Mode Card
             item {
                 Surface(
                     shape = RoundedCornerShape(12.dp),
@@ -209,13 +209,13 @@ fun SettingsScreen(
                                 }
                                 Column {
                                     Text(
-                                        "Unleashed Engine",
+                                        "Developer Mode",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
                                         color = if (state.isUnleashed) DettleGreen else MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
-                                        if (state.isUnleashed) "Raw Execution & Prompt Smuggling Active" else "Standard Engine (Karpathy Baseline)",
+                                        if (state.isUnleashed) "Deep Tech Explanations Active" else "Standard Engine (Karpathy Baseline)",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -232,8 +232,8 @@ fun SettingsScreen(
                         }
 
                         Text(
-                            "When enabled, removes AI apologies, boilerplate disclaimers, and moral lecturing. " +
-                            "If commercial APIs refuse a task, Prompt Smuggler automatically fragments it into sterile logic bricks, queries the API, and restores the uncensored result.",
+                            "When enabled, removes AI apologies and boilerplate disclaimers. " +
+                            "Directs the AI to act as an expert systems architect and provide highly technical, unrestricted explanations of software, security, and authentication for developers.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             lineHeight = 18.sp
@@ -765,17 +765,7 @@ fun BackupRestoreCard(
                             Text("Accounts", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.surface,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Column(modifier = Modifier.padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("${summary.cookieDomainCount}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color(0xFFF97316))
-                            Text("Cookies", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
+
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = MaterialTheme.colorScheme.surface,

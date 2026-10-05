@@ -2,7 +2,6 @@ package com.dettle.app.data.backup
 
 import android.content.Context
 import android.net.Uri
-import android.webkit.CookieManager
 import androidx.core.content.FileProvider
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -46,25 +45,23 @@ import javax.inject.Singleton
 data class BackupOptions(
     val includeApis: Boolean = true,
     val includeSubscriptions: Boolean = true,
-    val includeCookies: Boolean = true,
     val includeMemories: Boolean = true,
     val includeProjects: Boolean = true,
     val includeChatsAndLogs: Boolean = true,
     val includeAppSettings: Boolean = true
 ) {
     val isAllSelected: Boolean
-        get() = includeApis && includeSubscriptions && includeCookies && includeMemories &&
+        get() = includeApis && includeSubscriptions && includeMemories &&
                 includeProjects && includeChatsAndLogs && includeAppSettings
 
     val isNoneSelected: Boolean
-        get() = !includeApis && !includeSubscriptions && !includeCookies && !includeMemories &&
+        get() = !includeApis && !includeSubscriptions && !!includeMemories &&
                 !includeProjects && !includeChatsAndLogs && !includeAppSettings
 }
 
 data class BackupSummary(
     val apiCount: Int = 0,
     val subscriptionCount: Int = 0,
-    val cookieDomainCount: Int = 0,
     val memoryCount: Int = 0,
     val projectCount: Int = 0,
     val chatCount: Int = 0,
@@ -77,7 +74,6 @@ data class RestoreResult(
     val message: String,
     val apisRestored: Int = 0,
     val subscriptionsRestored: Int = 0,
-    val cookiesRestored: Int = 0,
     val memoriesRestored: Int = 0,
     val projectsRestored: Int = 0,
     val chatsRestored: Int = 0,
@@ -91,7 +87,6 @@ data class RestoreResult(
  * Backs up 100% of application state:
  * 1. APIs, Multi-Accounts, Tokens, Google Drive OAuth, and raw EncryptedSharedPreferences entries.
  * 2. WebView subscription accounts.
- * 3. Live browser session cookies via Android CookieManager across all AI & developer domains.
  * 4. Cognitive episodic memories, project facts, knowledge graph concepts/edges, and user profile.
  * 5. Projects and workspace architectures.
  * 6. Conversations, message threads with tool calls, autonomous task logs, goals, and deployments.
@@ -114,25 +109,6 @@ class BackupManager @Inject constructor(
     private val deploymentDao = database.deploymentDao()
     private val goalDao = database.goalDao()
 
-    private val wellKnownCookieDomains = listOf(
-        "https://chatgpt.com",
-        "https://auth.openai.com",
-        "https://platform.openai.com",
-        "https://oaistatic.com",
-        "https://claude.ai",
-        "https://anthropic.com",
-        "https://x.ai",
-        "https://grok.com",
-        "https://twitter.com",
-        "https://x.com",
-        "https://chat.deepseek.com",
-        "https://deepseek.com",
-        "https://www.perplexity.ai",
-        "https://perplexity.ai",
-        "https://github.com",
-        "https://accounts.google.com"
-    )
-
     suspend fun getLiveSummary(): BackupSummary = withContext(Dispatchers.IO) {
         val apis = apiKeyStore.getAllProviderAccounts().size + apiKeyStore.getAllGitHubAccounts().size
         val subscriptions = apiKeyStore.getAllWebViewAccounts().size
@@ -141,32 +117,15 @@ class BackupManager @Inject constructor(
         val logs = taskLogDao.getAllLogs().size
         val memories = memoryDao.getAllMemories().size + projectDao.getAllProjectMemories().size
 
-        // Count domains with active cookies
-        val cookieDomains = getAllTargetCookieDomains()
-        val cookieCount = withContext(Dispatchers.Main) {
-            val cm = CookieManager.getInstance()
-            cookieDomains.count { url -> !cm.getCookie(url).isNullOrBlank() }
-        }
-
         BackupSummary(
             apiCount = apis,
             subscriptionCount = subscriptions,
-            cookieDomainCount = cookieCount,
             memoryCount = memories,
             projectCount = projects,
             chatCount = chats,
             logCount = logs,
             hasSettings = true
         )
-    }
-
-    private fun getAllTargetCookieDomains(): List<String> {
-        val dynamicDomains = apiKeyStore.getAllWebViewAccounts().flatMap {
-            listOfNotNull(it.baseUrl, it.loginUrl)
-        }
-        return (wellKnownCookieDomains + dynamicDomains)
-            .filter { it.startsWith("http://") || it.startsWith("https://") }
-            .distinct()
     }
 
     suspend fun createBackupJson(options: BackupOptions): String = withContext(Dispatchers.IO) {
@@ -261,25 +220,6 @@ class BackupManager @Inject constructor(
                 })
             }
             root.put("subscriptions", subArr)
-        }
-
-        // 3. Browser Sessions & Cookies
-        if (options.includeCookies) {
-            val cookieList = JSONArray()
-            val targetDomains = getAllTargetCookieDomains()
-            withContext(Dispatchers.Main) {
-                val cm = CookieManager.getInstance()
-                for (domain in targetDomains) {
-                    val cookieStr = cm.getCookie(domain)
-                    if (!cookieStr.isNullOrBlank()) {
-                        cookieList.put(JSONObject().apply {
-                            put("url", domain)
-                            put("cookies", cookieStr)
-                        })
-                    }
-                }
-            }
-            root.put("cookies", cookieList)
         }
 
         // 4. Cognitive Memories, Facts, Knowledge Graph, & User Profile
@@ -527,7 +467,6 @@ class BackupManager @Inject constructor(
             val root = JSONObject(jsonString)
             var apisCount = 0
             var subsCount = 0
-            var cookiesCount = 0
             var memoriesCount = 0
             var projCount = 0
             var chatCount = 0
@@ -644,30 +583,6 @@ class BackupManager @Inject constructor(
                 }
             }
 
-            // 3. Browser Sessions & Cookies
-            if (options.includeCookies && root.has("cookies")) {
-                runCatching {
-                    val cookieList = root.getJSONArray("cookies")
-                    withContext(Dispatchers.Main) {
-                        val cm = CookieManager.getInstance()
-                        cm.setAcceptCookie(true)
-                        for (i in 0 until cookieList.length()) {
-                            val o = cookieList.getJSONObject(i)
-                            val domain = o.getString("url")
-                            val cookieStr = o.getString("cookies")
-                            val individualCookies = cookieStr.split(";")
-                            for (c in individualCookies) {
-                                val trimmed = c.trim()
-                                if (trimmed.isNotEmpty()) {
-                                    cm.setCookie(domain, trimmed)
-                                }
-                            }
-                            cookiesCount++
-                        }
-                        cm.flush()
-                    }
-                }
-            }
 
             // 4. Cognitive Memories, Knowledge Graph, & Profile
             if (options.includeMemories && root.has("memories")) {
@@ -1004,7 +919,6 @@ class BackupManager @Inject constructor(
                 message = "Backup successfully restored across all selected components",
                 apisRestored = apisCount,
                 subscriptionsRestored = subsCount,
-                cookiesRestored = cookiesCount,
                 memoriesRestored = memoriesCount,
                 projectsRestored = projCount,
                 chatsRestored = chatCount,

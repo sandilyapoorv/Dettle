@@ -332,13 +332,13 @@ fun ChatHistoryDrawer(
                     Spacer(Modifier.width(8.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            if (isUnleashed) "Unleashed Active" else "Standard Engine",
+                            if (isUnleashed) "Developer Mode Active" else "Standard Engine",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = if (isUnleashed) DettleGreen else MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            if (isUnleashed) "Raw execution ON" else "Safety guardrails ON",
+                            if (isUnleashed) "Deep tech & raw explanations ON" else "Standard engineering ON",
                             style = MaterialTheme.typography.labelSmall,
                             fontSize = 9.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant

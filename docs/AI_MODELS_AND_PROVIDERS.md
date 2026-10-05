@@ -173,7 +173,6 @@ Dettle implements a dual-track AI infrastructure:
 ---
 
 ### 12. Track B: WebView Subscriptions
-* Persistent cookie sessions via Android WebView:
   - `CHATGPT_WEB` (`https://chatgpt.com`): GPT-4o / GPT-5 Free & Plus
   - `CLAUDE_WEB` (`https://claude.ai`): Claude 3.7 / Claude Sonnet 5 Free & Pro
   - `DEEPSEEK_WEB` (`https://chat.deepseek.com`): DeepSeek V3 / R1

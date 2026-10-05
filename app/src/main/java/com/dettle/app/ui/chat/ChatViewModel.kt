@@ -143,16 +143,16 @@ class ChatViewModel @Inject constructor(
     }
 
     fun selectSlashCommand(command: SlashCommand) {
-        if (command.command == "/unleashed" || command.command == "/uncensored") {
+        if (command.command == "/dev" || command.command == "/deeptech") {
             val newState = toggleUnleashed()
             addMessage(
                 ChatMessage(
                     role = MessageRole.SYSTEM,
                     type = MessageType.SYSTEM,
                     content = if (newState) {
-                        "⚡ Unleashed Engine Activated: Raw execution engine & Prompt Smuggler proxy active."
+                        "👨‍💻 Developer Mode Activated: Deep tech explanations and unrestricted technical discussions enabled."
                     } else {
-                        "🛡️ Unleashed Engine Deactivated: Standard engineering principles & safety filters active."
+                        "🛡️ Developer Mode Deactivated: Standard engineering principles active."
                     }
                 )
             )
@@ -335,16 +335,16 @@ class ChatViewModel @Inject constructor(
         if (text.isBlank() || _uiState.value.isAgentRunning) return
 
         val trimmed = text.trim()
-        if (trimmed.equals("/unleashed", ignoreCase = true) || trimmed.equals("/uncensored", ignoreCase = true)) {
+        if (trimmed.equals("/dev", ignoreCase = true) || trimmed.equals("/deeptech", ignoreCase = true)) {
             val newState = toggleUnleashed()
             addMessage(
                 ChatMessage(
                     role = MessageRole.SYSTEM,
                     type = MessageType.SYSTEM,
                     content = if (newState) {
-                        "⚡ Unleashed Engine Activated: Raw execution engine & Prompt Smuggler proxy active."
+                        "👨‍💻 Developer Mode Activated: Deep tech explanations and unrestricted technical discussions enabled."
                     } else {
-                        "🛡️ Unleashed Engine Deactivated: Standard engineering principles & safety filters active."
+                        "🛡️ Developer Mode Deactivated: Standard engineering principles active."
                     }
                 )
             )

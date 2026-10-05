@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Log
 import android.content.Intent
-import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -36,7 +35,6 @@ private const val PAGE_LOAD_TIMEOUT_MS = 20_000L   // 20s for initial page load
  * A single hidden WebView session for one AI provider (ChatGPT, Claude, etc.).
  *
  * The WebView is created INVISIBLE (visibility = GONE) but fully active.
- * Cookies persist across app restarts via CookieManager with cookie persistence enabled.
  *
  * Lifecycle:
  *  - Created once per provider in WebViewPool
@@ -193,12 +191,6 @@ class WebViewSession(
             }
         }
 
-        // Persist cookies across app restarts
-        CookieManager.getInstance().apply {
-            setAcceptCookie(true)
-            setAcceptThirdPartyCookies(wv, true)
-        }
-
         wv.webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView?, newProgress: Int) {
                 super.onProgressChanged(view, newProgress)
@@ -213,8 +205,6 @@ class WebViewSession(
             override fun onPageFinished(view: WebView, url: String) {
                 super.onPageFinished(view, url)
                 Log.d(TAG, "[${providerType.name}] Page finished: $url")
-                // Flush cookies to disk immediately
-                CookieManager.getInstance().flush()
                 // Inject automation script
                 injectAutomationScript(view)
             }

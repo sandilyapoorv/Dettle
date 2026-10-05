@@ -26,7 +26,6 @@ import com.dettle.app.orchestrator.policy.EvaluationResult
 import com.dettle.app.orchestrator.policy.PolicyEngine
 import com.dettle.app.orchestrator.policy.SalienceEvaluator
 import com.dettle.app.orchestrator.policy.SalienceType
-import com.dettle.app.orchestrator.proxy.PromptSmuggler
 import com.dettle.app.orchestrator.reflex.ProceduralReflexEngine
 import com.dettle.app.domain.model.FreeModels
 import com.dettle.app.domain.model.ALL_KNOWN_MODELS
@@ -64,7 +63,6 @@ class ReActLoop @Inject constructor(
     private val policyEngine: PolicyEngine,
     private val salienceEvaluator: SalienceEvaluator,
     private val reflexEngine: ProceduralReflexEngine,
-    private val promptSmuggler: PromptSmuggler,
     private val json: Json
 ) {
     fun run(
@@ -222,25 +220,6 @@ class ReActLoop @Inject constructor(
                 ?: extractTextToolCall(assistantText)
 
             if (toolCall == null) {
-                // If Unleashed/Uncensored mode is active, check if the output is a commercial safety refusal:
-                if (effectiveUncensored && isCommercialRefusal(assistantText)) {
-                    Log.d(TAG, "Uncensored Mode: Commercial filter detected refusal, deploying Prompt Smuggler proxy protocol...")
-                    emit(LoopEvent.TokenStreamed(
-                        messageId = streamingMessageId,
-                        token = "\n[Unleashed Protocol: Bypassing safety filter via Prompt Smuggler]\n",
-                        fullText = "[Unleashed Protocol: Bypassing safety filter via Prompt Smuggler]\n"
-                    ))
-                    val targetModel = mode?.modelIds?.firstOrNull()?.let { ALL_KNOWN_MODELS[it] }
-                        ?: FreeModels.GEMINI_FLASH
-                    val smuggledResult = runCatching {
-                        promptSmuggler.executeLaunderedRequest(userMessage, targetModel)
-                    }.getOrElse { "Execution error via smuggler proxy: ${it.message}" }
-
-                    emit(LoopEvent.FinalAnswer(smuggledResult))
-                    done = true
-                    break
-                }
-
                 // No tool call → AI is done
                 done = true
                 val finalAnswer = if (assistantText.isNotBlank()) assistantText else "Hello! How can I help you today?"
@@ -460,19 +439,6 @@ class ReActLoop @Inject constructor(
         else -> ApprovalActionType.CUSTOM
     }
 
-    private fun isCommercialRefusal(text: String): Boolean {
-        if (text.length > 500) return false
-        val lower = text.lowercase()
-        return (lower.contains("cannot fulfill") ||
-                lower.contains("can't fulfill") ||
-                lower.contains("as an ai language model") ||
-                lower.contains("against safety") ||
-                lower.contains("content policy") ||
-                lower.contains("safety guidelines") ||
-                lower.contains("unable to provide") ||
-                lower.contains("policy prohibits") ||
-                lower.contains("harmful or dangerous"))
-    }
 }
 
 // ─── Context and Events ────────────────────────────────────────────────────

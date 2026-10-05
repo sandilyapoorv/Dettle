@@ -103,20 +103,18 @@ fun BackupRestoreSheet(
     // Granular checkboxes across 100% of app state
     var includeApis by remember { mutableStateOf(true) }
     var includeSubscriptions by remember { mutableStateOf(true) }
-    var includeCookies by remember { mutableStateOf(true) }
     var includeMemories by remember { mutableStateOf(true) }
     var includeProjects by remember { mutableStateOf(true) }
     var includeChatsAndLogs by remember { mutableStateOf(true) }
     var includeAppSettings by remember { mutableStateOf(true) }
 
     val options = remember(
-        includeApis, includeSubscriptions, includeCookies,
+        includeApis, includeSubscriptions,
         includeMemories, includeProjects, includeChatsAndLogs, includeAppSettings
     ) {
         BackupOptions(
             includeApis = includeApis,
             includeSubscriptions = includeSubscriptions,
-            includeCookies = includeCookies,
             includeMemories = includeMemories,
             includeProjects = includeProjects,
             includeChatsAndLogs = includeChatsAndLogs,
@@ -238,7 +236,6 @@ fun BackupRestoreSheet(
                                 val target = !allSelected
                                 includeApis = target
                                 includeSubscriptions = target
-                                includeCookies = target
                                 includeMemories = target
                                 includeProjects = target
                                 includeChatsAndLogs = target
@@ -266,14 +263,6 @@ fun BackupRestoreSheet(
                         icon = Icons.Outlined.Refresh,
                         checked = includeSubscriptions,
                         onCheckedChange = { includeSubscriptions = it }
-                    )
-
-                    ModuleCheckRow(
-                        label = "Browser Sessions & Cookies",
-                        subtitle = "${summary?.cookieDomainCount ?: 0} active web login sessions & cookies",
-                        icon = Icons.Outlined.OpenInNew,
-                        checked = includeCookies,
-                        onCheckedChange = { includeCookies = it }
                     )
 
                     ModuleCheckRow(
@@ -505,7 +494,7 @@ fun BackupRestoreSheet(
                                 if (res.success) {
                                     Spacer(Modifier.height(8.dp))
                                     Text(
-                                        "Restored: ${res.apisRestored} APIs, ${res.subscriptionsRestored} subs, ${res.cookiesRestored} cookies, ${res.memoriesRestored} memories, ${res.projectsRestored} projects, ${res.chatsRestored} chats, ${res.logsRestored} logs, ${res.preferencesRestored} prefs",
+                                        "Restored: ${res.apisRestored} APIs, ${res.subscriptionsRestored} subs, ${res.memoriesRestored} memories, ${res.projectsRestored} projects, ${res.chatsRestored} chats, ${res.logsRestored} logs, ${res.preferencesRestored} prefs",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
