@@ -115,9 +115,79 @@ Replace all stubbed string responses with actual service executions:
 
 ---
 
-## 5. Pillar 3: Universal Gamified Onboarding ("Awaken the Machine")
+## 5. Pillar 3: Bare-Metal Codebase & API RAG Pipeline
 
-### 5.1 The 4-Quest Onboarding Progression
+Currently, Dettle only does basic episodic memory injection via `MemoryInjector` (retrieving notes/preferences from `MemoryDao`). It has **zero real Codebase RAG or Documentation RAG**, forcing the model to hallucinate repo architecture or flood the context window with raw files.
+
+### 5.1 The 4-Stage Bare-Metal RAG Architecture
+To give models true semantic intelligence over projects and APIs, we implement a dedicated **Codebase & Knowledge RAG Subsystem**:
+
+```
+ ┌──────────────────────┐   ┌───────────────────────┐   ┌──────────────────────┐
+ │  Anchored Repo Files │   │ Cloudflare/Git Docs   │   │  Episodic Memories   │
+ └──────────┬───────────┘   └───────────┬───────────┘   └──────────┬───────────┘
+            │                           │                          │
+            ▼                           ▼                          ▼
+ ┌─────────────────────────────────────────────────────────────────────────────┐
+ │                         INGESTION & CHUNKING ENGINE                         │
+ │  • AST / Symbol-aware chunker (functions, classes, interfaces, schemas)     │
+ │  • Embedding generation (Local MediaPipe TFLite or Gemini text-embedding-4) │
+ │  • Room DB storage: `CodeChunkEntity` + FTS4 Virtual Table                  │
+ └──────────────────────────────────────┬──────────────────────────────────────┘
+                                        │
+                                        ▼
+ ┌─────────────────────────────────────────────────────────────────────────────┐
+ │                     HYBRID RETRIEVAL & RERANKING BUS                        │
+ │  • Lexical BM25 Search (FTS4 exact symbol matching: class, function, var)   │
+ │  • Vector Cosine Similarity (Semantic intent matching)                      │
+ │  • Reranking: Recency + Relevance + Active File Priority                    │
+ └──────────────────────────────────────┬──────────────────────────────────────┘
+                                        │
+                                        ▼
+ ┌─────────────────────────────────────────────────────────────────────────────┐
+ │                    TOKEN-BUDGETED INJECTION & TOOL ACCESS                   │
+ │  1. Pre-Prompt Injection: `<codebase_context>` (Strict 2k-4k token cap)     │
+ │  2. Active ReAct Tool: `codebase_search(query, symbol_filter)`              │
+ │  3. Prompt Cache Headers (Gemini Context Cache / Anthropic Cache Control)   │
+ └─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 5.2 Room Database Schema for Codebase RAG
+- `CodeChunkEntity`:
+  - `id`: Primary Key
+  - `projectId`: Foreign Key to active anchored project
+  - `filePath`: Relative repo file path (e.g. `src/auth/jwt.rs`)
+  - `symbolName`: Function/Class name (e.g. `validate_session_token`)
+  - `symbolType`: `FUNCTION`, `CLASS`, `INTERFACE`, `CONFIG`
+  - `content`: Actual chunk code (lines of code with context)
+  - `startLine`: Integer
+  - `endLine`: Integer
+  - `vector`: FloatArray (Embedding)
+  - `updatedAt`: Timestamp
+- `CodeChunkFtsEntity`: SQLite FTS4 virtual table for millisecond lexical matching.
+
+### 5.3 Active ReAct Tool: `codebase_search`
+In addition to automated pre-prompt injection, the agent is equipped with a native tool:
+```json
+{
+  "name": "codebase_search",
+  "description": "Semantically and lexically search the indexed codebase for functions, types, schemas, and implementations. Returns exact snippets with file paths and line ranges without wasting tokens on full files.",
+  "parameters": {
+    "query": "search query or symbol name",
+    "filter_type": "all | function | class | interface"
+  }
+}
+```
+
+### 5.4 Token Budgeting & Caching Strategy
+- **Token Allocator:** Context assembler enforces strict token ceilings (e.g., max 3,500 tokens for retrieved code chunks, 1,000 tokens for repo map, 500 tokens for user preferences).
+- **Context Caching:** For providers supporting caching (Gemini 1.5/2.0, Anthropic), the static codebase index and system instructions are tagged with `cache_control: {"type": "ephemeral"}` to drastically reduce token latency and cost.
+
+---
+
+## 6. Pillar 4: Universal Gamified Onboarding ("Awaken the Machine")
+
+### 6.1 The 4-Quest Onboarding Progression
 Every user must complete the onboarding quest on first launch before entering the general studio:
 
 ```
@@ -151,9 +221,9 @@ Every user must complete the onboarding quest on first launch before entering th
 
 ---
 
-## 6. Pillar 4: Duolingo-Style Gamified Engine & Savage Duo Persona
+## 7. Pillar 5: Duolingo-Style Gamified Engine & Savage Duo Persona
 
-### 6.1 Savage Developer Persona ("Sally the Enforcer")
+### 7.1 Savage Developer Persona ("Sally the Enforcer")
 Sally is an unhinged, development-focused companion with tough-love energy:
 - **Active Streak (1+ days):** Hyped, proud, and aggressive.
   - *"Hell yeah. 4-day streak. Keep shipping and don't let these script kiddies catch up."*
@@ -201,9 +271,9 @@ To avoid heavy audio files and maintain 100% offline capability:
 
 ---
 
-## 7. Pillar 5: Autonomous Background Loop (Overnight & GNHF)
+## 8. Pillar 6: Autonomous Background Loop (Overnight & GNHF)
 
-### 7.1 Background Worker (`OvernightWorker`)
+### 8.1 Background Worker (`OvernightWorker`)
 - Built on Android `WorkManager` with `ForegroundService` notification (`"Dettle Autonomous Agent Operating"`).
 - Runs while device is charging/overnight.
 - Work cycle:
@@ -216,7 +286,7 @@ To avoid heavy audio files and maintain 100% offline capability:
 
 ---
 
-## 8. Verification & Delivery Plan
+## 9. Verification & Delivery Plan
 
 1. **Unit Testing:**
    - Test `StreamingToolCallAccumulator` against partial SSE JSON chunks.
@@ -233,5 +303,5 @@ To avoid heavy audio files and maintain 100% offline capability:
 
 ---
 
-## 9. Conclusion
+## 10. Conclusion
 This architecture transitions Dettle from a passive prompt-based chat interface to a bare-metal autonomous developer agent runtime with an engaging, hilarious, Duolingo-inspired user experience.
