@@ -134,11 +134,19 @@ class ReActLoop @Inject constructor(
             }
         }
 
+        val effectiveTools = if (tools != AgentTools.ALL) {
+            tools
+        } else if (mode?.id?.environment == com.dettle.app.orchestrator.mode.EnvironmentMode.CHAT) {
+            AgentTools.READ_ONLY
+        } else {
+            AgentTools.ALL
+        }
+
         emit(LoopEvent.TraceStepEmitted(
             TraceStep(
                 icon = "📝",
                 title = "System Prompt Assembled",
-                description = "${tools.size} tools registered, context: ${systemPrompt.length} chars (RAG active)",
+                description = "${effectiveTools.size} tools registered (${if (mode?.id?.environment == com.dettle.app.orchestrator.mode.EnvironmentMode.CHAT) "Read-Only" else "Full"}), context: ${systemPrompt.length} chars (RAG active)",
                 offsetMs = System.currentTimeMillis() - startTimeMs
             )
         ))
@@ -162,7 +170,7 @@ class ReActLoop @Inject constructor(
             // Stream from AI provider
             keyPoolManager.chat(
                 messages = history,
-                tools = tools,
+                tools = effectiveTools,
                 systemPrompt = systemPrompt
             ).collect { chunk ->
                 when (chunk) {
@@ -282,7 +290,7 @@ class ReActLoop @Inject constructor(
             }
 
             // ── Check safety / approval required ──────────────────────────
-            val toolDef = tools.find { it.name == toolCall.name }
+            val toolDef = effectiveTools.find { it.name == toolCall.name }
             if (toolDef?.requiresApproval == true) {
                 val approval = ApprovalRequest(
                     title = "Agent wants to: ${toolCall.name}",

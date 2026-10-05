@@ -18,6 +18,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import com.dettle.app.orchestrator.learning.LearningEngine
 import javax.inject.Inject
 
@@ -59,6 +60,28 @@ class AgentForegroundService : Service() {
         learningEngine.startProcessing(serviceScope)
         apiHeartbeat.start(serviceScope)
         ServiceBridge.tryEmit(DaemonEvent.ServiceStarted)
+
+        serviceScope.launch {
+            ServiceBridge.commands.collect { cmd ->
+                when (cmd) {
+                    is Command.UpdateStatus -> updateNotification(cmd.status)
+                    is Command.StartOvernightLoop -> {
+                        overnightLoop.start()
+                        updateNotification("Overnight run active...")
+                    }
+                    is Command.StopOvernightLoop -> {
+                        overnightLoop.interrupt()
+                        updateNotification("Dettle Agent running...")
+                    }
+                    is Command.StartGoal -> {
+                        updateNotification("Running goal: ${cmd.goalId}")
+                    }
+                    is Command.StopGoal -> {
+                        updateNotification("Dettle Agent running...")
+                    }
+                }
+            }
+        }
     }
 
     override fun onDestroy() {

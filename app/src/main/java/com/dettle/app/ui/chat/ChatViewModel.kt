@@ -59,6 +59,7 @@ enum class SimpleChatMode(val displayName: String, val emoji: String) {
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
+    private val agentExecutionManager: com.dettle.app.orchestrator.execution.AgentExecutionManager,
     private val reActLoop: ReActLoop,
     private val modeRouter: ModeRouter,
     private val modeRepository: ModeRepository,
@@ -106,6 +107,56 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             projectContextManager.activeProject.collect { proj ->
                 _uiState.update { it.copy(activeProject = proj) }
+            }
+        }
+        viewModelScope.launch {
+            agentExecutionManager.executionUpdates.collect { update ->
+                when (update) {
+                    is com.dettle.app.orchestrator.execution.ExecutionUpdate.Event -> {
+                        if (update.conversationId == activeConversationId) {
+                            handleLoopEvent(update.loopEvent)
+                        }
+                    }
+                    is com.dettle.app.orchestrator.execution.ExecutionUpdate.Completed -> {
+                        if (update.conversationId == activeConversationId) {
+                            _uiState.update {
+                                it.copy(
+                                    isAgentRunning = false,
+                                    inputEnabled = true,
+                                    thinkingStep = 0,
+                                    activeExecutionTrace = update.trace
+                                )
+                            }
+                        }
+                    }
+                    is com.dettle.app.orchestrator.execution.ExecutionUpdate.Error -> {
+                        if (update.conversationId == activeConversationId) {
+                            _uiState.update {
+                                it.copy(
+                                    isAgentRunning = false,
+                                    inputEnabled = true,
+                                    thinkingStep = 0,
+                                    activeExecutionTrace = update.trace
+                                )
+                            }
+                            addMessage(
+                                ChatMessage(
+                                    role = MessageRole.ASSISTANT,
+                                    type = MessageType.ERROR,
+                                    content = "Execution error: ${update.error}",
+                                    executionTrace = update.trace
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        viewModelScope.launch {
+            agentExecutionManager.activeExecution.collect { exec ->
+                if (exec != null && exec.conversationId == activeConversationId && exec.isRunning) {
+                    _uiState.update { it.copy(isAgentRunning = true, inputEnabled = false) }
+                }
             }
         }
         refreshKeyStatus()
@@ -470,132 +521,32 @@ class ChatViewModel @Inject constructor(
             conversationDao.incrementMessageCount(convId)
         }
 
-        val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
-            Log.e("ChatViewModel", "Unhandled exception in sendMessage coroutine", throwable)
-            val endMs = System.currentTimeMillis()
-            val errorTrace = ExecutionTrace(
-                startTimeMs = traceStartTimeMs,
-                endTimeMs = endMs,
-                totalDurationMs = (endMs - traceStartTimeMs).coerceAtLeast(0L),
-                modelUsed = activeAiModel,
-                steps = currentTraceSteps.toList()
-            )
-            _uiState.update { it.copy(isAgentRunning = false, inputEnabled = true, thinkingStep = 0, activeExecutionTrace = errorTrace) }
-            addMessage(
-                ChatMessage(
-                    role = MessageRole.ASSISTANT,
-                    type = MessageType.ERROR,
-                    content = "System Error: ${throwable.localizedMessage ?: "Unexpected error occurred. Please verify your API keys and network."}",
-                    executionTrace = errorTrace
-                )
-            )
-        }
-
-        viewModelScope.launch(exceptionHandler) {
+        // Delegate execution to 24/7 background daemon
+        viewModelScope.launch {
             try {
                 val isUnleashedMode = _uiState.value.isUnleashed
                 val taskContext = TaskContext(isUncensored = isUnleashedMode)
+                val effectiveMode = resolveMode(text)
+                _uiState.update { it.copy(activeModeId = effectiveMode.id) }
 
-                // 1. Cognitive Brain: Prepare cognitive context & memory recall
-                val cognitiveContext = cognitiveBrain.prepareCognitiveContext(
+                val goal = if (effectiveMode.id == ModeId.GOAL) {
+                    resolveGoal(text, effectiveMode)
+                } else null
+
+                agentExecutionManager.dispatchMessage(
+                    conversationId = convId,
                     userMessage = text,
+                    conversationHistory = conversationHistory.toList(),
                     taskContext = taskContext,
-                    isUncensored = isUnleashedMode
+                    effectiveMode = effectiveMode,
+                    isUncensored = isUnleashedMode,
+                    activeChatMode = _uiState.value.activeChatMode,
+                    selectedModel = _uiState.value.selectedModel,
+                    goal = goal,
+                    startTimeMs = traceStartTimeMs
                 )
-                val cogOffset = System.currentTimeMillis() - traceStartTimeMs
-                currentTraceSteps.add(
-                    TraceStep(
-                        timestampMs = System.currentTimeMillis(),
-                        offsetMs = cogOffset,
-                        icon = "🧠",
-                        title = "Cognitive Recall & Amygdala",
-                        description = "Episodic memory & cognitive context prepared",
-                        status = TraceStatus.SUCCESS
-                    )
-                )
-                _uiState.update {
-                    it.copy(
-                        activeExecutionTrace = ExecutionTrace(
-                            startTimeMs = traceStartTimeMs,
-                            steps = currentTraceSteps.toList(),
-                            modelUsed = activeAiModel
-                        )
-                    )
-                }
-
-                // 2. Dispatch to the right engine based on the selected chat mode
-                when (_uiState.value.activeChatMode) {
-
-                    // ── Swarm Mode: 20 parallel agents, Sally judges winner ──────
-                    SimpleChatMode.SWARM -> {
-                        _uiState.update { it.copy(activeModeId = ModeId.SWARM) }
-                        currentTraceSteps.add(
-                            TraceStep(
-                                timestampMs = System.currentTimeMillis(),
-                                offsetMs = System.currentTimeMillis() - traceStartTimeMs,
-                                icon = "⚡",
-                                title = "Swarm Mode Activated",
-                                description = "Launching 20 parallel agents — Sally will judge the winner",
-                                status = TraceStatus.SUCCESS
-                            )
-                        )
-                        _uiState.update {
-                            it.copy(
-                                activeExecutionTrace = ExecutionTrace(
-                                    startTimeMs = traceStartTimeMs,
-                                    steps = currentTraceSteps.toList(),
-                                    modelUsed = "Swarm (20 agents)"
-                                )
-                            )
-                        }
-                        swarmOrchestrator.executeChatSwarm(
-                            userMessage = text,
-                            conversationHistory = conversationHistory.toList()
-                        ).collect { event -> handleLoopEvent(event) }
-                    }
-
-                    // ── Normal + Web Mode: Sally routes or locks to WEB ──────────
-                    SimpleChatMode.NORMAL, SimpleChatMode.WEB -> {
-                        val effectiveMode = resolveMode(text)
-                        _uiState.update { it.copy(activeModeId = effectiveMode.id) }
-                        currentTraceSteps.add(
-                            TraceStep(
-                                timestampMs = System.currentTimeMillis(),
-                                offsetMs = System.currentTimeMillis() - traceStartTimeMs,
-                                icon = "🧭",
-                                title = "Intent Mode Classified",
-                                description = "Mode selected: ${effectiveMode.displayName} (${effectiveMode.id.name})",
-                                status = TraceStatus.SUCCESS
-                            )
-                        )
-                        _uiState.update {
-                            it.copy(
-                                activeExecutionTrace = ExecutionTrace(
-                                    startTimeMs = traceStartTimeMs,
-                                    steps = currentTraceSteps.toList(),
-                                    modelUsed = activeAiModel
-                                )
-                            )
-                        }
-
-                        val goal = if (effectiveMode.id == ModeId.GOAL) {
-                            resolveGoal(text, effectiveMode)
-                        } else null
-
-                        reActLoop.run(
-                            userMessage = text,
-                            conversationHistory = conversationHistory.toList(),
-                            taskContext = taskContext,
-                            mode = effectiveMode,
-                            goal = goal,
-                            isUncensored = isUnleashedMode,
-                            maxSteps = 30,
-                            startTimeMs = traceStartTimeMs
-                        ).collect { event -> handleLoopEvent(event) }
-                    }
-                }
             } catch (t: Throwable) {
-                Log.e("ChatViewModel", "Caught throwable in chat execution loop", t)
+                Log.e("ChatViewModel", "Failed to dispatch message to background daemon", t)
                 val endMs = System.currentTimeMillis()
                 val errorTrace = ExecutionTrace(
                     startTimeMs = traceStartTimeMs,
@@ -604,16 +555,15 @@ class ChatViewModel @Inject constructor(
                     modelUsed = activeAiModel,
                     steps = currentTraceSteps.toList()
                 )
+                _uiState.update { it.copy(isAgentRunning = false, inputEnabled = true, thinkingStep = 0, activeExecutionTrace = errorTrace) }
                 addMessage(
                     ChatMessage(
                         role = MessageRole.ASSISTANT,
                         type = MessageType.ERROR,
-                        content = "Execution failed: ${t.localizedMessage ?: "Check API settings and connectivity."}",
+                        content = "Dispatch failed: ${t.localizedMessage ?: "Unknown error"}",
                         executionTrace = errorTrace
                     )
                 )
-            } finally {
-                _uiState.update { it.copy(isAgentRunning = false, inputEnabled = true, thinkingStep = 0) }
             }
         }
     }
@@ -687,19 +637,6 @@ class ChatViewModel @Inject constructor(
                     it.copy(isStreaming = false, providerName = activeAiModel)
                 }
                 conversationHistory.add(ApiMessage(role = "assistant", content = event.fullText))
-                activeConversationId?.let { convId ->
-                    viewModelScope.launch {
-                        conversationDao.insertMessage(
-                            ConversationMessageEntity(
-                                conversationId = convId,
-                                role = "assistant",
-                                content = event.fullText,
-                                type = MessageType.TEXT.name
-                            )
-                        )
-                        conversationDao.incrementMessageCount(convId)
-                    }
-                }
             }
 
             is LoopEvent.ExecutingTool -> {

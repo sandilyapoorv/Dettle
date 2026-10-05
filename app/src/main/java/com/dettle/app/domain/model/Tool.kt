@@ -114,6 +114,74 @@ object AgentTools {
         safetyLevel = SafetyLevel.AUTO
     )
 
+    val GITHUB_LIST_REPOS = Tool(
+        name = "github_list_repos",
+        description = "List all GitHub repositories belonging to or accessible by the connected GitHub account. Returns repository names, full names, visibility, stars, language, description, and last updated timestamps.",
+        parameters = ToolParameters(
+            properties = mapOf(
+                "force_refresh" to ToolProperty("boolean", "Whether to bypass in-memory cache and fetch fresh list from GitHub")
+            ),
+            required = emptyList()
+        ),
+        safetyLevel = SafetyLevel.AUTO
+    )
+
+    val GITHUB_GET_REPO = Tool(
+        name = "github_get_repo",
+        description = "Get detailed information about a GitHub repository, including stars, forks, default branch, language, description, and open issues.",
+        parameters = ToolParameters(
+            properties = mapOf(
+                "owner" to ToolProperty("string", "GitHub repository owner/org name (defaults to active project owner)"),
+                "repo" to ToolProperty("string", "Repository name (defaults to active project repo)")
+            ),
+            required = emptyList()
+        ),
+        safetyLevel = SafetyLevel.AUTO
+    )
+
+    val GITHUB_LIST_BRANCHES = Tool(
+        name = "github_list_branches",
+        description = "List all branches on a GitHub repository.",
+        parameters = ToolParameters(
+            properties = mapOf(
+                "owner" to ToolProperty("string", "GitHub repository owner/org name (defaults to active project owner)"),
+                "repo" to ToolProperty("string", "Repository name (defaults to active project repo)")
+            ),
+            required = emptyList()
+        ),
+        safetyLevel = SafetyLevel.AUTO
+    )
+
+    val GITHUB_LIST_COMMITS = Tool(
+        name = "github_list_commits",
+        description = "View recent commit history and commit messages on a repository branch.",
+        parameters = ToolParameters(
+            properties = mapOf(
+                "owner" to ToolProperty("string", "GitHub repository owner/org name (defaults to active project owner)"),
+                "repo" to ToolProperty("string", "Repository name (defaults to active project repo)"),
+                "branch" to ToolProperty("string", "Branch name, defaults to main"),
+                "limit" to ToolProperty("integer", "Max number of commits to return (default 10)")
+            ),
+            required = emptyList()
+        ),
+        safetyLevel = SafetyLevel.AUTO
+    )
+
+    val GITHUB_LIST_ISSUES = Tool(
+        name = "github_list_issues",
+        description = "List open or closed issues and pull requests on a GitHub repository.",
+        parameters = ToolParameters(
+            properties = mapOf(
+                "owner" to ToolProperty("string", "GitHub repository owner/org name (defaults to active project owner)"),
+                "repo" to ToolProperty("string", "Repository name (defaults to active project repo)"),
+                "state" to ToolProperty("string", "Issue state: 'open', 'closed', or 'all' (default 'open')"),
+                "limit" to ToolProperty("integer", "Max issues to return (default 10)")
+            ),
+            required = emptyList()
+        ),
+        safetyLevel = SafetyLevel.AUTO
+    )
+
     val CODEBASE_SEARCH = Tool(
         name = "codebase_search",
         description = "Semantically and lexically search the indexed codebase for functions, types, schemas, and implementations. Returns exact snippets with file paths and line ranges without wasting tokens on full files.",
@@ -258,8 +326,13 @@ object AgentTools {
 
     /** All tools available to agents by default */
     val ALL: List<Tool> = listOf(
+        GITHUB_LIST_REPOS,
+        GITHUB_GET_REPO,
         GITHUB_MAP_REPO,
         GITHUB_READ_FILE,
+        GITHUB_LIST_BRANCHES,
+        GITHUB_LIST_COMMITS,
+        GITHUB_LIST_ISSUES,
         GITHUB_CREATE_BRANCH_PR,
         GITHUB_TRIGGER_ACTION,
         GITHUB_POLL_RUN,
@@ -276,9 +349,23 @@ object AgentTools {
         FINAL_ANSWER
     )
 
-    /** Read-only tools (safe for READER agent) */
+    /** Read-only tools (safe for Chat mode & READER agent - 100% read access) */
     val READ_ONLY: List<Tool> = listOf(
-        GITHUB_MAP_REPO, GITHUB_READ_FILE, GITHUB_POLL_RUN, CODEBASE_SEARCH, WORKSPACE_LIST_FILES, WORKSPACE_READ_FILE, MEMORY_RECALL, WEB_SEARCH, READ_URL, FINAL_ANSWER
+        GITHUB_LIST_REPOS,
+        GITHUB_GET_REPO,
+        GITHUB_MAP_REPO,
+        GITHUB_READ_FILE,
+        GITHUB_LIST_BRANCHES,
+        GITHUB_LIST_COMMITS,
+        GITHUB_LIST_ISSUES,
+        GITHUB_POLL_RUN,
+        CODEBASE_SEARCH,
+        WORKSPACE_LIST_FILES,
+        WORKSPACE_READ_FILE,
+        MEMORY_RECALL,
+        WEB_SEARCH,
+        READ_URL,
+        FINAL_ANSWER
     )
 
     /** Tools for the DEPLOYER agent */

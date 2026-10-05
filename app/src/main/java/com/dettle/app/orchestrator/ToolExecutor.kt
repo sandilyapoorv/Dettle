@@ -42,6 +42,101 @@ class ToolExecutor @Inject constructor(
 
         val content = when (toolCall.name) {
 
+            "github_list_repos" -> {
+                val forceRefresh = args["force_refresh"]?.toBooleanStrictOrNull() ?: false
+                val repos = githubClient.getUserRepositories(forceRefresh)
+                    .getOrElse { return errResult(toolCall, it.message ?: "Failed to list repositories") }
+                if (repos.isEmpty()) {
+                    "No repositories found for the authenticated GitHub user."
+                } else {
+                    buildString {
+                        appendLine("### Connected GitHub Repositories (${repos.size} total):")
+                        repos.take(25).forEach { r ->
+                            val priv = if (r.isPrivate) "🔒 Private" else "🌐 Public"
+                            val lang = r.language?.let { " • $it" }.orEmpty()
+                            val stars = if (r.stars > 0) " • ⭐ ${r.stars}" else ""
+                            appendLine("- **[${r.fullName}](https://github.com/${r.fullName})** ($priv$lang$stars)")
+                            if (!r.description.isNullOrBlank()) {
+                                appendLine("  _${r.description}_")
+                            }
+                        }
+                        if (repos.size > 25) {
+                            appendLine("\n_...and ${repos.size - 25} more repositories._")
+                        }
+                    }
+                }
+            }
+
+            "github_get_repo" -> {
+                val owner = args["owner"] ?: activeProj?.owner ?: return errResult(toolCall, "Missing owner and no active project anchored")
+                val repo = args["repo"] ?: activeProj?.repo ?: return errResult(toolCall, "Missing repo and no active project anchored")
+                val details = githubClient.getRepoDetails(owner, repo)
+                    .getOrElse { return errResult(toolCall, it.message ?: "Failed to get repository details") }
+                buildString {
+                    appendLine("### Repository: ${details.fullName}")
+                    appendLine("- **Visibility**: ${if (details.isPrivate) "Private" else "Public"}")
+                    appendLine("- **Default Branch**: `${details.defaultBranch}`")
+                    appendLine("- **Primary Language**: ${details.language ?: "None"}")
+                    appendLine("- **Stars**: ⭐ ${details.stars} | **Forks**: 🍴 ${details.forks}")
+                    appendLine("- **Open Issues/PRs**: ${details.openIssuesCount}")
+                    if (!details.description.isNullOrBlank()) {
+                        appendLine("- **Description**: ${details.description}")
+                    }
+                    details.htmlUrl?.let { appendLine("- **URL**: $it") }
+                }
+            }
+
+            "github_list_branches" -> {
+                val owner = args["owner"] ?: activeProj?.owner ?: return errResult(toolCall, "Missing owner and no active project anchored")
+                val repo = args["repo"] ?: activeProj?.repo ?: return errResult(toolCall, "Missing repo and no active project anchored")
+                val branches = githubClient.listRepoBranches(owner, repo)
+                    .getOrElse { return errResult(toolCall, it.message ?: "Failed to list branches") }
+                if (branches.isEmpty()) {
+                    "No branches found for $owner/$repo"
+                } else {
+                    "Branches in **$owner/$repo**:\n" + branches.joinToString("\n") { "- `$it`" }
+                }
+            }
+
+            "github_list_commits" -> {
+                val owner = args["owner"] ?: activeProj?.owner ?: return errResult(toolCall, "Missing owner and no active project anchored")
+                val repo = args["repo"] ?: activeProj?.repo ?: return errResult(toolCall, "Missing repo and no active project anchored")
+                val branch = args["branch"] ?: activeProj?.branch ?: "main"
+                val limit = args["limit"]?.toIntOrNull() ?: 10
+                val commits = githubClient.listRepoCommits(owner, repo, branch, limit)
+                    .getOrElse { return errResult(toolCall, it.message ?: "Failed to list commits") }
+                if (commits.isEmpty()) {
+                    "No commits found on branch `$branch` for $owner/$repo"
+                } else {
+                    buildString {
+                        appendLine("### Recent commits on `$branch` in **$owner/$repo**:")
+                        commits.forEach { c ->
+                            appendLine("- [`${c.sha}`] **${c.message}** (by ${c.author} on ${c.date.take(10)})")
+                        }
+                    }
+                }
+            }
+
+            "github_list_issues" -> {
+                val owner = args["owner"] ?: activeProj?.owner ?: return errResult(toolCall, "Missing owner and no active project anchored")
+                val repo = args["repo"] ?: activeProj?.repo ?: return errResult(toolCall, "Missing repo and no active project anchored")
+                val state = args["state"] ?: "open"
+                val limit = args["limit"]?.toIntOrNull() ?: 10
+                val issues = githubClient.listRepoIssues(owner, repo, state, limit)
+                    .getOrElse { return errResult(toolCall, it.message ?: "Failed to list issues") }
+                if (issues.isEmpty()) {
+                    "No $state issues or pull requests found in $owner/$repo"
+                } else {
+                    buildString {
+                        appendLine("### Issues & PRs ($state) in **$owner/$repo**:")
+                        issues.forEach { issue ->
+                            val type = if (issue.isPullRequest) "PR" else "Issue"
+                            appendLine("- **#${issue.number}** [$type]: ${issue.title} (by @${issue.author})")
+                        }
+                    }
+                }
+            }
+
             "github_map_repo" -> {
                 val owner = args["owner"] ?: activeProj?.owner ?: return errResult(toolCall, "Missing owner and no active project anchored")
                 val repo = args["repo"] ?: activeProj?.repo ?: return errResult(toolCall, "Missing repo and no active project anchored")

@@ -12,8 +12,11 @@
     <!-- Notifications (for agent status + morning summaries) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Wake lock (for overnight mode) -->
+    <!-- Wake lock (for overnight mode and background execution) -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Boot completed (for 24/7 background agent daemon) -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!-- Audio / Voice Typing -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
@@ -53,6 +56,18 @@
             android:name=".service.AgentForegroundService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <!-- Boot Receiver for 24/7 background agent -->
+        <receiver
+            android:name=".service.BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
 
         <service
             android:name=".orchestrator.events.EventReceiverService"

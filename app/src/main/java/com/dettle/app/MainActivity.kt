@@ -36,6 +36,14 @@ class MainActivity : ComponentActivity() {
             )
         }
         enableEdgeToEdge()
+
+        try {
+            val serviceIntent = com.dettle.app.service.AgentForegroundService.startIntent(this)
+            androidx.core.content.ContextCompat.startForegroundService(this, serviceIntent)
+        } catch (e: Exception) {
+            android.util.Log.w("MainActivity", "Failed to start AgentForegroundService", e)
+        }
+
         setContent {
             val themeConfig by themeManager.themeConfig.collectAsState()
             DettleTheme(themeConfig = themeConfig) {

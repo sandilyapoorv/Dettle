@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
@@ -266,6 +267,225 @@ class GitHubClient @Inject constructor(
         }
     }
 
+    // ─── Cache & Authenticated User Info ───────────────────────────────────
+
+    private var cachedUser: GitHubUser? = null
+    private var cachedRepos: List<GitHubRepoSummary> = emptyList()
+    private var cacheTimestampMs: Long = 0L
+    private val CACHE_TTL_MS = 60_000L // 60 seconds
+
+    /**
+     * Fetches details of the authenticated GitHub user.
+     * Failsafe: Returns cached user if network fails.
+     */
+    suspend fun getAuthenticatedUser(forceRefresh: Boolean = false): Result<GitHubUser> = withContext(Dispatchers.IO) {
+        val token = pat
+        if (token.isNullOrBlank()) {
+            return@withContext Result.failure(IllegalStateException("GitHub Access Token is not configured. Please add your GitHub Personal Access Token in Settings or Onboarding."))
+        }
+
+        if (!forceRefresh && cachedUser != null && System.currentTimeMillis() - cacheTimestampMs < CACHE_TTL_MS) {
+            return@withContext Result.success(cachedUser!!)
+        }
+
+        try {
+            val response = rest("GET", "$GITHUB_API/user")
+            val login = response["login"]?.jsonPrimitive?.content ?: throw Exception("GitHub API response missing login")
+            val name = response["name"]?.let { runCatching { it.jsonPrimitive.content }.getOrNull() }
+            val avatarUrl = response["avatar_url"]?.let { runCatching { it.jsonPrimitive.content }.getOrNull() }
+            val bio = response["bio"]?.let { runCatching { it.jsonPrimitive.content }.getOrNull() }
+            val publicRepos = response["public_repos"]?.let { runCatching { it.jsonPrimitive.content.toInt() }.getOrNull() } ?: 0
+            val totalPrivateRepos = response["total_private_repos"]?.let { runCatching { it.jsonPrimitive.content.toInt() }.getOrNull() }
+
+            val user = GitHubUser(
+                login = login,
+                name = name,
+                avatarUrl = avatarUrl,
+                bio = bio,
+                publicRepos = publicRepos,
+                totalPrivateRepos = totalPrivateRepos
+            )
+            cachedUser = user
+            cacheTimestampMs = System.currentTimeMillis()
+
+            if (keyStore.githubOwner.isNullOrBlank()) {
+                keyStore.githubOwner = login
+            }
+
+            Result.success(user)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to fetch authenticated user", e)
+            cachedUser?.let { return@withContext Result.success(it) }
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Lists repositories belonging to or accessible by the authenticated user.
+     * Sorted by recently updated, up to 100 repositories.
+     * Failsafe: Falls back to cached repository list if network or rate limit fails.
+     */
+    suspend fun getUserRepositories(forceRefresh: Boolean = false): Result<List<GitHubRepoSummary>> = withContext(Dispatchers.IO) {
+        val token = pat
+        if (token.isNullOrBlank()) {
+            return@withContext Result.failure(IllegalStateException("GitHub Access Token is not configured. Please add your GitHub Personal Access Token in Settings or Onboarding."))
+        }
+
+        if (!forceRefresh && cachedRepos.isNotEmpty() && System.currentTimeMillis() - cacheTimestampMs < CACHE_TTL_MS) {
+            return@withContext Result.success(cachedRepos)
+        }
+
+        try {
+            val array = restArray("GET", "$GITHUB_API/user/repos?sort=updated&per_page=100&affiliation=owner,collaborator,organization_member")
+            val repos = array.mapNotNull { element ->
+                val obj = runCatching { element.jsonObject }.getOrNull() ?: return@mapNotNull null
+                val name = obj["name"]?.jsonPrimitive?.content ?: return@mapNotNull null
+                val fullName = obj["full_name"]?.jsonPrimitive?.content ?: name
+                val ownerObj = obj["owner"]?.let { runCatching { it.jsonObject }.getOrNull() }
+                val owner = ownerObj?.get("login")?.jsonPrimitive?.content ?: fullName.substringBefore('/', "")
+                val description = obj["description"]?.let { runCatching { it.jsonPrimitive.content }.getOrNull() }
+                val isPrivate = obj["private"]?.let { runCatching { it.jsonPrimitive.content.toBoolean() }.getOrNull() } ?: false
+                val defaultBranch = obj["default_branch"]?.jsonPrimitive?.content ?: "main"
+                val language = obj["language"]?.let { runCatching { it.jsonPrimitive.content }.getOrNull() }
+                val stars = obj["stargazers_count"]?.let { runCatching { it.jsonPrimitive.content.toInt() }.getOrNull() } ?: 0
+                val updatedAt = obj["updated_at"]?.let { runCatching { it.jsonPrimitive.content }.getOrNull() }
+
+                GitHubRepoSummary(
+                    name = name,
+                    fullName = fullName,
+                    owner = owner,
+                    description = description,
+                    isPrivate = isPrivate,
+                    defaultBranch = defaultBranch,
+                    language = language,
+                    stars = stars,
+                    updatedAt = updatedAt
+                )
+            }
+            cachedRepos = repos
+            cacheTimestampMs = System.currentTimeMillis()
+            Result.success(repos)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to fetch repositories", e)
+            if (cachedRepos.isNotEmpty()) {
+                return@withContext Result.success(cachedRepos)
+            }
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Get detailed information for a specific repository.
+     */
+    suspend fun getRepoDetails(owner: String, repo: String): Result<GitHubRepoDetails> = withContext(Dispatchers.IO) {
+        try {
+            val obj = rest("GET", "$GITHUB_API/repos/$owner/$repo")
+            val name = obj["name"]?.jsonPrimitive?.content ?: repo
+            val fullName = obj["full_name"]?.jsonPrimitive?.content ?: "$owner/$repo"
+            val description = obj["description"]?.let { runCatching { it.jsonPrimitive.content }.getOrNull() }
+            val isPrivate = obj["private"]?.let { runCatching { it.jsonPrimitive.content.toBoolean() }.getOrNull() } ?: false
+            val defaultBranch = obj["default_branch"]?.jsonPrimitive?.content ?: "main"
+            val language = obj["language"]?.let { runCatching { it.jsonPrimitive.content }.getOrNull() }
+            val stars = obj["stargazers_count"]?.let { runCatching { it.jsonPrimitive.content.toInt() }.getOrNull() } ?: 0
+            val forks = obj["forks_count"]?.let { runCatching { it.jsonPrimitive.content.toInt() }.getOrNull() } ?: 0
+            val openIssues = obj["open_issues_count"]?.let { runCatching { it.jsonPrimitive.content.toInt() }.getOrNull() } ?: 0
+            val cloneUrl = obj["clone_url"]?.let { runCatching { it.jsonPrimitive.content }.getOrNull() }
+            val htmlUrl = obj["html_url"]?.let { runCatching { it.jsonPrimitive.content }.getOrNull() }
+
+            Result.success(
+                GitHubRepoDetails(
+                    name = name,
+                    fullName = fullName,
+                    owner = owner,
+                    description = description,
+                    isPrivate = isPrivate,
+                    defaultBranch = defaultBranch,
+                    language = language,
+                    stars = stars,
+                    forks = forks,
+                    openIssuesCount = openIssues,
+                    cloneUrl = cloneUrl,
+                    htmlUrl = htmlUrl
+                )
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get repo details for $owner/$repo", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * List all branches in a repository.
+     */
+    suspend fun listRepoBranches(owner: String, repo: String): Result<List<String>> = withContext(Dispatchers.IO) {
+        try {
+            val array = restArray("GET", "$GITHUB_API/repos/$owner/$repo/branches?per_page=30")
+            val branches = array.mapNotNull { el ->
+                runCatching { el.jsonObject["name"]?.jsonPrimitive?.content }.getOrNull()
+            }
+            Result.success(branches)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to list branches for $owner/$repo", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * List recent commits on a repository branch.
+     */
+    suspend fun listRepoCommits(owner: String, repo: String, branch: String = "main", limit: Int = 10): Result<List<GitHubCommitSummary>> = withContext(Dispatchers.IO) {
+        try {
+            val array = restArray("GET", "$GITHUB_API/repos/$owner/$repo/commits?sha=$branch&per_page=${limit.coerceIn(1, 30)}")
+            val commits = array.mapNotNull { el ->
+                val obj = runCatching { el.jsonObject }.getOrNull() ?: return@mapNotNull null
+                val sha = obj["sha"]?.jsonPrimitive?.content?.take(7) ?: ""
+                val commitObj = obj["commit"]?.let { runCatching { it.jsonObject }.getOrNull() }
+                val message = commitObj?.get("message")?.jsonPrimitive?.content?.lines()?.firstOrNull() ?: ""
+                val authorObj = commitObj?.get("author")?.let { runCatching { it.jsonObject }.getOrNull() }
+                val author = authorObj?.get("name")?.jsonPrimitive?.content ?: "unknown"
+                val date = authorObj?.get("date")?.jsonPrimitive?.content ?: ""
+
+                GitHubCommitSummary(sha = sha, message = message, author = author, date = date)
+            }
+            Result.success(commits)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to list commits for $owner/$repo", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * List open issues and pull requests on a repository.
+     */
+    suspend fun listRepoIssues(owner: String, repo: String, state: String = "open", limit: Int = 10): Result<List<GitHubIssueSummary>> = withContext(Dispatchers.IO) {
+        try {
+            val array = restArray("GET", "$GITHUB_API/repos/$owner/$repo/issues?state=$state&per_page=${limit.coerceIn(1, 30)}")
+            val issues = array.mapNotNull { el ->
+                val obj = runCatching { el.jsonObject }.getOrNull() ?: return@mapNotNull null
+                val number = obj["number"]?.jsonPrimitive?.content?.toIntOrNull() ?: return@mapNotNull null
+                val title = obj["title"]?.jsonPrimitive?.content ?: ""
+                val issueState = obj["state"]?.jsonPrimitive?.content ?: state
+                val userObj = obj["user"]?.let { runCatching { it.jsonObject }.getOrNull() }
+                val author = userObj?.get("login")?.jsonPrimitive?.content ?: "unknown"
+                val isPR = obj.containsKey("pull_request")
+                val url = obj["html_url"]?.jsonPrimitive?.content ?: ""
+
+                GitHubIssueSummary(
+                    number = number,
+                    title = title,
+                    state = issueState,
+                    author = author,
+                    isPullRequest = isPR,
+                    url = url
+                )
+            }
+            Result.success(issues)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to list issues for $owner/$repo", e)
+            Result.failure(e)
+        }
+    }
+
     // ─── Internal Helpers ─────────────────────────────────────────────────
 
     private suspend fun graphql(query: String, variables: JsonObject): JsonObject {
@@ -274,10 +494,15 @@ class GitHubClient @Inject constructor(
             put("variables", variables)
         }.toString()
 
+        val token = pat
+        if (token.isNullOrBlank()) {
+            throw IllegalStateException("GitHub Personal Access Token is not configured.")
+        }
+
         val request = Request.Builder()
             .url(GITHUB_GRAPHQL)
             .post(body.toRequestBody("application/json".toMediaType()))
-            .header("Authorization", "Bearer ${pat ?: throw Exception("GitHub PAT not configured")}")
+            .header("Authorization", "Bearer $token")
             .header("User-Agent", "Dettle-App/1.0")
             .header("Accept", "application/vnd.github+json")
             .build()
@@ -292,10 +517,15 @@ class GitHubClient @Inject constructor(
     private suspend fun rest(method: String, url: String, body: String? = null): JsonObject {
         val requestBody = body?.toRequestBody("application/json".toMediaType())
 
+        val token = pat
+        if (token.isNullOrBlank()) {
+            throw IllegalStateException("GitHub Personal Access Token is not configured. Please add it in Settings or Onboarding.")
+        }
+
         val request = Request.Builder()
             .url(url)
             .method(method, requestBody)
-            .header("Authorization", "Bearer ${pat ?: throw Exception("GitHub PAT not configured")}")
+            .header("Authorization", "Bearer $token")
             .header("User-Agent", "Dettle-App/1.0")
             .header("Accept", "application/vnd.github+json")
             .header("X-GitHub-Api-Version", "2022-11-28")
@@ -303,9 +533,46 @@ class GitHubClient @Inject constructor(
 
         val response = client.newCall(request).execute()
         if (!response.isSuccessful && response.code != 201) {
-            throw Exception("GitHub REST error ${response.code}: ${response.body?.string()}")
+            val errBody = response.body?.string().orEmpty()
+            if (response.code == 401) {
+                throw IllegalStateException("GitHub PAT is invalid or expired (401 Unauthorized)")
+            } else if (response.code == 403) {
+                throw IllegalStateException("GitHub API rate limit exceeded or missing scopes (403 Forbidden)")
+            }
+            throw Exception("GitHub REST error ${response.code}: $errBody")
         }
         return json.parseToJsonElement(response.body?.string() ?: "{}").jsonObject
+    }
+
+    private suspend fun restArray(method: String, url: String, body: String? = null): JsonArray {
+        val requestBody = body?.toRequestBody("application/json".toMediaType())
+
+        val token = pat
+        if (token.isNullOrBlank()) {
+            throw IllegalStateException("GitHub Personal Access Token is not configured. Please add it in Settings or Onboarding.")
+        }
+
+        val request = Request.Builder()
+            .url(url)
+            .method(method, requestBody)
+            .header("Authorization", "Bearer $token")
+            .header("User-Agent", "Dettle-App/1.0")
+            .header("Accept", "application/vnd.github+json")
+            .header("X-GitHub-Api-Version", "2022-11-28")
+            .build()
+
+        val response = client.newCall(request).execute()
+        if (!response.isSuccessful && response.code != 201) {
+            val errBody = response.body?.string().orEmpty()
+            if (response.code == 401) {
+                throw IllegalStateException("GitHub PAT is invalid or expired (401 Unauthorized)")
+            } else if (response.code == 403) {
+                throw IllegalStateException("GitHub API rate limit exceeded or missing scopes (403 Forbidden)")
+            }
+            throw Exception("GitHub REST error ${response.code}: $errBody")
+        }
+        val raw = response.body?.string() ?: "[]"
+        return json.parseToJsonElement(raw).jsonArray
     }
 
     private suspend fun getRefSha(owner: String, repo: String, ref: String): String? {
@@ -363,5 +630,57 @@ data class WorkflowRun(
     val id: Long,
     val status: String,
     val conclusion: String?,
+    val url: String
+)
+
+data class GitHubUser(
+    val login: String,
+    val name: String?,
+    val avatarUrl: String?,
+    val bio: String?,
+    val publicRepos: Int,
+    val totalPrivateRepos: Int?
+)
+
+data class GitHubRepoSummary(
+    val name: String,
+    val fullName: String,
+    val owner: String,
+    val description: String?,
+    val isPrivate: Boolean,
+    val defaultBranch: String,
+    val language: String?,
+    val stars: Int,
+    val updatedAt: String?
+)
+
+data class GitHubRepoDetails(
+    val name: String,
+    val fullName: String,
+    val owner: String,
+    val description: String?,
+    val isPrivate: Boolean,
+    val defaultBranch: String,
+    val language: String?,
+    val stars: Int,
+    val forks: Int,
+    val openIssuesCount: Int,
+    val cloneUrl: String?,
+    val htmlUrl: String?
+)
+
+data class GitHubCommitSummary(
+    val sha: String,
+    val message: String,
+    val author: String,
+    val date: String
+)
+
+data class GitHubIssueSummary(
+    val number: Int,
+    val title: String,
+    val state: String,
+    val author: String,
+    val isPullRequest: Boolean,
     val url: String
 )

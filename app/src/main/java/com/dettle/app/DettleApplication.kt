@@ -27,5 +27,13 @@ class DettleApplication : Application() {
                 defaultHandler?.uncaughtException(thread, throwable)
             }
         }
+
+        // Start 24/7 background agent daemon
+        try {
+            val serviceIntent = com.dettle.app.service.AgentForegroundService.startIntent(this)
+            androidx.core.content.ContextCompat.startForegroundService(this, serviceIntent)
+        } catch (e: Exception) {
+            Log.w("DettleApplication", "Failed to start AgentForegroundService on startup", e)
+        }
     }
 }
