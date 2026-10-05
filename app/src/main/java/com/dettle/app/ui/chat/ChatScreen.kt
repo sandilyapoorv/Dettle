@@ -168,9 +168,14 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dettle.app.ui.theme.liquidGlass
 import com.dettle.app.ui.theme.LiquidGlassTokens
+import com.dettle.app.ui.theme.UserBubble
+import com.dettle.app.ui.theme.AiBubble
+import com.dettle.app.ui.theme.UserBubbleBorder
+import com.dettle.app.ui.theme.AiBubbleBorder
 import com.dettle.app.audio.VoiceTypingManager
 import com.dettle.app.domain.model.ChatMessage
 import com.dettle.app.domain.model.MessageRole
