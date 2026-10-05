@@ -57,6 +57,11 @@ For substantial completed versions also run:
 ```
 APK = direct install; AAB = Google Play.
 
+**APK Naming Convention:**
+Never distribute generic filenames like `app-release.apk` or `app-debug.apk`. All release and debug APK artifacts and release attachments MUST follow proper versioning and direction:
+- Release APK: `dettle-release-<version>.apk` (e.g. `dettle-release-1.8.0.apk`)
+- Debug APK: `dettle-debug-<version>.apk` (e.g. `dettle-debug-1.8.0.apk`)
+
 ### 8. Signing
 **Treat production signing as sensitive. Never commit keystores or passwords.**
 GitHub Actions Secrets: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`.
@@ -66,7 +71,7 @@ Never casually replace an established signing key.
 
 ### 9. GitHub Releases
 For meaningful completed versions: code → tests → build → commit → push → tag → Actions → APK/AAB → Release.
-Attach APK, AAB when available. Make version tags trigger Actions automatically.
+Attach version-named APKs (`dettle-release-<version>.apk`, `dettle-debug-<version>.apk`), and AAB when available. Make version tags trigger Actions automatically.
 **Never claim a release exists unless verified.**
 
 ### 10. Backend Stack
