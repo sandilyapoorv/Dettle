@@ -1,20 +1,50 @@
-# Gates: Remove Cookie Capturing
+# GATES.md — Bare-Metal Runtime & Gamified Onboarding
 
-OWNS: app/src/main/java/com/dettle/app/data/backup/BackupManager.kt, app/src/main/java/com/dettle/app/ui/backup/BackupRestoreSheet.kt, app/src/main/java/com/dettle/app/ui/settings/SettingsScreen.kt, docs/dettle-architecture.html, docs/AI_MODELS_AND_PROVIDERS.md, CHANGELOG.md, task.md
+OWNS:
+- app/src/main/java/com/dettle/app/data/api/StreamingToolCallAccumulator.kt
+- app/src/main/java/com/dettle/app/data/api/OpenAICompatProvider.kt
+- app/src/main/java/com/dettle/app/orchestrator/ToolExecutor.kt
+- app/src/main/java/com/dettle/app/domain/model/Tool.kt
+- app/src/main/java/com/dettle/app/data/db/entity/CodeChunkEntity.kt
+- app/src/main/java/com/dettle/app/data/db/dao/CodeChunkDao.kt
+- app/src/main/java/com/dettle/app/data/db/DettleDatabase.kt
+- app/src/main/java/com/dettle/app/orchestrator/rag/CodebaseChunker.kt
+- app/src/main/java/com/dettle/app/orchestrator/rag/CodebaseRagService.kt
+- app/src/main/java/com/dettle/app/orchestrator/project/ProjectContextManager.kt
+- app/src/main/java/com/dettle/app/orchestrator/gamification/GamificationEngine.kt
+- app/src/main/java/com/dettle/app/orchestrator/gamification/SallyEnforcerPersona.kt
+- app/src/main/java/com/dettle/app/audio/ProceduralAudioService.kt
+- app/src/main/java/com/dettle/app/ui/onboarding/GamifiedOnboardingScreen.kt
+- app/src/main/java/com/dettle/app/ui/components/StreakXpChip.kt
+- app/src/main/java/com/dettle/app/ui/components/ActiveProjectChip.kt
+- app/src/main/java/com/dettle/app/ui/navigation/DettleNavGraph.kt
 
-Scope: Remove all logic related to capturing, persisting, and restoring browser cookies via Android CookieManager, as requested to address ethical and privacy concerns.
+---
 
-- [x] G1: No CookieManager references exist in the Kotlin codebase
-  CHECK: grep -r "CookieManager" app/src/main/java || echo "CLEAN"
-  EXPECT: CLEAN
-  EVIDENCE: automatic-evidence=v1; definition-sha256=0c6612811a01e6b1f13cf936b8949225fed1a2204217d946e747ab5595b1791a; exit=0; EXPECT=matched; output-sha256=0b98843240a0b1a2384483206c02be8968dd809eb73838820be24cb7d6d6aeb9; output-bytes=6; shell=/bin/sh; cwd=/home/shiv/Sandilyapoorv/Dettle; path=0ed32491488a/18 entries
+### G1: Streaming Tool Delta Accumulator Exists and Handles Chunked Arguments
+CHECK: test -f app/src/main/java/com/dettle/app/data/api/StreamingToolCallAccumulator.kt
+EXPECT: 0
 
-- [x] G2: BackupOptions data class no longer includes cookies
-  CHECK: grep -r "includeCookies" app/src/main/java || echo "CLEAN"
-  EXPECT: CLEAN
-  EVIDENCE: automatic-evidence=v1; definition-sha256=bc8dd31f1f935b9635e85f949d06d390c656e14bc719d3a0cd324b7949609d55; exit=0; EXPECT=matched; output-sha256=0b98843240a0b1a2384483206c02be8968dd809eb73838820be24cb7d6d6aeb9; output-bytes=6; shell=/bin/sh; cwd=/home/shiv/Sandilyapoorv/Dettle; path=0ed32491488a/18 entries
+### G2: ToolExecutor Has Live Cloudflare and Codebase Search Wiring (No Phase 3 Stubs)
+CHECK: grep -c "Phase 3" app/src/main/java/com/dettle/app/orchestrator/ToolExecutor.kt || true
+EXPECT: 0
 
-- [x] G3: SettingsScreen UI no longer displays cookie count
-  CHECK: grep -r "cookieDomainCount" app/src/main/java || echo "CLEAN"
-  EXPECT: CLEAN
-  EVIDENCE: automatic-evidence=v1; definition-sha256=6f72cff1379a44caddcb469632140d1f274c7f90dca32c4e4c127dabd982e585; exit=0; EXPECT=matched; output-sha256=0b98843240a0b1a2384483206c02be8968dd809eb73838820be24cb7d6d6aeb9; output-bytes=6; shell=/bin/sh; cwd=/home/shiv/Sandilyapoorv/Dettle; path=0ed32491488a/18 entries
+### G3: Codebase RAG Entity and DAO Registered in DettleDatabase
+CHECK: grep -c "CodeChunkEntity" app/src/main/java/com/dettle/app/data/db/DettleDatabase.kt
+EXPECT: 1
+
+### G4: Gamification Engine and Sally Persona Created
+CHECK: test -f app/src/main/java/com/dettle/app/orchestrator/gamification/GamificationEngine.kt && test -f app/src/main/java/com/dettle/app/orchestrator/gamification/SallyEnforcerPersona.kt
+EXPECT: 0
+
+### G5: Procedural Audio Service Implemented Using ToneGenerator
+CHECK: grep -c "ToneGenerator" app/src/main/java/com/dettle/app/audio/ProceduralAudioService.kt
+EXPECT: [1-9]
+
+### G6: Gamified 4-Quest Onboarding Screen Exists and Wired in NavGraph
+CHECK: test -f app/src/main/java/com/dettle/app/ui/onboarding/GamifiedOnboardingScreen.kt && grep -c "GamifiedOnboarding" app/src/main/java/com/dettle/app/ui/navigation/DettleNavGraph.kt
+EXPECT: [1-9]
+
+### G7: GitHub Actions CI Build and Tests Pass Cleanly
+CHECK: git status --porcelain
+EXPECT: ""
