@@ -15,6 +15,7 @@ import com.dettle.app.data.db.dao.ProjectDao
 import com.dettle.app.data.db.dao.ConversationDao
 import com.dettle.app.data.db.dao.UserProfileDao
 import com.dettle.app.data.db.dao.KnowledgeGraphDao
+import com.dettle.app.data.db.dao.CodeChunkDao
 import com.dettle.app.data.db.entity.DeploymentEntity
 import com.dettle.app.data.db.entity.MemoryEntity
 import com.dettle.app.data.db.entity.TaskLogEntity
@@ -25,6 +26,8 @@ import com.dettle.app.data.db.entity.ConversationMessageEntity
 import com.dettle.app.data.db.entity.UserProfileEntity
 import com.dettle.app.data.db.entity.ConceptNodeEntity
 import com.dettle.app.data.db.entity.ConceptEdgeEntity
+import com.dettle.app.data.db.entity.CodeChunkEntity
+import com.dettle.app.data.db.entity.CodeChunkFtsEntity
 import com.dettle.app.orchestrator.mode.GoalDao
 import com.dettle.app.orchestrator.mode.GoalEntity
 
@@ -40,9 +43,11 @@ import com.dettle.app.orchestrator.mode.GoalEntity
         ConversationMessageEntity::class,
         UserProfileEntity::class,
         ConceptNodeEntity::class,
-        ConceptEdgeEntity::class
+        ConceptEdgeEntity::class,
+        CodeChunkEntity::class,
+        CodeChunkFtsEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(DettleConverters::class)
@@ -56,6 +61,7 @@ abstract class DettleDatabase : RoomDatabase() {
     abstract fun conversationDao(): ConversationDao
     abstract fun userProfileDao(): UserProfileDao
     abstract fun knowledgeGraphDao(): KnowledgeGraphDao
+    abstract fun codeChunkDao(): CodeChunkDao
 
     companion object {
         @Volatile private var INSTANCE: DettleDatabase? = null

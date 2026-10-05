@@ -100,6 +100,33 @@ object AgentTools {
         safetyLevel = SafetyLevel.REQUIRE
     )
 
+    val GITHUB_POLL_RUN = Tool(
+        name = "github_poll_run",
+        description = "Check the status and conclusion (e.g. success, failure, in_progress) of recent GitHub Actions workflow runs.",
+        parameters = ToolParameters(
+            properties = mapOf(
+                "owner" to ToolProperty("string", "GitHub repository owner/org name"),
+                "repo" to ToolProperty("string", "Repository name"),
+                "workflow_id" to ToolProperty("string", "Workflow file name, e.g. android-build.yml")
+            ),
+            required = listOf("owner", "repo", "workflow_id")
+        ),
+        safetyLevel = SafetyLevel.AUTO
+    )
+
+    val CODEBASE_SEARCH = Tool(
+        name = "codebase_search",
+        description = "Semantically and lexically search the indexed codebase for functions, types, schemas, and implementations. Returns exact snippets with file paths and line ranges without wasting tokens on full files.",
+        parameters = ToolParameters(
+            properties = mapOf(
+                "query" to ToolProperty("string", "Search query or symbol name (e.g. 'auth tokens', 'UserRepository', 'deployWorker')"),
+                "filter_type" to ToolProperty("string", "Optional symbol filter: 'all', 'function', 'class', 'interface'")
+            ),
+            required = listOf("query")
+        ),
+        safetyLevel = SafetyLevel.AUTO
+    )
+
     val CLOUDFLARE_DEPLOY_PREVIEW = Tool(
         name = "cloudflare_deploy_preview",
         description = "Trigger a Cloudflare Pages preview deployment for a specific branch or PR. Use this to verify your code changes deploy successfully before merging.",
@@ -235,12 +262,14 @@ object AgentTools {
         GITHUB_READ_FILE,
         GITHUB_CREATE_BRANCH_PR,
         GITHUB_TRIGGER_ACTION,
+        GITHUB_POLL_RUN,
         CLOUDFLARE_DEPLOY_PREVIEW,
         CLOUDFLARE_PUBLISH_WORKER,
         WORKSPACE_LIST_FILES,
         WORKSPACE_READ_FILE,
         WORKSPACE_WRITE_FILE,
         WORKSPACE_DELETE_FILE,
+        CODEBASE_SEARCH,
         WEB_SEARCH,
         READ_URL,
         MEMORY_RECALL,
@@ -249,11 +278,11 @@ object AgentTools {
 
     /** Read-only tools (safe for READER agent) */
     val READ_ONLY: List<Tool> = listOf(
-        GITHUB_MAP_REPO, GITHUB_READ_FILE, WORKSPACE_LIST_FILES, WORKSPACE_READ_FILE, MEMORY_RECALL, WEB_SEARCH, READ_URL, FINAL_ANSWER
+        GITHUB_MAP_REPO, GITHUB_READ_FILE, GITHUB_POLL_RUN, CODEBASE_SEARCH, WORKSPACE_LIST_FILES, WORKSPACE_READ_FILE, MEMORY_RECALL, WEB_SEARCH, READ_URL, FINAL_ANSWER
     )
 
     /** Tools for the DEPLOYER agent */
     val DEPLOY: List<Tool> = listOf(
-        GITHUB_TRIGGER_ACTION, CLOUDFLARE_DEPLOY_PREVIEW, CLOUDFLARE_PUBLISH_WORKER, WORKSPACE_READ_FILE, FINAL_ANSWER
+        GITHUB_TRIGGER_ACTION, GITHUB_POLL_RUN, CLOUDFLARE_DEPLOY_PREVIEW, CLOUDFLARE_PUBLISH_WORKER, WORKSPACE_READ_FILE, FINAL_ANSWER
     )
 }

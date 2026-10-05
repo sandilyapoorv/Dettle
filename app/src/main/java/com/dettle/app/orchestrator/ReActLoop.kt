@@ -63,6 +63,8 @@ class ReActLoop @Inject constructor(
     private val policyEngine: PolicyEngine,
     private val salienceEvaluator: SalienceEvaluator,
     private val reflexEngine: ProceduralReflexEngine,
+    private val codebaseRagService: com.dettle.app.orchestrator.rag.CodebaseRagService,
+    private val projectContextManager: com.dettle.app.orchestrator.project.ProjectContextManager,
     private val json: Json
 ) {
     fun run(
@@ -102,16 +104,41 @@ class ReActLoop @Inject constructor(
 
         val effectiveMaxSteps = if (maxSteps > 0) maxSteps else DEFAULT_MAX_STEPS
         val effectiveUncensored = isUncensored || taskContext.isUncensored
-        val systemPrompt = skillInjector.buildSystemPrompt(
+        val baseSystemPrompt = skillInjector.buildSystemPrompt(
             context = taskContext,
             userPrompt = userMessage,
             isUncensored = effectiveUncensored
         )
+
+        val activeProj = projectContextManager.activeProject.value
+        val ragBlock = if (activeProj != null) {
+            codebaseRagService.buildRagContextBlock(activeProj.id, userMessage)
+        } else ""
+
+        val systemPrompt = buildString {
+            append(baseSystemPrompt)
+            if (activeProj != null) {
+                appendLine()
+                appendLine("=== ACTIVE ANCHORED PROJECT ===")
+                appendLine("Project: ${activeProj.name}")
+                appendLine("Repo: ${activeProj.owner}/${activeProj.repo} (${activeProj.branch})")
+                appendLine("Cloudflare: ${activeProj.cloudflareProjectName}")
+                if (activeProj.instructions.isNotBlank()) {
+                    appendLine("Project Instructions: ${activeProj.instructions}")
+                }
+                appendLine("===============================")
+            }
+            if (ragBlock.isNotBlank()) {
+                appendLine()
+                appendLine(ragBlock)
+            }
+        }
+
         emit(LoopEvent.TraceStepEmitted(
             TraceStep(
                 icon = "📝",
                 title = "System Prompt Assembled",
-                description = "${tools.size} tools registered, context: ${systemPrompt.length} chars",
+                description = "${tools.size} tools registered, context: ${systemPrompt.length} chars (RAG active)",
                 offsetMs = System.currentTimeMillis() - startTimeMs
             )
         ))

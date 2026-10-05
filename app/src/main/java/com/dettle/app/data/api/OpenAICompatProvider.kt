@@ -96,14 +96,20 @@ class OpenAICompatProvider(
 
             var totalPromptTokens = 0
             var totalCompletionTokens = 0
+            val toolAccumulator = StreamingToolCallAccumulator(json)
 
             while (!source.exhausted()) {
                 val line = source.readUtf8Line() ?: break
                 if (!line.startsWith("data: ")) continue
                 val data = line.removePrefix("data: ").trim()
                 if (data == "[DONE]") {
+                    if (toolAccumulator.hasToolCalls()) {
+                        toolAccumulator.buildPrimaryToolCallJson()?.let {
+                            emit(StreamChunk.ToolCallDetected(it))
+                        }
+                    }
                     emit(StreamChunk.Done(
-                        finishReason = "stop",
+                        finishReason = if (toolAccumulator.hasToolCalls()) "tool_calls" else "stop",
                         usage = TokenUsage(totalPromptTokens, totalCompletionTokens, totalPromptTokens + totalCompletionTokens)
                     ))
                     break
@@ -137,10 +143,10 @@ class OpenAICompatProvider(
                         emit(StreamChunk.Token(reasoningContent))
                     }
 
-                    // Tool call detected
-                    val toolCall = delta?.get("tool_calls")
-                    if (toolCall != null) {
-                        emit(StreamChunk.ToolCallDetected(toolCall.toString()))
+                    // Ingest partial tool call deltas into accumulator
+                    val toolCallsDelta = delta?.get("tool_calls")
+                    if (toolCallsDelta != null) {
+                        toolAccumulator.ingestDelta(toolCallsDelta)
                     }
 
                     // Usage tracking
@@ -158,6 +164,11 @@ class OpenAICompatProvider(
                         runCatching { it.jsonPrimitive.content }.getOrNull()
                     }
                     if (finishReason == "stop" || finishReason == "tool_calls") {
+                        if (toolAccumulator.hasToolCalls()) {
+                            toolAccumulator.buildPrimaryToolCallJson()?.let {
+                                emit(StreamChunk.ToolCallDetected(it))
+                            }
+                        }
                         emit(StreamChunk.Done(
                             finishReason = finishReason,
                             usage = TokenUsage(totalPromptTokens, totalCompletionTokens, totalPromptTokens + totalCompletionTokens)

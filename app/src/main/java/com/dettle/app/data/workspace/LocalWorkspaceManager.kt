@@ -46,4 +46,10 @@ class LocalWorkspaceManager @Inject constructor(
         val file = resolve(path)
         return file.delete()
     }
+
+    /** Reads all files in the workspace directory into a Map of relativePath -> content */
+    fun readAllFiles(subDir: String = ""): Map<String, String> {
+        val files = listFiles(subDir)
+        return files.associateWith { readFile(it) }
+    }
 }

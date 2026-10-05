@@ -22,5 +22,14 @@ data class UserProfileEntity(
     @ColumnInfo(name = "communication_pref") val communicationPref: String = "",
     @ColumnInfo(name = "current_focus") val currentFocus: String = "",
     @ColumnInfo(name = "interests") val interests: String = "",   // comma-separated
+    @ColumnInfo(name = "streak_count") val streakCount: Int = 1,
+    @ColumnInfo(name = "last_active_timestamp") val lastActiveTimestamp: Long = System.currentTimeMillis(),
+    @ColumnInfo(name = "streak_freeze_tokens") val streakFreezeTokens: Int = 1,
+    @ColumnInfo(name = "total_xp") val totalXp: Long = 50L,
+    @ColumnInfo(name = "level") val level: Int = 1,
+    @ColumnInfo(name = "level_title") val levelTitle: String = "Script Apprentice",
+    @ColumnInfo(name = "badges") val badges: List<String> = emptyList(),
+    @ColumnInfo(name = "onboarding_completed") val onboardingCompleted: Boolean = false,
+    @ColumnInfo(name = "completed_quests") val completedQuests: List<String> = emptyList(),
     @ColumnInfo(name = "updated_at") val updatedAt: Long = System.currentTimeMillis()
 )

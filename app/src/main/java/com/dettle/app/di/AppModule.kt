@@ -261,5 +261,9 @@ object AppModule {
     @Provides
     @Singleton
     fun provideUserProfileDao(db: DettleDatabase): com.dettle.app.data.db.dao.UserProfileDao = db.userProfileDao()
+
+    @Provides
+    @Singleton
+    fun provideCodeChunkDao(db: DettleDatabase): com.dettle.app.data.db.dao.CodeChunkDao = db.codeChunkDao()
 }
 

@@ -1,9 +1,13 @@
 package com.dettle.app.orchestrator
 
+import com.dettle.app.data.cloudflare.CloudflareClient
+import com.dettle.app.data.db.dao.MemoryDao
 import com.dettle.app.data.github.GitHubClient
 import com.dettle.app.data.workspace.LocalWorkspaceManager
 import com.dettle.app.domain.model.ToolCall
 import com.dettle.app.domain.model.ToolResult
+import com.dettle.app.orchestrator.project.ProjectContextManager
+import com.dettle.app.orchestrator.rag.CodebaseRagService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -16,41 +20,48 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Executes tool calls from the AI agent by routing to the correct service.
+ * Bare-metal tool executor routing AI function calls directly to services:
+ * GitHub API, Cloudflare API, Local Workspace, Room Vector/FTS RAG, and Web Search.
  */
 @Singleton
 class ToolExecutor @Inject constructor(
     private val githubClient: GitHubClient,
+    private val cloudflareClient: CloudflareClient,
     private val repoMapper: RepoMapper,
     private val webSearchClient: WebSearchClient,
     private val httpClient: OkHttpClient,
     private val json: Json,
-    private val workspaceManager: LocalWorkspaceManager
+    private val workspaceManager: LocalWorkspaceManager,
+    private val codebaseRagService: CodebaseRagService,
+    private val projectContextManager: ProjectContextManager,
+    private val memoryDao: MemoryDao
 ) {
     suspend fun execute(toolCall: ToolCall): ToolResult {
         val args = toolCall.arguments
+        val activeProj = projectContextManager.activeProject.value
+
         val content = when (toolCall.name) {
 
             "github_map_repo" -> {
-                val owner = args["owner"] ?: return errResult(toolCall, "Missing owner")
-                val repo = args["repo"] ?: return errResult(toolCall, "Missing repo")
-                val branch = args["branch"] ?: "main"
+                val owner = args["owner"] ?: activeProj?.owner ?: return errResult(toolCall, "Missing owner and no active project anchored")
+                val repo = args["repo"] ?: activeProj?.repo ?: return errResult(toolCall, "Missing repo and no active project anchored")
+                val branch = args["branch"] ?: activeProj?.branch ?: "main"
                 repoMapper.buildRepoMap(owner, repo, branch)
                     .getOrElse { return errResult(toolCall, it.message ?: "Failed to map repo") }
             }
 
             "github_read_file" -> {
-                val owner = args["owner"] ?: return errResult(toolCall, "Missing owner")
-                val repo = args["repo"] ?: return errResult(toolCall, "Missing repo")
+                val owner = args["owner"] ?: activeProj?.owner ?: return errResult(toolCall, "Missing owner and no active project anchored")
+                val repo = args["repo"] ?: activeProj?.repo ?: return errResult(toolCall, "Missing repo and no active project anchored")
                 val path = args["path"] ?: return errResult(toolCall, "Missing path")
-                val branch = args["branch"] ?: "main"
+                val branch = args["branch"] ?: activeProj?.branch ?: "main"
                 githubClient.readFile(owner, repo, path, branch)
                     .getOrElse { return errResult(toolCall, it.message ?: "Failed to read file") }
             }
 
             "github_create_branch_pr" -> {
-                val owner = args["owner"] ?: return errResult(toolCall, "Missing owner")
-                val repo = args["repo"] ?: return errResult(toolCall, "Missing repo")
+                val owner = args["owner"] ?: activeProj?.owner ?: return errResult(toolCall, "Missing owner and no active project anchored")
+                val repo = args["repo"] ?: activeProj?.repo ?: return errResult(toolCall, "Missing repo and no active project anchored")
                 val branch = args["branch_name"] ?: return errResult(toolCall, "Missing branch_name")
                 val fileChangesJson = args["file_changes"] ?: "[]"
                 val commitMsg = args["commit_message"] ?: "Update by Dettle agent"
@@ -81,10 +92,10 @@ class ToolExecutor @Inject constructor(
             }
 
             "github_trigger_action" -> {
-                val owner = args["owner"] ?: return errResult(toolCall, "Missing owner")
-                val repo = args["repo"] ?: return errResult(toolCall, "Missing repo")
+                val owner = args["owner"] ?: activeProj?.owner ?: return errResult(toolCall, "Missing owner and no active project anchored")
+                val repo = args["repo"] ?: activeProj?.repo ?: return errResult(toolCall, "Missing repo and no active project anchored")
                 val workflowId = args["workflow_id"] ?: return errResult(toolCall, "Missing workflow_id")
-                val ref = args["ref"] ?: "main"
+                val ref = args["ref"] ?: activeProj?.branch ?: "main"
                 val inputsJson = args["inputs"] ?: "{}"
                 val inputs = try {
                     json.parseToJsonElement(inputsJson).jsonObject
@@ -93,32 +104,60 @@ class ToolExecutor @Inject constructor(
 
                 githubClient.triggerWorkflow(owner, repo, workflowId, ref, inputs)
                     .getOrElse { return errResult(toolCall, it.message ?: "Failed to trigger workflow") }
-                "Workflow `$workflowId` triggered on `$ref`"
+                "Workflow `$workflowId` triggered on `$ref` in $owner/$repo"
             }
 
-            "web_search" -> {
-                val query = args["query"] ?: return errResult(toolCall, "Missing query")
-                val numResults = args["num_results"]?.toIntOrNull() ?: 5
-                webSearchClient.search(query, numResults)
-            }
-
-            "read_url" -> {
-                val url = args["url"] ?: return errResult(toolCall, "Missing url")
-                fetchUrl(url)
-            }
-
-            "memory_recall" -> {
-                // Phase 3: implemented with Room database
-                "Memory recall not yet implemented. This will be available in Phase 3."
+            "github_poll_run" -> {
+                val owner = args["owner"] ?: activeProj?.owner ?: return errResult(toolCall, "Missing owner and no active project anchored")
+                val repo = args["repo"] ?: activeProj?.repo ?: return errResult(toolCall, "Missing repo and no active project anchored")
+                val workflowId = args["workflow_id"] ?: return errResult(toolCall, "Missing workflow_id")
+                val runs = githubClient.getWorkflowRuns(owner, repo, workflowId)
+                    .getOrElse { return errResult(toolCall, it.message ?: "Failed to fetch workflow runs") }
+                if (runs.isEmpty()) {
+                    "No workflow runs found for `$workflowId`"
+                } else {
+                    val latest = runs.first()
+                    "Latest Workflow Run #${latest.id}:\n" +
+                            "**Status**: `${latest.status}`\n" +
+                            "**Conclusion**: `${latest.conclusion ?: "running"}`\n" +
+                            "**URL**: ${latest.url}"
+                }
             }
 
             "cloudflare_deploy_preview" -> {
-                // Phase 3: Cloudflare client
-                "Cloudflare deployment will be available in Phase 3."
+                val projectName = args["project_name"]?.ifBlank { null }
+                    ?: activeProj?.cloudflareProjectName
+                    ?: "dettle-site"
+                val files = workspaceManager.readAllFiles()
+                if (files.isEmpty()) {
+                    return errResult(toolCall, "Workspace is empty. Write HTML/JS files first with workspace_write_file before deploying.")
+                }
+                val deploy = cloudflareClient.deployToPages(projectName, files)
+                    .getOrElse { return errResult(toolCall, it.message ?: "Failed to deploy to Cloudflare Pages") }
+                "Cloudflare Pages Preview Deployed Successfully!\n" +
+                        "**Project**: ${deploy.projectName}\n" +
+                        "**Preview URL**: ${deploy.url}\n" +
+                        "**Production URL**: ${deploy.productionUrl}\n" +
+                        "**Files Deployed**: ${deploy.fileCount}"
             }
 
             "cloudflare_publish_worker" -> {
-                "Cloudflare Worker deployment will be available in Phase 3."
+                val workerName = args["worker_name"] ?: args["script_name"]
+                    ?: "${activeProj?.cloudflareProjectName ?: "dettle"}-worker"
+                val scriptBody = args["script"] ?: args["code"] ?: runCatching { workspaceManager.readFile("worker.js") }.getOrNull()
+                    ?: return errResult(toolCall, "Missing script body and worker.js not found in workspace")
+                val deploy = cloudflareClient.deployWorker(workerName, scriptBody)
+                    .getOrElse { return errResult(toolCall, it.message ?: "Failed to deploy Cloudflare Worker") }
+                "Cloudflare Worker Deployed Successfully!\n" +
+                        "**Worker**: ${deploy.name}\n" +
+                        "**Live URL**: ${deploy.url}\n" +
+                        "**Script Size**: ${deploy.scriptSize} bytes"
+            }
+
+            "codebase_search" -> {
+                val query = args["query"] ?: return errResult(toolCall, "Missing query")
+                val projectId = activeProj?.id ?: "default"
+                codebaseRagService.search(projectId, query)
             }
 
             "workspace_list_files" -> {
@@ -157,6 +196,31 @@ class ToolExecutor @Inject constructor(
                 }
             }
 
+            "web_search" -> {
+                val query = args["query"] ?: return errResult(toolCall, "Missing query")
+                val numResults = args["num_results"]?.toIntOrNull() ?: 5
+                webSearchClient.search(query, numResults)
+            }
+
+            "read_url" -> {
+                val url = args["url"] ?: return errResult(toolCall, "Missing url")
+                fetchUrl(url)
+            }
+
+            "memory_recall" -> {
+                val query = args["query"] ?: ""
+                val memories = memoryDao.getAllMemories()
+                if (memories.isEmpty()) {
+                    "No memories stored yet."
+                } else {
+                    val matching = if (query.isNotBlank()) {
+                        memories.filter { it.content.contains(query, ignoreCase = true) || it.tags.any { tag -> tag.contains(query, ignoreCase = true) } }
+                    } else memories
+                    matching.take(5).joinToString("\n") { "• [${it.type}] ${it.content}" }
+                        .ifBlank { "No memories matching '$query'" }
+                }
+            }
+
             "final_answer" -> {
                 args["summary"] ?: args["details"] ?: "Task complete."
             }
@@ -186,11 +250,10 @@ class ToolExecutor @Inject constructor(
                 .build()
             val response = httpClient.newCall(request).execute()
             val body = response.body?.string() ?: return@withContext "Empty response"
-            // Strip HTML tags for readability
             body.replace(Regex("<[^>]+>"), " ")
                 .replace(Regex("\\s+"), " ")
                 .trim()
-                .take(8000)  // Limit to avoid token explosion
+                .take(8000)
         } catch (e: Exception) {
             "Error fetching URL: ${e.message}"
         }

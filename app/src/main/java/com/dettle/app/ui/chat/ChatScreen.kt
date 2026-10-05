@@ -185,6 +185,8 @@ import com.dettle.app.ui.mode.GoalProgressCard
 import com.dettle.app.ui.mode.ModeCustomizationSheet
 import com.dettle.app.ui.mode.ModePillBar
 import com.dettle.app.ui.mode.TopEnvironmentSegmentedControl
+import com.dettle.app.ui.components.ActiveProjectChip
+import com.dettle.app.ui.components.StreakXpChip
 import androidx.compose.runtime.produceState
 import com.dettle.app.domain.model.ExecutionTrace
 import com.dettle.app.domain.model.TraceStep
@@ -468,7 +470,7 @@ fun ChatScreen(
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .statusBarsPadding()
-                                        .padding(top = 56.dp, bottom = 40.dp),
+                                        .padding(top = 88.dp, bottom = 40.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     ChatWelcomeHero(
@@ -481,7 +483,7 @@ fun ChatScreen(
                                 LazyColumn(
                                     state = listState,
                                     modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 56.dp, bottom = 16.dp),
+                                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 88.dp, bottom = 16.dp),
                                     verticalArrangement = Arrangement.spacedBy(14.dp)
                                 ) {
                                     items(
@@ -537,7 +539,7 @@ fun ChatScreen(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .statusBarsPadding()
-                                .padding(top = 56.dp),
+                                .padding(top = 88.dp),
                             messageStreamContent = {
                                 LazyColumn(
                                     state = listState,
@@ -596,58 +598,134 @@ fun ChatScreen(
                     }
                 }
 
-                // ── Sleek Top App Bar (Centered Segmented Control + Menu & Actions) ──
-                Row(
+                // ── Sleek Top App Bar (Centered Segmented Control + Chips & Menu) ──
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .statusBarsPadding()
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Left: Menu & Agent Indicator
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(
-                            onClick = {
-                                keyboardController?.hide()
-                                focusManager.clearFocus()
-                                coroutineScope.launch { drawerState.open() }
-                            },
-                            modifier = Modifier.size(38.dp)
-                        ) {
-                            Icon(
-                                Icons.Filled.Menu,
-                                contentDescription = "Open Chat History",
-                                tint = MaterialTheme.colorScheme.onBackground
-                            )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Left: Menu & Agent Indicator
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = {
+                                    keyboardController?.hide()
+                                    focusManager.clearFocus()
+                                    coroutineScope.launch { drawerState.open() }
+                                },
+                                modifier = Modifier.size(38.dp)
+                            ) {
+                                Icon(
+                                    Icons.Filled.Menu,
+                                    contentDescription = "Open Chat History",
+                                    tint = MaterialTheme.colorScheme.onBackground
+                                )
+                            }
+
+                            if (uiState.isAgentRunning) {
+                                Spacer(Modifier.width(4.dp))
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    color = if (uiState.isUnleashed) DettleGreen else MaterialTheme.colorScheme.primary,
+                                    strokeWidth = 2.dp
+                                )
+                            }
                         }
 
-                        if (uiState.isAgentRunning) {
-                            Spacer(Modifier.width(4.dp))
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                color = if (uiState.isUnleashed) DettleGreen else MaterialTheme.colorScheme.primary,
-                                strokeWidth = 2.dp
-                            )
+                        // Center: Clean, horizontal Segmented Mode Control
+                        TopEnvironmentSegmentedControl(
+                            selected = uiState.environmentMode,
+                            onSelect = viewModel::setEnvironmentMode
+                        )
+
+                        // Right: Streak/XP Pill & New Chat button
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            StreakXpChip(profile = uiState.profile)
+
+                            IconButton(
+                                onClick = viewModel::startNewChat,
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Edit,
+                                    contentDescription = "New chat",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
 
-                    // Center: Clean, horizontal Segmented Mode Control
-                    TopEnvironmentSegmentedControl(
-                        selected = uiState.environmentMode,
-                        onSelect = viewModel::setEnvironmentMode
-                    )
-
-                    // Right: New Chat button
-                    IconButton(
-                        onClick = viewModel::startNewChat,
-                        modifier = Modifier.size(38.dp)
+                    // Secondary Sub-Bar: Active Project Context Anchor Chip
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.Start,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            Icons.Outlined.Edit,
-                            contentDescription = "New chat",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        ActiveProjectChip(
+                            project = uiState.activeProject,
+                            onClick = {
+                                onNavigateToSettings()
+                            }
                         )
+                    }
+
+                    // Sally Roast Banner (Tough Love Inactivity / Streak Notice)
+                    if (uiState.sallyRoast != null) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.90f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.45f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 4.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    modifier = Modifier.weight(1f),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = "🚨",
+                                        fontSize = 14.sp
+                                    )
+                                    Text(
+                                        text = uiState.sallyRoast ?: "",
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 12.sp
+                                        ),
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { viewModel.dismissSallyRoast() },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.Close,
+                                        contentDescription = "Dismiss",
+                                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

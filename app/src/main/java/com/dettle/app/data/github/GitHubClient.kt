@@ -238,6 +238,34 @@ class GitHubClient @Inject constructor(
         }
     }
 
+    /**
+     * Fetches recent workflow runs for a specific workflow file.
+     */
+    suspend fun getWorkflowRuns(
+        owner: String,
+        repo: String,
+        workflowId: String
+    ): Result<List<WorkflowRun>> = withContext(Dispatchers.IO) {
+        try {
+            val response = rest("GET", "$GITHUB_API/repos/$owner/$repo/actions/workflows/$workflowId/runs?per_page=5")
+            val runsArray = response["workflow_runs"]?.let {
+                runCatching { it.jsonArray }.getOrNull()
+            } ?: emptyList()
+
+            val runs = runsArray.mapNotNull { item ->
+                val obj = runCatching { item.jsonObject }.getOrNull() ?: return@mapNotNull null
+                val id = obj["id"]?.jsonPrimitive?.content?.toLongOrNull() ?: return@mapNotNull null
+                val status = obj["status"]?.jsonPrimitive?.content ?: "unknown"
+                val conclusion = obj["conclusion"]?.let { runCatching { it.jsonPrimitive.content }.getOrNull() }
+                val url = obj["html_url"]?.jsonPrimitive?.content ?: ""
+                WorkflowRun(id, status, conclusion, url)
+            }
+            Result.success(runs)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     // ─── Internal Helpers ─────────────────────────────────────────────────
 
     private suspend fun graphql(query: String, variables: JsonObject): JsonObject {
@@ -329,4 +357,11 @@ data class PullRequest(
     val url: String,
     val branch: String,
     val filesChanged: Int
+)
+
+data class WorkflowRun(
+    val id: Long,
+    val status: String,
+    val conclusion: String?,
+    val url: String
 )

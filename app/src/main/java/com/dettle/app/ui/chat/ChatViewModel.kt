@@ -67,7 +67,11 @@ class ChatViewModel @Inject constructor(
     private val conversationDao: ConversationDao,
     private val apiKeyStore: ApiKeyStore,
     private val cognitiveBrain: CognitiveBrain,
-    private val swarmOrchestrator: SwarmOrchestrator
+    private val swarmOrchestrator: SwarmOrchestrator,
+    private val gamificationEngine: com.dettle.app.orchestrator.gamification.GamificationEngine,
+    private val projectContextManager: com.dettle.app.orchestrator.project.ProjectContextManager,
+    private val audioService: com.dettle.app.audio.ProceduralAudioService,
+    private val sallyPersona: com.dettle.app.orchestrator.gamification.SallyEnforcerPersona
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -88,7 +92,52 @@ class ChatViewModel @Inject constructor(
                 }
             }
         }
+        viewModelScope.launch {
+            gamificationEngine.profileState.collect { prof ->
+                val roast = if (prof != null) {
+                    val days = java.util.concurrent.TimeUnit.MILLISECONDS.toDays(
+                        System.currentTimeMillis() - prof.lastActiveTimestamp
+                    )
+                    if (days >= 2) sallyPersona.getInactivityRoast(days.toInt()) else null
+                } else null
+                _uiState.update { it.copy(profile = prof, sallyRoast = roast) }
+            }
+        }
+        viewModelScope.launch {
+            projectContextManager.activeProject.collect { proj ->
+                _uiState.update { it.copy(activeProject = proj) }
+            }
+        }
         refreshKeyStatus()
+    }
+
+    fun completeOnboarding() {
+        gamificationEngine.finishOnboarding()
+    }
+
+    fun saveGitHubToken(token: String) {
+        apiKeyStore.githubPat = token
+    }
+
+    fun saveCloudflareToken(accountId: String, token: String) {
+        if (accountId.isNotBlank()) apiKeyStore.cloudflareAccountId = accountId
+        if (token.isNotBlank()) apiKeyStore.cloudflareApiToken = token
+    }
+
+    suspend fun anchorProject(name: String, repo: String) {
+        projectContextManager.setOrCreateProject(name, repo)
+    }
+
+    fun playSuccessSound() {
+        audioService.playSuccessChime()
+    }
+
+    fun playLevelUpSound() {
+        audioService.playLevelUpFanfare()
+    }
+
+    fun dismissSallyRoast() {
+        _uiState.update { it.copy(sallyRoast = null) }
     }
 
     fun refreshKeyStatus() {
@@ -866,5 +915,8 @@ data class ChatUiState(
     val effortLevel: String = "Medium",
     // ──────────────────────────────────────────────────────────────────────
     val activeExecutionTrace: ExecutionTrace? = null,
-    val hasConfiguredKeys: Boolean = true
+    val hasConfiguredKeys: Boolean = true,
+    val profile: com.dettle.app.data.db.entity.UserProfileEntity? = null,
+    val activeProject: com.dettle.app.orchestrator.project.AnchoredProject? = null,
+    val sallyRoast: String? = null
 )
