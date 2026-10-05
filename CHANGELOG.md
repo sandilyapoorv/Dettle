@@ -4,6 +4,23 @@ All notable changes, commits, architectural decisions, and releases for the **De
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and [Conventional Commits](https://www.conventionalcommits.org/).
 
+## [v1.8.0] - 2026-10-05: Apple Liquid Glass Redesign, Auth Vault Eradication, Top Segmented Mode Control, Onboarding & Clean Carbon Theme
+
+### Direct APK Download
+- **Production Release APK (R8 Minified, Signed)**: [app-release.apk](https://github.com/sandilyapoorv/Dettle/releases/download/v1.8.0/app-release.apk)
+- **Debug APK**: [app-debug.apk](https://github.com/sandilyapoorv/Dettle/releases/download/v1.8.0/app-debug.apk)
+- **GitHub Release Page**: [https://github.com/sandilyapoorv/Dettle/releases/tag/v1.8.0](https://github.com/sandilyapoorv/Dettle/releases/tag/v1.8.0)
+- **CI/CD Workflow**: [https://github.com/sandilyapoorv/Dettle/actions](https://github.com/sandilyapoorv/Dettle/actions)
+
+### What Was Built & Changed
+1. **Total AuthVault Eradication**: Completely deleted `AuthVaultScreen`, `AuthVaultViewModel`, and all related routes, navigation drawer entries, and cookie capturing logic across the codebase.
+2. **Apple Liquid Glass Design System**: Applied Apple's frosted liquid glass styling with subtle specular light highlights, clean hairline borders, and translucent elevation cards across chat cards and input bars.
+3. **Onboarding & Quick Setup Sheet**: Implemented `OnboardingSheet` with 1-tap provider selection for Google AI Studio (1M Free), Groq (300+ tok/s), and OpenRouter, direct links to fetch free API keys, Keystore AES-256 persistence, and Developer Mode switch.
+4. **Clean Centered Mode Segmented Control**: Replaced legacy vertical toggle with a centered horizontal segmented control (`TopEnvironmentSegmentedControl`) with animated pill transitions between Chat and Build.
+5. **Calibrated Carbon & Neutral Bubbles**: Overhauled palette to an obsidian carbon dark canvas (`#09090B`) with elevated neutral charcoal message bubbles (`#222227`) and crisp borders, eliminating jarring bright blues.
+6. **Decluttered Build Cockpit**: Simplified Build mode into a clean single-tier developer cockpit with Build Stream, Projects, Repos, Deploy, and Overnight tabs without stacked redundant pill bars.
+7. **Cleaned Web Mode Banner & Typography**: Removed colliding top-left `Active: /web` chip and scrubbed all residual handwriting font references.
+
 ---
 
 ## [v1.6.0] - 2026-09-26: Pure Pitch Black & Lavender Dark Theme, Top Bar Alignment, Web Search / Research Modes, Document/Photo Uploads & Hidden Step Budget

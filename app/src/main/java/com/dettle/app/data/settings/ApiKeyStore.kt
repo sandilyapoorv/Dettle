@@ -198,6 +198,12 @@ class ApiKeyStore @Inject constructor(
 
     fun hasKey(provider: AIProviderType): Boolean = !getKey(provider).isNullOrBlank()
 
+    fun hasAnyActiveKey(): Boolean {
+        val accounts = getAllProviderAccounts()
+        if (accounts.any { it.isActive && it.apiKey.isNotBlank() }) return true
+        return AIProviderType.entries.any { !it.isWebView && hasKey(it) }
+    }
+
     private fun keyFor(provider: AIProviderType) = "api_key_${provider.name}"
 
     // ─── Multi-Account GitHub Storage & Scopes ────────────────────────────

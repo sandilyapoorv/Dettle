@@ -18,7 +18,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.dettle.app.ui.authvault.AuthVaultScreen
 import com.dettle.app.ui.chat.ChatScreen
 import com.dettle.app.ui.deployments.DeploymentsScreen
 import com.dettle.app.ui.overnight.OvernightScreen
@@ -29,7 +28,6 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object Chat : Screen("chat", "Chat", Icons.Outlined.ChatBubbleOutline)
     object Repos : Screen("repos", "Repos", Icons.Outlined.FolderCopy)
     object Deployments : Screen("deployments", "Deploy", Icons.Outlined.CloudUpload)
-    object Agents : Screen("agents", "Vault", Icons.Outlined.VpnKey)
     object Overnight : Screen("overnight", "Overnight", Icons.Outlined.Bedtime)
     object Settings : Screen("settings", "Settings", Icons.Outlined.Tune)
 }
@@ -51,17 +49,9 @@ fun DettleNavGraph() {
     ) {
         composable(Screen.Chat.route) {
             ChatScreen(
-                onNavigateToVault = {
-                    navController.navigate(Screen.Agents.route)
-                },
                 onNavigateToSettings = {
                     navController.navigate(Screen.Settings.route)
                 }
-            )
-        }
-        composable(Screen.Agents.route) {
-            AuthVaultScreen(
-                onBack = { navController.popBackStack() }
             )
         }
         composable(Screen.Settings.route) {

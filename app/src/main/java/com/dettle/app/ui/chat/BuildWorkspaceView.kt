@@ -5,7 +5,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -44,23 +42,21 @@ import androidx.compose.ui.unit.sp
 import com.dettle.app.orchestrator.mode.AgentMode
 import com.dettle.app.orchestrator.mode.ModeId
 import com.dettle.app.ui.deployments.DeploymentsScreen
-import com.dettle.app.ui.mode.ModePillBar
 import com.dettle.app.ui.overnight.OvernightScreen
 import com.dettle.app.ui.projects.ProjectsScreen
 import com.dettle.app.ui.repos.ReposScreen
 
 enum class BuildWorkspaceTab(val label: String, val icon: ImageVector) {
+    CHAT_STREAM("Build Stream", Icons.Outlined.ChatBubbleOutline),
     PROJECTS("Projects", Icons.Outlined.FolderCopy),
     REPOS("Repos", Icons.Outlined.Code),
     DEPLOY("Deploy", Icons.Outlined.CloudUpload),
-    OVERNIGHT("Overnight", Icons.Outlined.Bedtime),
-    CHAT_STREAM("Build Tasks", Icons.Outlined.ChatBubbleOutline)
+    OVERNIGHT("Overnight", Icons.Outlined.Bedtime)
 }
 
 /**
- * Integrated Build Mode Workspace:
- * Consolidates Projects, Repositories, Deployments, and Overnight execution
- * directly inside Build mode with zero clutter.
+ * Streamlined Build Mode Workspace:
+ * Clean, single-tier developer cockpit without stacked or duplicate pill bars.
  */
 @Composable
 fun BuildWorkspaceView(
@@ -74,30 +70,16 @@ fun BuildWorkspaceView(
     modifier: Modifier = Modifier
 ) {
     var selectedTab by remember(hasActiveMessages) {
-        mutableStateOf(if (hasActiveMessages) BuildWorkspaceTab.CHAT_STREAM else BuildWorkspaceTab.PROJECTS)
+        mutableStateOf(if (hasActiveMessages) BuildWorkspaceTab.CHAT_STREAM else BuildWorkspaceTab.CHAT_STREAM)
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        // Sub-mode pills (Plan, Goal, Review, Deploy, Code)
-        if (workModes.isNotEmpty()) {
-            ModePillBar(
-                modes = workModes,
-                activeModeId = activeModeId,
-                lockedModeId = lockedModeId,
-                onModeTap = { id ->
-                    onModeTap(id)
-                    selectedTab = BuildWorkspaceTab.CHAT_STREAM
-                },
-                onModeSettings = onModeSettings
-            )
-        }
-
-        // Workspace Segmented Navigation Tabs
+        // Single clean workspace navigation bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 14.dp, vertical = 4.dp),
+                .padding(horizontal = 14.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -105,17 +87,17 @@ fun BuildWorkspaceView(
                 val isSelected = selectedTab == tab
                 Surface(
                     onClick = { selectedTab = tab },
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(14.dp),
                     color = if (isSelected)
-                        MaterialTheme.colorScheme.primaryContainer
+                        MaterialTheme.colorScheme.surfaceVariant
                     else
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        MaterialTheme.colorScheme.surface.copy(alpha = 0.4f),
                     border = BorderStroke(
                         1.dp,
                         if (isSelected)
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                            MaterialTheme.colorScheme.outline
                         else
-                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
                     )
                 ) {
                     Row(
@@ -127,7 +109,7 @@ fun BuildWorkspaceView(
                             imageVector = tab.icon,
                             contentDescription = null,
                             tint = if (isSelected)
-                                MaterialTheme.colorScheme.onPrimaryContainer
+                                MaterialTheme.colorScheme.primary
                             else
                                 MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(14.dp)
@@ -135,11 +117,11 @@ fun BuildWorkspaceView(
                         Text(
                             text = tab.label,
                             style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                fontSize = 11.sp
+                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                fontSize = 11.5.sp
                             ),
                             color = if (isSelected)
-                                MaterialTheme.colorScheme.onPrimaryContainer
+                                MaterialTheme.colorScheme.onSurface
                             else
                                 MaterialTheme.colorScheme.onSurfaceVariant
                         )

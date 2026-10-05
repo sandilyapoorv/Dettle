@@ -118,7 +118,7 @@ class WebViewSession(
     }
 
     /**
-     * Explicitly loads the login endpoint for manual user authentication in Auth Vault.
+     * Explicitly loads the login endpoint for manual web authentication.
      * Must be called on the main thread.
      */
     fun loadLoginUrl() {

@@ -31,6 +31,7 @@ import com.dettle.app.orchestrator.mode.ModeRouter
 import com.dettle.app.orchestrator.learning.LearningEngine
 import com.dettle.app.orchestrator.brain.CognitiveBrain
 import com.dettle.app.orchestrator.brain.CognitiveState
+import com.dettle.app.domain.model.AIProviderType
 import com.dettle.app.data.settings.ApiKeyStore
 import com.dettle.app.data.db.dao.ConversationDao
 import com.dettle.app.data.db.entity.ConversationEntity
@@ -87,6 +88,18 @@ class ChatViewModel @Inject constructor(
                 }
             }
         }
+        refreshKeyStatus()
+    }
+
+    fun refreshKeyStatus() {
+        val hasKeys = apiKeyStore.hasAnyActiveKey()
+        _uiState.update { it.copy(hasConfiguredKeys = hasKeys) }
+    }
+
+    fun addQuickApiKey(provider: AIProviderType, apiKey: String) {
+        if (apiKey.isBlank()) return
+        apiKeyStore.setKey(provider, apiKey.trim())
+        refreshKeyStatus()
     }
 
     fun toggleUnleashed(): Boolean {
@@ -852,5 +865,6 @@ data class ChatUiState(
     val searchOrResearchMode: String = "Normal",
     val effortLevel: String = "Medium",
     // ──────────────────────────────────────────────────────────────────────
-    val activeExecutionTrace: ExecutionTrace? = null
+    val activeExecutionTrace: ExecutionTrace? = null,
+    val hasConfiguredKeys: Boolean = true
 )

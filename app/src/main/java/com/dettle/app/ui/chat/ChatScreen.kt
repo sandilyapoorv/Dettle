@@ -88,6 +88,8 @@ import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.ElectricBolt
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Key
+import com.dettle.app.ui.onboarding.OnboardingSheet
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.AccountTree
 import androidx.compose.material.icons.outlined.Bedtime
@@ -166,9 +168,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.dettle.app.ui.theme.PatrickHand
 import com.dettle.app.ui.theme.liquidGlass
 import com.dettle.app.ui.theme.LiquidGlassTokens
 import com.dettle.app.audio.VoiceTypingManager
@@ -179,7 +179,7 @@ import com.dettle.app.ui.mode.AppleModePillToggle
 import com.dettle.app.ui.mode.GoalProgressCard
 import com.dettle.app.ui.mode.ModeCustomizationSheet
 import com.dettle.app.ui.mode.ModePillBar
-import com.dettle.app.ui.mode.VerticalModeToggle
+import com.dettle.app.ui.mode.TopEnvironmentSegmentedControl
 import androidx.compose.runtime.produceState
 import com.dettle.app.domain.model.ExecutionTrace
 import com.dettle.app.domain.model.TraceStep
@@ -204,7 +204,6 @@ import kotlinx.coroutines.isActive
 @Composable
 fun ChatScreen(
     viewModel: ChatViewModel = hiltViewModel(),
-    onNavigateToVault: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -214,6 +213,7 @@ fun ChatScreen(
     val listState = rememberLazyListState()
     var inputText by remember { mutableStateOf("") }
     var attachments by remember { mutableStateOf<List<ChatAttachment>>(emptyList()) }
+    var showOnboardingSheet by remember { mutableStateOf(false) }
 
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
@@ -346,10 +346,7 @@ fun ChatScreen(
                 onDeleteConversation = { convId ->
                     viewModel.deleteConversation(convId)
                 },
-                onOpenVault = {
-                    coroutineScope.launch { drawerState.close() }
-                    onNavigateToVault()
-                },
+
                 onOpenSettings = {
                     coroutineScope.launch { drawerState.close() }
                     onNavigateToSettings()
@@ -461,64 +458,25 @@ fun ChatScreen(
                 ) { mode ->
                     if (mode == EnvironmentMode.CHAT) {
                         Column(modifier = Modifier.fillMaxSize()) {
-                            if (uiState.lockedModeId != null && uiState.lockedModeId != ModeId.CHAT) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f),
-                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Icon(
-                                                imageVector = getModeVectorIcon(uiState.lockedModeId!!),
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                                modifier = Modifier.size(14.dp)
-                                            )
-                                            Spacer(Modifier.width(6.dp))
-                                            Text(
-                                                "Active: /${uiState.lockedModeId!!.name.lowercase()}",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
-                                            Spacer(Modifier.width(6.dp))
-                                            Icon(
-                                                Icons.Outlined.Close,
-                                                contentDescription = "Unlock mode",
-                                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                                modifier = Modifier
-                                                    .size(14.dp)
-                                                    .clickable { viewModel.toggleModelock(uiState.lockedModeId!!) }
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
                             if (uiState.messages.isEmpty()) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .statusBarsPadding()
-                                        .padding(top = 80.dp, bottom = 40.dp),
+                                        .padding(top = 56.dp, bottom = 40.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    ChatWelcomeHero(onPromptSelected = onPromptSelected)
+                                    ChatWelcomeHero(
+                                        onPromptSelected = onPromptSelected,
+                                        hasConfiguredKeys = uiState.hasConfiguredKeys,
+                                        onOpenSetup = { showOnboardingSheet = true }
+                                    )
                                 }
                             } else {
                                 LazyColumn(
                                     state = listState,
                                     modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(start = 20.dp, end = 68.dp, top = 136.dp, bottom = 12.dp),
+                                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 56.dp, bottom = 16.dp),
                                     verticalArrangement = Arrangement.spacedBy(14.dp)
                                 ) {
                                     items(
@@ -574,17 +532,21 @@ fun ChatScreen(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .statusBarsPadding()
-                                .padding(top = 126.dp),
+                                .padding(top = 56.dp),
                             messageStreamContent = {
                                 LazyColumn(
                                     state = listState,
                                     modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 12.dp),
+                                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
                                     verticalArrangement = Arrangement.spacedBy(14.dp)
                                 ) {
                                     if (uiState.messages.isEmpty()) {
                                         item(key = "welcome_card_build") {
-                                            BuildWelcomeHero(onPromptSelected = onPromptSelected)
+                                            BuildWelcomeHero(
+                                                onPromptSelected = onPromptSelected,
+                                                hasConfiguredKeys = uiState.hasConfiguredKeys,
+                                                onOpenSetup = { showOnboardingSheet = true }
+                                            )
                                         }
                                     }
 
@@ -629,25 +591,24 @@ fun ChatScreen(
                     }
                 }
 
-                // Top Control Bar: Hamburger menu (Left) and Apple Design Vertical Toggle (Right) aligned at the EXACT same vertical level
+                // ── Sleek Top App Bar (Centered Segmented Control + Menu & Actions) ──
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .statusBarsPadding()
-                        .padding(start = 8.dp, end = 12.dp, top = 8.dp),
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    // Left: Menu & Agent Indicator
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(
                             onClick = {
                                 keyboardController?.hide()
                                 focusManager.clearFocus()
                                 coroutineScope.launch { drawerState.open() }
                             },
-                            modifier = Modifier.size(40.dp)
+                            modifier = Modifier.size(38.dp)
                         ) {
                             Icon(
                                 Icons.Filled.Menu,
@@ -656,22 +617,8 @@ fun ChatScreen(
                             )
                         }
 
-                        if (uiState.messages.isNotEmpty()) {
-                            Spacer(Modifier.width(4.dp))
-                            IconButton(
-                                onClick = viewModel::startNewChat,
-                                modifier = Modifier.size(40.dp)
-                            ) {
-                                Icon(
-                                    Icons.Outlined.Edit,
-                                    contentDescription = "New chat",
-                                    tint = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
-
                         if (uiState.isAgentRunning) {
-                            Spacer(Modifier.width(8.dp))
+                            Spacer(Modifier.width(4.dp))
                             CircularProgressIndicator(
                                 modifier = Modifier.size(16.dp),
                                 color = if (uiState.isUnleashed) DettleGreen else MaterialTheme.colorScheme.primary,
@@ -680,11 +627,23 @@ fun ChatScreen(
                         }
                     }
 
-                    // Apple Design Vertical Toggle docked on the right
-                    VerticalModeToggle(
+                    // Center: Clean, horizontal Segmented Mode Control
+                    TopEnvironmentSegmentedControl(
                         selected = uiState.environmentMode,
                         onSelect = viewModel::setEnvironmentMode
                     )
+
+                    // Right: New Chat button
+                    IconButton(
+                        onClick = viewModel::startNewChat,
+                        modifier = Modifier.size(38.dp)
+                    ) {
+                        Icon(
+                            Icons.Outlined.Edit,
+                            contentDescription = "New chat",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }
@@ -698,17 +657,45 @@ fun ChatScreen(
             onDismiss = { customizingMode = null }
         )
     }
+
+    if (showOnboardingSheet) {
+        OnboardingSheet(
+            onSaveKey = { provider, key ->
+                viewModel.addQuickApiKey(provider, key)
+                showOnboardingSheet = false
+            },
+            onEnableDeveloperMode = { enabled ->
+                if (enabled != uiState.isUnleashed) {
+                    viewModel.toggleUnleashed()
+                }
+            },
+            isDeveloperModeEnabled = uiState.isUnleashed,
+            onDismiss = { showOnboardingSheet = false }
+        )
+    }
 }
 
 // ─── Welcome Hero Cards ───────────────────────────────────────────────────────
 
 @Composable
-fun WelcomeCard(onPromptSelected: (String) -> Unit) {
-    ChatWelcomeHero(onPromptSelected = onPromptSelected)
+fun WelcomeCard(
+    onPromptSelected: (String) -> Unit,
+    hasConfiguredKeys: Boolean = true,
+    onOpenSetup: () -> Unit = {}
+) {
+    ChatWelcomeHero(
+        onPromptSelected = onPromptSelected,
+        hasConfiguredKeys = hasConfiguredKeys,
+        onOpenSetup = onOpenSetup
+    )
 }
 
 @Composable
-fun ChatWelcomeHero(onPromptSelected: (String) -> Unit) {
+fun ChatWelcomeHero(
+    onPromptSelected: (String) -> Unit,
+    hasConfiguredKeys: Boolean = true,
+    onOpenSetup: () -> Unit = {}
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -749,7 +736,60 @@ fun ChatWelcomeHero(onPromptSelected: (String) -> Unit) {
             )
         }
 
-        Spacer(Modifier.height(8.dp))
+        if (!hasConfiguredKeys) {
+            Surface(
+                onClick = onOpenSetup,
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Key,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Connect AI Provider",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Add a free Google AI, Groq, or OpenRouter key to start building immediately.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.primary
+                    ) {
+                        Text(
+                            text = "Setup",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(4.dp))
 
         // Quick Starter Prompts in Liquid Glass Cards
         Column(
@@ -776,8 +816,16 @@ fun ChatWelcomeHero(onPromptSelected: (String) -> Unit) {
 }
 
 @Composable
-fun BuildWelcomeHero(onPromptSelected: (String) -> Unit) {
-    ChatWelcomeHero(onPromptSelected = onPromptSelected)
+fun BuildWelcomeHero(
+    onPromptSelected: (String) -> Unit,
+    hasConfiguredKeys: Boolean = true,
+    onOpenSetup: () -> Unit = {}
+) {
+    ChatWelcomeHero(
+        onPromptSelected = onPromptSelected,
+        hasConfiguredKeys = hasConfiguredKeys,
+        onOpenSetup = onOpenSetup
+    )
 }
 
 @Composable
@@ -845,38 +893,34 @@ fun TextMessageBubble(message: ChatMessage) {
     ) {
         if (!isUser) {
             Surface(
-                shape = MaterialTheme.shapes.small,
-                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
                 modifier = Modifier.size(28.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         Icons.Outlined.Terminal,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(16.dp)
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(15.dp)
                     )
                 }
             }
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(10.dp))
         }
 
-        Column(modifier = Modifier.widthIn(max = 330.dp)) {
+        Column(modifier = Modifier.widthIn(max = 520.dp)) {
             Surface(
                 shape = if (isUser) {
                     RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp)
                 } else {
                     RoundedCornerShape(4.dp, 18.dp, 18.dp, 18.dp)
                 },
-                color = if (isUser) {
-                    MaterialTheme.colorScheme.primaryContainer
-                } else {
-                    MaterialTheme.colorScheme.surface
-                },
+                color = if (isUser) UserBubble else AiBubble,
                 border = BorderStroke(
                     1.dp,
-                    if (isUser) MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    if (isUser) UserBubbleBorder else AiBubbleBorder
                 )
             ) {
                 Row(
@@ -885,12 +929,15 @@ fun TextMessageBubble(message: ChatMessage) {
                 ) {
                     Text(
                         text = message.content,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (isUser) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontSize = 15.sp,
+                            lineHeight = 22.sp
+                        ),
+                        color = if (isUser) Color(0xFFF4F4F5) else MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.weight(1f, fill = false)
                     )
                     if (message.isStreaming) {
-                        Spacer(Modifier.width(3.dp))
+                        Spacer(Modifier.width(4.dp))
                         StreamingCursor()
                     }
                 }
@@ -903,8 +950,8 @@ fun TextMessageBubble(message: ChatMessage) {
                 Text(
                     message.providerName,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
                 )
             }
         }
@@ -959,15 +1006,13 @@ fun ToolCallCard(message: ChatMessage) {
                 Text(
                     message.content,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontFamily = PatrickHand
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 message.toolCall?.arguments?.entries?.forEach { (k, v) ->
                     Text(
                         "$k: ${v.take(60)}${if (v.length > 60) "..." else ""}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontFamily = PatrickHand
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -1012,8 +1057,7 @@ fun ToolResultCard(message: ChatMessage) {
             Text(
                 message.content.take(500) + if (message.content.length > 500) "\n...(truncated)" else "",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontFamily = PatrickHand
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -1071,8 +1115,8 @@ fun ApprovalCard(
                 Spacer(Modifier.height(8.dp))
                 request.details.entries.take(4).forEach { (k, v) ->
                     Row {
-                        Text("$k: ", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = PatrickHand)
-                        Text(v.take(80), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface, fontFamily = PatrickHand)
+                        Text("$k: ", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(v.take(80), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
             }
@@ -1179,8 +1223,7 @@ fun PolicyBlockedCard(message: ChatMessage) {
                         Text(
                             "rule: ${message.policyId}",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
-                            fontFamily = PatrickHand
+                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
                         )
                     }
                 }
@@ -1879,12 +1922,17 @@ fun ChatInputBar(
             .padding(horizontal = 14.dp, vertical = 6.dp)
     ) {
         Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(15.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 2.dp,
-            shadowElevation = 2.dp,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            modifier = Modifier
+                .fillMaxWidth()
+                .liquidGlass(
+                    shape = RoundedCornerShape(20.dp),
+                    isDark = true,
+                    elevation = 4.dp
+                ),
+            shape = RoundedCornerShape(20.dp),
+            color = Color.Transparent,
+            tonalElevation = 0.dp,
+            shadowElevation = 0.dp
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth()
@@ -2230,7 +2278,6 @@ fun VoiceWaveformBar(
                 text = timeFormatted,
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
-                fontFamily = PatrickHand,
                 color = MaterialTheme.colorScheme.onSurface
             )
 
