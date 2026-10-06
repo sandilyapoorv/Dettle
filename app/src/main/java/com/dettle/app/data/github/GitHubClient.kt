@@ -127,7 +127,8 @@ class GitHubClient @Inject constructor(
     suspend fun readFile(owner: String, repo: String, path: String, branch: String = "main"): Result<String> =
         withContext(Dispatchers.IO) {
             try {
-                val url = "$GITHUB_API/repos/$owner/$repo/contents/$path?ref=$branch"
+                val cleanPath = path.trim().removePrefix("/")
+                val url = "$GITHUB_API/repos/$owner/$repo/contents/$cleanPath?ref=$branch"
                 val response = rest("GET", url)
 
                 val content = (response["content"] as? JsonPrimitive)?.content
@@ -182,41 +183,49 @@ class GitHubClient @Inject constructor(
         commitMessage: String,
         prTitle: String,
         prBody: String,
-        baseBranch: String = "main"
+        baseBranch: String? = null
     ): Result<PullRequest> = withContext(Dispatchers.IO) {
         try {
+            val cleanHead = branchName.trim().removePrefix("refs/").removePrefix("heads/")
+            val actualBase = if (baseBranch.isNullOrBlank()) {
+                getDefaultBranch(owner, repo).getOrDefault("main")
+            } else {
+                baseBranch.trim().removePrefix("refs/").removePrefix("heads/")
+            }
+
             // 1. Get the SHA of the base branch's HEAD
-            val baseSha = getRefSha(owner, repo, "heads/$baseBranch")
-                ?: return@withContext Result.failure(Exception("Cannot get SHA of $baseBranch"))
+            val baseSha = getRefSha(owner, repo, "heads/$actualBase")
+                ?: return@withContext Result.failure(Exception("Cannot get SHA of $actualBase"))
 
             // 2. Create the new branch
             val createBranchBody = buildJsonObject {
-                put("ref", "refs/heads/$branchName")
+                put("ref", "refs/heads/$cleanHead")
                 put("sha", baseSha)
             }.toString()
             rest("POST", "$GITHUB_API/repos/$owner/$repo/git/refs", body = createBranchBody)
 
             // 3. Commit each file change
             for (change in fileChanges) {
-                val existingSha = getFileSha(owner, repo, change.path, branchName)
+                val cleanPath = change.path.trim().removePrefix("/")
+                val existingSha = getFileSha(owner, repo, cleanPath, cleanHead)
                 val encodedContent = Base64.getEncoder().encodeToString(change.content.toByteArray(Charsets.UTF_8))
 
                 val commitBody = buildJsonObject {
                     put("message", commitMessage)
                     put("content", encodedContent)
-                    put("branch", branchName)
+                    put("branch", cleanHead)
                     if (existingSha != null) put("sha", existingSha)
                 }.toString()
 
-                rest("PUT", "$GITHUB_API/repos/$owner/$repo/contents/${change.path}", body = commitBody)
+                rest("PUT", "$GITHUB_API/repos/$owner/$repo/contents/$cleanPath", body = commitBody)
             }
 
             // 4. Open the Pull Request
             val prBody2 = buildJsonObject {
                 put("title", prTitle)
                 put("body", "*Created by Dettle AI Agent*\n\n$prBody")
-                put("head", branchName)
-                put("base", baseBranch)
+                put("head", cleanHead)
+                put("base", actualBase)
                 put("draft", false)
             }.toString()
 
@@ -230,7 +239,7 @@ class GitHubClient @Inject constructor(
                     number = prNumber,
                     title = prTitle,
                     url = prUrl,
-                    branch = branchName,
+                    branch = cleanHead,
                     filesChanged = fileChanges.size
                 )
             )
@@ -323,14 +332,16 @@ class GitHubClient @Inject constructor(
         tagName: String,
         name: String,
         body: String,
-        targetCommitish: String = "main",
+        targetCommitish: String? = null,
         draft: Boolean = false,
         prerelease: Boolean = false
     ): Result<GitHubRelease> = withContext(Dispatchers.IO) {
         try {
             val payload = buildJsonObject {
                 put("tag_name", tagName)
-                put("target_commitish", targetCommitish)
+                if (!targetCommitish.isNullOrBlank()) {
+                    put("target_commitish", targetCommitish.trim().removePrefix("refs/").removePrefix("heads/"))
+                }
                 put("name", name)
                 put("body", body)
                 put("draft", draft)
@@ -669,11 +680,28 @@ class GitHubClient @Inject constructor(
             throw Exception("GitHub GraphQL error ${response.code}: $rawBody")
         }
         val element = if (rawBody.isBlank()) JsonObject(emptyMap()) else json.parseToJsonElement(rawBody)
-        return (element as? JsonObject) ?: JsonObject(emptyMap())
+        val parsedObj = (element as? JsonObject) ?: JsonObject(emptyMap())
+
+        // Check if GraphQL returned errors despite 200 OK
+        val errorsArray = parsedObj["errors"] as? JsonArray
+        if (!errorsArray.isNullOrEmpty()) {
+            val errorMessages = errorsArray.mapNotNull {
+                ((it as? JsonObject)?.get("message") as? JsonPrimitive)?.content
+            }.joinToString("; ")
+            if (errorMessages.isNotBlank()) {
+                throw Exception("GitHub GraphQL error: $errorMessages")
+            }
+        }
+
+        return parsedObj
     }
 
     private suspend fun restElement(method: String, url: String, body: String? = null): JsonElement {
-        val requestBody = body?.toRequestBody("application/json".toMediaType())
+        val requestBody = when {
+            body != null -> body.toRequestBody("application/json".toMediaType())
+            method in listOf("POST", "PUT", "PATCH") -> "".toRequestBody("application/json".toMediaType())
+            else -> null
+        }
 
         val token = pat
         if (token.isNullOrBlank()) {
@@ -747,7 +775,8 @@ class GitHubClient @Inject constructor(
 
     private suspend fun getFileSha(owner: String, repo: String, path: String, branch: String): String? {
         return try {
-            val response = rest("GET", "$GITHUB_API/repos/$owner/$repo/contents/$path?ref=$branch")
+            val cleanPath = path.trim().removePrefix("/")
+            val response = rest("GET", "$GITHUB_API/repos/$owner/$repo/contents/$cleanPath?ref=$branch")
             (response["sha"] as? JsonPrimitive)?.content
         } catch (_: Exception) { null }
     }

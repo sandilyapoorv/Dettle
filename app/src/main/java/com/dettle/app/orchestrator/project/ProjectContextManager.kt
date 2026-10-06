@@ -16,7 +16,7 @@ data class AnchoredProject(
     val name: String,
     val owner: String,
     val repo: String,
-    val branch: String = "main",
+    val branch: String? = null,
     val cloudflareProjectName: String = "dettle-site",
     val instructions: String = ""
 )
@@ -75,7 +75,7 @@ class ProjectContextManager @Inject constructor(
             name = entity.name,
             owner = owner,
             repo = repo,
-            branch = "main",
+            branch = null,
             cloudflareProjectName = cfName,
             instructions = entity.systemInstructions
         )

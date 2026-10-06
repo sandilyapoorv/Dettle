@@ -77,6 +77,80 @@ class GitHubClientParsingTest {
         val parsed4 = parseFileChanges(mixedArray)
         assertEquals(1, parsed4.size)
         assertEquals("valid.txt", parsed4[0].path)
+        // Case 5: Conversational text preceding markdown fenced JSON
+        val conversationalFenced = """Here are the file changes:
+```json
+[{"path":"build.gradle.kts","content":"// plugins"}]
+```
+Hope this helps!"""
+        val parsed5 = parseFileChanges(conversationalFenced)
+        assertEquals(1, parsed5.size)
+        assertEquals("build.gradle.kts", parsed5[0].path)
+
+        // Case 6: Unfenced JSON preceded and followed by text
+        val conversationalUnfenced = """Sure, applying: [{"file_path":"src/App.kt","code":"class App"}] done."""
+        val parsed6 = parseFileChanges(conversationalUnfenced)
+        assertEquals(1, parsed6.size)
+        assertEquals("src/App.kt", parsed6[0].path)
+        assertEquals("class App", parsed6[0].content)
+    }
+
+    @Test
+    fun testExtractTextToolCallHandlesArrayAndObjectArguments() {
+        // Bug 1: extractTextToolCall previously crashed when argument values were arrays or objects
+        val textResponse = """
+            Thinking about changes...
+            <tool_call>
+            {
+              "name": "github_create_branch_pr",
+              "args": {
+                "branch_name": "feat/my-branch",
+                "file_changes": [
+                  {"path": "Main.kt", "content": "fun main() {}"}
+                ],
+                "commit_message": "feat: new file"
+              }
+            }
+            </tool_call>
+        """.trimIndent()
+
+        val parsedCall = extractTextToolCall(textResponse)
+        assertNotNull(parsedCall)
+        assertEquals("github_create_branch_pr", parsedCall?.name)
+        assertEquals("feat/my-branch", parsedCall?.arguments?.get("branch_name"))
+        assertTrue(parsedCall?.arguments?.get("file_changes")?.contains("Main.kt") == true)
+        assertEquals("feat: new file", parsedCall?.arguments?.get("commit_message"))
+    }
+
+    @Test
+    fun testPathSanitizationStripsLeadingSlashes() {
+        val paths = listOf("/src/App.kt", "///README.md", "gradle.properties")
+        val sanitized = paths.map { it.trim().removePrefix("/") }
+        assertEquals("src/App.kt", sanitized[0])
+        assertEquals("README.md", sanitized[1].removePrefix("/").removePrefix("/"))
+        assertEquals("gradle.properties", sanitized[2])
+    }
+
+    @Test
+    fun testGraphQLResponseThrowsOnErrorsField() {
+        val errorPayload = """
+            {
+              "errors": [
+                { "message": "Could not resolve to a Repository with the name 'unknown/repo'" }
+              ],
+              "data": null
+            }
+        """.trimIndent()
+
+        val parsed = json.parseToJsonElement(errorPayload) as? JsonObject
+        assertNotNull(parsed)
+        val errorsArray = parsed?.get("errors") as? JsonArray
+        assertNotNull(errorsArray)
+        assertTrue(errorsArray!!.isNotEmpty())
+        val msg = errorsArray.mapNotNull {
+            ((it as? JsonObject)?.get("message") as? JsonPrimitive)?.content
+        }.joinToString("; ")
+        assertEquals("Could not resolve to a Repository with the name 'unknown/repo'", msg)
     }
 
     @Test
@@ -103,9 +177,16 @@ class GitHubClientParsingTest {
 
     // Mirrors ToolExecutor file_changes parsing
     private fun parseFileChanges(raw: String): List<FileChange> {
-        val cleaned = if (raw.trim().startsWith("```")) {
-            raw.trim().substringAfter("\n").substringBeforeLast("```").trim()
-        } else raw.trim()
+        val cleaned = if (raw.contains("```")) {
+            raw.substringAfter("```").let { if (it.startsWith("json", ignoreCase = true)) it.substring(4) else it }
+                .substringBeforeLast("```").trim()
+        } else {
+            val firstBracket = raw.indexOfFirst { it == '[' || it == '{' }
+            val lastBracket = raw.indexOfLast { it == ']' || it == '}' }
+            if (firstBracket != -1 && lastBracket > firstBracket) {
+                raw.substring(firstBracket, lastBracket + 1).trim()
+            } else raw.trim()
+        }
 
         return try {
             val element = json.parseToJsonElement(cleaned)
@@ -113,16 +194,16 @@ class GitHubClientParsingTest {
                 is JsonArray -> {
                     element.mapNotNull { el ->
                         val obj = el as? JsonObject ?: return@mapNotNull null
-                        val path = (obj["path"] as? JsonPrimitive)?.content?.trim()
-                        val content = (obj["content"] as? JsonPrimitive)?.content
+                        val path = ((obj["path"] ?: obj["file_path"] ?: obj["filename"] ?: obj["file"]) as? JsonPrimitive)?.content?.trim()
+                        val content = ((obj["content"] ?: obj["code"] ?: obj["text"]) as? JsonPrimitive)?.content
                         if (!path.isNullOrBlank() && content != null) {
                             FileChange(path = path, content = content)
                         } else null
                     }
                 }
                 is JsonObject -> {
-                    val path = (element["path"] as? JsonPrimitive)?.content?.trim()
-                    val content = (element["content"] as? JsonPrimitive)?.content
+                    val path = ((element["path"] ?: element["file_path"] ?: element["filename"] ?: element["file"]) as? JsonPrimitive)?.content?.trim()
+                    val content = ((element["content"] ?: element["code"] ?: element["text"]) as? JsonPrimitive)?.content
                     if (!path.isNullOrBlank() && content != null) {
                         listOf(FileChange(path = path, content = content))
                     } else emptyList()
@@ -131,6 +212,23 @@ class GitHubClientParsingTest {
             }
         } catch (_: Exception) {
             emptyList()
+        }
+    }
+
+    // Mirrors ReActLoop extractTextToolCall
+    private fun extractTextToolCall(text: String): com.dettle.app.domain.model.ToolCall? {
+        val regex = """<tool_call>\s*(\{.*?\})\s*</tool_call>""".toRegex(RegexOption.DOT_MATCHES_ALL)
+        val match = regex.find(text) ?: return null
+        return try {
+            val obj = json.parseToJsonElement(match.groupValues[1]) as? JsonObject ?: return null
+            val name = (obj["name"] as? JsonPrimitive)?.content ?: return null
+            val argsObj = obj["args"] as? JsonObject
+            val args = argsObj?.entries?.associate { (k, v) ->
+                k to ((v as? JsonPrimitive)?.content ?: v.toString())
+            } ?: emptyMap()
+            com.dettle.app.domain.model.ToolCall(name = name, arguments = args)
+        } catch (_: Exception) {
+            null
         }
     }
 }

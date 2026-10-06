@@ -101,7 +101,7 @@ class ToolExecutor @Inject constructor(
             "github_list_commits" -> {
                 val owner = args["owner"] ?: activeProj?.owner ?: return errResult(toolCall, "Missing owner and no active project anchored")
                 val repo = args["repo"] ?: activeProj?.repo ?: return errResult(toolCall, "Missing repo and no active project anchored")
-                val branch = args["branch"] ?: activeProj?.branch ?: "main"
+                val branch = resolveBranch(owner, repo, args["branch"])
                 val limit = args["limit"]?.toIntOrNull() ?: 10
                 val commits = githubClient.listRepoCommits(owner, repo, branch, limit)
                     .getOrElse { return errResult(toolCall, it.message ?: "Failed to list commits") }
@@ -148,9 +148,7 @@ class ToolExecutor @Inject constructor(
             "github_map_repo" -> {
                 val owner = args["owner"] ?: activeProj?.owner ?: return errResult(toolCall, "Missing owner and no active project anchored")
                 val repo = args["repo"] ?: activeProj?.repo ?: return errResult(toolCall, "Missing repo and no active project anchored")
-                val branch = args["branch"] ?: activeProj?.branch ?: runCatching {
-                    githubClient.getDefaultBranch(owner, repo).getOrNull()
-                }.getOrNull() ?: "main"
+                val branch = resolveBranch(owner, repo, args["branch"])
                 repoMapper.buildRepoMap(owner, repo, branch)
                     .getOrElse { return errResult(toolCall, it.message ?: "Failed to map repo") }
             }
@@ -159,7 +157,7 @@ class ToolExecutor @Inject constructor(
                 val owner = args["owner"] ?: activeProj?.owner ?: return errResult(toolCall, "Missing owner and no active project anchored")
                 val repo = args["repo"] ?: activeProj?.repo ?: return errResult(toolCall, "Missing repo and no active project anchored")
                 val path = args["path"] ?: return errResult(toolCall, "Missing path")
-                val branch = args["branch"] ?: activeProj?.branch ?: "main"
+                val branch = resolveBranch(owner, repo, args["branch"])
                 githubClient.readFile(owner, repo, path, branch)
                     .getOrElse { return errResult(toolCall, it.message ?: "Failed to read file") }
             }
@@ -168,10 +166,18 @@ class ToolExecutor @Inject constructor(
                 val owner = args["owner"] ?: activeProj?.owner ?: return errResult(toolCall, "Missing owner and no active project anchored")
                 val repo = args["repo"] ?: activeProj?.repo ?: return errResult(toolCall, "Missing repo and no active project anchored")
                 val branch = args["branch_name"] ?: return errResult(toolCall, "Missing branch_name")
+                val baseBranch = resolveBranch(owner, repo, args["base_branch"])
                 val rawChanges = (args["file_changes"] ?: "[]").trim()
-                val cleanedJson = if (rawChanges.startsWith("```")) {
-                    rawChanges.substringAfter("\n").substringBeforeLast("```").trim()
-                } else rawChanges
+                val cleanedJson = if (rawChanges.contains("```")) {
+                    rawChanges.substringAfter("```").let { if (it.startsWith("json", ignoreCase = true)) it.substring(4) else it }
+                        .substringBeforeLast("```").trim()
+                } else {
+                    val firstBracket = rawChanges.indexOfFirst { it == '[' || it == '{' }
+                    val lastBracket = rawChanges.indexOfLast { it == ']' || it == '}' }
+                    if (firstBracket != -1 && lastBracket > firstBracket) {
+                        rawChanges.substring(firstBracket, lastBracket + 1).trim()
+                    } else rawChanges
+                }
 
                 val commitMsg = args["commit_message"] ?: "Update by Dettle agent"
                 val prTitle = args["pr_title"] ?: commitMsg
@@ -183,16 +189,16 @@ class ToolExecutor @Inject constructor(
                         is kotlinx.serialization.json.JsonArray -> {
                             element.mapNotNull { el ->
                                 val obj = el as? kotlinx.serialization.json.JsonObject ?: return@mapNotNull null
-                                val path = (obj["path"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.trim()
-                                val content = (obj["content"] as? kotlinx.serialization.json.JsonPrimitive)?.content
+                                val path = ((obj["path"] ?: obj["file_path"] ?: obj["filename"] ?: obj["file"]) as? kotlinx.serialization.json.JsonPrimitive)?.content?.trim()
+                                val content = ((obj["content"] ?: obj["code"] ?: obj["text"]) as? kotlinx.serialization.json.JsonPrimitive)?.content
                                 if (!path.isNullOrBlank() && content != null) {
                                     com.dettle.app.data.github.FileChange(path = path, content = content)
                                 } else null
                             }
                         }
                         is kotlinx.serialization.json.JsonObject -> {
-                            val path = (element["path"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.trim()
-                            val content = (element["content"] as? kotlinx.serialization.json.JsonPrimitive)?.content
+                            val path = ((element["path"] ?: element["file_path"] ?: element["filename"] ?: element["file"]) as? kotlinx.serialization.json.JsonPrimitive)?.content?.trim()
+                            val content = ((element["content"] ?: element["code"] ?: element["text"]) as? kotlinx.serialization.json.JsonPrimitive)?.content
                             if (!path.isNullOrBlank() && content != null) {
                                 listOf(com.dettle.app.data.github.FileChange(path = path, content = content))
                             } else emptyList()
@@ -208,7 +214,14 @@ class ToolExecutor @Inject constructor(
                 }
 
                 val pr = githubClient.createBranchAndPR(
-                    owner, repo, branch, fileChanges, commitMsg, prTitle, prBody
+                    owner = owner,
+                    repo = repo,
+                    branchName = branch,
+                    fileChanges = fileChanges,
+                    commitMessage = commitMsg,
+                    prTitle = prTitle,
+                    prBody = prBody,
+                    baseBranch = baseBranch
                 ).getOrElse { return errResult(toolCall, it.message ?: "Failed to create PR") }
 
                 "Pull Request created successfully!\n" +
@@ -252,6 +265,10 @@ class ToolExecutor @Inject constructor(
                 val status = githubClient.getPullRequest(owner, repo, pullNumber)
                     .getOrElse { return errResult(toolCall, it.message ?: "Failed to get PR status") }
 
+                val ciRuns = if (status.headRef.isNotBlank()) {
+                    githubClient.listWorkflowRuns(owner, repo, status.headRef, 3).getOrNull()
+                } else null
+
                 buildString {
                     appendLine("### PR #$pullNumber Status:")
                     appendLine("- **State**: `${status.state}`")
@@ -260,6 +277,18 @@ class ToolExecutor @Inject constructor(
                     status.mergeableState?.let { appendLine("- **Mergeable State**: `$it`") }
                     appendLine("- **Head Branch**: `${status.headRef}` (`${status.headSha.take(7)}`)")
                     if (status.htmlUrl.isNotBlank()) appendLine("- **URL**: ${status.htmlUrl}")
+
+                    if (!ciRuns.isNullOrEmpty()) {
+                        appendLine("\n**CI Workflow Runs on `${status.headRef}`:**")
+                        ciRuns.forEach { r ->
+                            val icon = when (r.conclusion) {
+                                "success" -> "✅"
+                                "failure" -> "❌"
+                                else -> "⏳"
+                            }
+                            appendLine("- $icon Run #${r.id}: **${r.status}** (${r.conclusion ?: "running"})")
+                        }
+                    }
                 }
             }
 
@@ -269,7 +298,7 @@ class ToolExecutor @Inject constructor(
                 val tagName = args["tag_name"] ?: return errResult(toolCall, "Missing tag_name")
                 val name = args["name"] ?: tagName
                 val body = args["body"] ?: "Release $tagName created by Dettle AI Agent"
-                val targetBranch = args["target_branch"] ?: activeProj?.branch ?: "main"
+                val targetBranch = resolveBranch(owner, repo, args["target_branch"])
                 val draft = args["draft"]?.toBooleanStrictOrNull() ?: false
                 val prerelease = args["prerelease"]?.toBooleanStrictOrNull() ?: false
 
@@ -294,7 +323,7 @@ class ToolExecutor @Inject constructor(
                 val owner = args["owner"] ?: activeProj?.owner ?: return errResult(toolCall, "Missing owner and no active project anchored")
                 val repo = args["repo"] ?: activeProj?.repo ?: return errResult(toolCall, "Missing repo and no active project anchored")
                 val workflowId = args["workflow_id"] ?: return errResult(toolCall, "Missing workflow_id")
-                val ref = args["ref"] ?: activeProj?.branch ?: "main"
+                val ref = resolveBranch(owner, repo, args["ref"])
                 val inputsJson = args["inputs"] ?: "{}"
                 val inputs = try {
                     val el = json.parseToJsonElement(inputsJson)
@@ -357,9 +386,21 @@ class ToolExecutor @Inject constructor(
                 val projectName = args["project_name"]?.ifBlank { null }
                     ?: activeProj?.cloudflareProjectName
                     ?: "dettle-site"
-                val files = workspaceManager.readAllFiles()
+                val files = if (!args["files"].isNullOrBlank()) {
+                    try {
+                        val el = json.parseToJsonElement(args["files"]!!)
+                        (el as? kotlinx.serialization.json.JsonObject)?.entries?.associate {
+                            it.key to ((it.value as? kotlinx.serialization.json.JsonPrimitive)?.content ?: it.value.toString())
+                        } ?: workspaceManager.readAllFiles()
+                    } catch (_: Exception) {
+                        workspaceManager.readAllFiles()
+                    }
+                } else {
+                    workspaceManager.readAllFiles()
+                }
+
                 if (files.isEmpty()) {
-                    return errResult(toolCall, "Workspace is empty. Write HTML/JS files first with workspace_write_file before deploying.")
+                    return errResult(toolCall, "Workspace is empty. Write HTML/JS files first with workspace_write_file or provide files parameter before deploying.")
                 }
                 val deploy = cloudflareClient.deployToPages(projectName, files)
                     .getOrElse { return errResult(toolCall, it.message ?: "Failed to deploy to Cloudflare Pages") }
@@ -373,8 +414,9 @@ class ToolExecutor @Inject constructor(
             "cloudflare_publish_worker" -> {
                 val workerName = args["worker_name"] ?: args["script_name"]
                     ?: "${activeProj?.cloudflareProjectName ?: "dettle"}-worker"
-                val scriptBody = args["script"] ?: args["code"] ?: runCatching { workspaceManager.readFile("worker.js") }.getOrNull()
-                    ?: return errResult(toolCall, "Missing script body and worker.js not found in workspace")
+                val scriptBody = args["script_content"] ?: args["script"] ?: args["code"]
+                    ?: runCatching { workspaceManager.readFile("worker.js") }.getOrNull()
+                    ?: return errResult(toolCall, "Missing script_content (or script/code) and worker.js not found in workspace")
                 val deploy = cloudflareClient.deployWorker(workerName, scriptBody)
                     .getOrElse { return errResult(toolCall, it.message ?: "Failed to deploy Cloudflare Worker") }
                 "Cloudflare Worker Deployed Successfully!\n" +
@@ -534,6 +576,13 @@ class ToolExecutor @Inject constructor(
         content = "Error: $message",
         isError = true
     )
+
+    private suspend fun resolveBranch(owner: String, repo: String, specified: String?): String {
+        if (!specified.isNullOrBlank()) return specified
+        val projBranch = activeProj?.branch
+        if (!projBranch.isNullOrBlank()) return projBranch
+        return githubClient.getDefaultBranch(owner, repo).getOrDefault("main")
+    }
 
     private suspend fun fetchUrl(url: String): String = withContext(Dispatchers.IO) {
         try {

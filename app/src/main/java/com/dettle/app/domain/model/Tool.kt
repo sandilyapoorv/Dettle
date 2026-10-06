@@ -72,6 +72,7 @@ object AgentTools {
                 "owner" to ToolProperty("string", "GitHub repository owner/org name"),
                 "repo" to ToolProperty("string", "Repository name"),
                 "branch_name" to ToolProperty("string", "New branch name, e.g. dettle/fix-jwt-bug"),
+                "base_branch" to ToolProperty("string", "Base branch to branch off of and target PR to (defaults to repository default branch)"),
                 "file_changes" to ToolProperty("string", "JSON array of {path, content} objects for files to create/update"),
                 "commit_message" to ToolProperty("string", "Commit message"),
                 "pr_title" to ToolProperty("string", "Pull Request title"),
@@ -197,13 +198,13 @@ object AgentTools {
 
     val CLOUDFLARE_DEPLOY_PREVIEW = Tool(
         name = "cloudflare_deploy_preview",
-        description = "Trigger a Cloudflare Pages preview deployment for a specific branch or PR. Use this to verify your code changes deploy successfully before merging.",
+        description = "Deploy files from local agent workspace (or optional files JSON) directly to Cloudflare Pages as a live preview deployment.",
         parameters = ToolParameters(
             properties = mapOf(
-                "project_name" to ToolProperty("string", "Cloudflare Pages project name"),
-                "branch" to ToolProperty("string", "Branch to deploy a preview for")
+                "project_name" to ToolProperty("string", "Cloudflare Pages project name (defaults to active project)"),
+                "files" to ToolProperty("string", "Optional JSON map of relative path to file content. If omitted, deploys workspace files.")
             ),
-            required = listOf("project_name", "branch")
+            required = emptyList()
         ),
         safetyLevel = SafetyLevel.AUTO
     )

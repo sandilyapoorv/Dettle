@@ -143,7 +143,7 @@ object CloudflareFreeTierPolicy : ToolPolicy {
     override fun evaluate(call: ToolCall, config: DettleAgentConfig, history: List<ApiMessage>): PolicyResult {
         if (call.name != "cloudflare_publish_worker") return PolicyResult.Approved
 
-        val script = call.arguments["script_content"] ?: return PolicyResult.Approved
+        val script = call.arguments["script_content"] ?: call.arguments["script"] ?: call.arguments["code"] ?: return PolicyResult.Approved
         val cpuLimit = config.freeTier.cloudflare.workerCpuMsPerInvocation
 
         val match = EXPENSIVE_PATTERNS.firstOrNull { it.containsMatchIn(script) }

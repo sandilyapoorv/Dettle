@@ -486,11 +486,12 @@ class ReActLoop @Inject constructor(
         val regex = """<tool_call>\s*(\{.*?\})\s*</tool_call>""".toRegex(RegexOption.DOT_MATCHES_ALL)
         val match = regex.find(text) ?: return null
         return try {
-            val obj = json.parseToJsonElement(match.groupValues[1]).jsonObject
-            val name = obj["name"]?.jsonPrimitive?.content ?: return null
-            val args = obj["args"]?.jsonObject
-                ?.entries?.associate { it.key to it.value.jsonPrimitive.content }
-                ?: emptyMap()
+            val obj = json.parseToJsonElement(match.groupValues[1]) as? kotlinx.serialization.json.JsonObject ?: return null
+            val name = (obj["name"] as? kotlinx.serialization.json.JsonPrimitive)?.content ?: return null
+            val argsObj = obj["args"] as? kotlinx.serialization.json.JsonObject
+            val args = argsObj?.entries?.associate { (k, v) ->
+                k to ((v as? kotlinx.serialization.json.JsonPrimitive)?.content ?: v.toString())
+            } ?: emptyMap()
             ToolCall(name = name, arguments = args)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to parse text tool call: $e")

@@ -69,11 +69,12 @@ class CloudflareClient @Inject constructor(
                 val parsed = json.decodeFromString<CfResponse<PagesProjectResult>>(responseBody)
 
                 if (parsed.success && parsed.result != null) {
+                    val sub = parsed.result.subdomain?.ifBlank { null } ?: parsed.result.name
                     Result.success(
                         PagesProject(
                             name = parsed.result.name,
-                            subdomain = parsed.result.subdomain,
-                            productionUrl = "https://${parsed.result.subdomain}.pages.dev"
+                            subdomain = sub,
+                            productionUrl = "https://$sub.pages.dev"
                         )
                     )
                 } else {
@@ -132,7 +133,13 @@ class CloudflareClient @Inject constructor(
                     Request.Builder().url(uploadUrl).post(multipart)
                 ).removeHeader("Content-Type").build()  // Let OkHttp set multipart Content-Type
 
-                client.newCall(uploadRequest).execute()
+                val uploadResponse = client.newCall(uploadRequest).execute()
+                uploadResponse.use { resp ->
+                    if (!resp.isSuccessful) {
+                        val err = resp.body?.string().orEmpty()
+                        return@withContext Result.failure(Exception("Failed to upload file $path (${resp.code}): $err"))
+                    }
+                }
             }
 
             // Step 3: Finalize deployment
@@ -141,7 +148,13 @@ class CloudflareClient @Inject constructor(
                     .url("$CF_API/accounts/$accountId/pages/projects/$projectName/deployments/$deploymentId")
                     .patch("{}".toRequestBody("application/json".toMediaType()))
             ).build()
-            client.newCall(finalizeRequest).execute()
+            val finalizeResponse = client.newCall(finalizeRequest).execute()
+            finalizeResponse.use { resp ->
+                if (!resp.isSuccessful) {
+                    val err = resp.body?.string().orEmpty()
+                    return@withContext Result.failure(Exception("Failed to finalize deployment (${resp.code}): $err"))
+                }
+            }
 
             Log.d(TAG, "Deployed $projectName: ${files.size} files")
             Result.success(
@@ -259,10 +272,11 @@ class CloudflareClient @Inject constructor(
 
             if (parsed.success) {
                 val projects = parsed.result?.map { r ->
+                    val sub = r.subdomain?.ifBlank { null } ?: r.name
                     PagesProject(
                         name = r.name,
-                        subdomain = r.subdomain,
-                        productionUrl = "https://${r.subdomain}.pages.dev"
+                        subdomain = sub,
+                        productionUrl = "https://$sub.pages.dev"
                     )
                 } ?: emptyList()
                 Result.success(projects)
@@ -424,7 +438,7 @@ class CloudflareClient @Inject constructor(
     val errors: List<CfError> = emptyList()
 )
 @Serializable data class CfError(val code: Int = 0, val message: String = "")
-@Serializable data class PagesProjectResult(val name: String = "", val subdomain: String = "")
+@Serializable data class PagesProjectResult(val name: String = "", val subdomain: String? = null)
 @Serializable data class PagesDeploymentResult(
     val id: String = "",
     val url: String? = null,
@@ -433,7 +447,7 @@ class CloudflareClient @Inject constructor(
 )
 @Serializable data class PagesStage(val name: String = "")
 @Serializable data class WorkerScript(val id: String = "")
-@Serializable data class PurgeResult(val id: String = "")
+@Serializable data class PurgeResult(val id: String? = null)
 @Serializable data class TokenVerifyResult(val status: String = "")
 
 // ── Domain models ─────────────────────────────────────────────────────────
