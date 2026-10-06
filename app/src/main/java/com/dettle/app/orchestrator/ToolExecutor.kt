@@ -137,10 +137,20 @@ class ToolExecutor @Inject constructor(
                 }
             }
 
+            "github_get_default_branch" -> {
+                val owner = args["owner"] ?: activeProj?.owner ?: return errResult(toolCall, "Missing owner and no active project anchored")
+                val repo = args["repo"] ?: activeProj?.repo ?: return errResult(toolCall, "Missing repo and no active project anchored")
+                val defaultBranch = githubClient.getDefaultBranch(owner, repo)
+                    .getOrElse { return errResult(toolCall, it.message ?: "Failed to get default branch") }
+                "Default branch for **$owner/$repo** is `$defaultBranch`"
+            }
+
             "github_map_repo" -> {
                 val owner = args["owner"] ?: activeProj?.owner ?: return errResult(toolCall, "Missing owner and no active project anchored")
                 val repo = args["repo"] ?: activeProj?.repo ?: return errResult(toolCall, "Missing repo and no active project anchored")
-                val branch = args["branch"] ?: activeProj?.branch ?: "main"
+                val branch = args["branch"] ?: activeProj?.branch ?: runCatching {
+                    githubClient.getDefaultBranch(owner, repo).getOrNull()
+                }.getOrNull() ?: "main"
                 repoMapper.buildRepoMap(owner, repo, branch)
                     .getOrElse { return errResult(toolCall, it.message ?: "Failed to map repo") }
             }
@@ -158,21 +168,43 @@ class ToolExecutor @Inject constructor(
                 val owner = args["owner"] ?: activeProj?.owner ?: return errResult(toolCall, "Missing owner and no active project anchored")
                 val repo = args["repo"] ?: activeProj?.repo ?: return errResult(toolCall, "Missing repo and no active project anchored")
                 val branch = args["branch_name"] ?: return errResult(toolCall, "Missing branch_name")
-                val fileChangesJson = args["file_changes"] ?: "[]"
+                val rawChanges = (args["file_changes"] ?: "[]").trim()
+                val cleanedJson = if (rawChanges.startsWith("```")) {
+                    rawChanges.substringAfter("\n").substringBeforeLast("```").trim()
+                } else rawChanges
+
                 val commitMsg = args["commit_message"] ?: "Update by Dettle agent"
                 val prTitle = args["pr_title"] ?: commitMsg
                 val prBody = args["pr_body"] ?: ""
 
                 val fileChanges = try {
-                    json.parseToJsonElement(fileChangesJson).jsonArray.map { el ->
-                        val obj = el.jsonObject
-                        com.dettle.app.data.github.FileChange(
-                            path = obj["path"]?.jsonPrimitive?.content ?: "",
-                            content = obj["content"]?.jsonPrimitive?.content ?: ""
-                        )
+                    val element = json.parseToJsonElement(cleanedJson)
+                    when (element) {
+                        is kotlinx.serialization.json.JsonArray -> {
+                            element.mapNotNull { el ->
+                                val obj = el as? kotlinx.serialization.json.JsonObject ?: return@mapNotNull null
+                                val path = (obj["path"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.trim()
+                                val content = (obj["content"] as? kotlinx.serialization.json.JsonPrimitive)?.content
+                                if (!path.isNullOrBlank() && content != null) {
+                                    com.dettle.app.data.github.FileChange(path = path, content = content)
+                                } else null
+                            }
+                        }
+                        is kotlinx.serialization.json.JsonObject -> {
+                            val path = (element["path"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.trim()
+                            val content = (element["content"] as? kotlinx.serialization.json.JsonPrimitive)?.content
+                            if (!path.isNullOrBlank() && content != null) {
+                                listOf(com.dettle.app.data.github.FileChange(path = path, content = content))
+                            } else emptyList()
+                        }
+                        else -> emptyList()
                     }
                 } catch (e: Exception) {
                     return errResult(toolCall, "Invalid file_changes JSON: ${e.message}")
+                }
+
+                if (fileChanges.isEmpty()) {
+                    return errResult(toolCall, "No valid file changes found in file_changes parameter. Expected JSON array of {path, content} objects.")
                 }
 
                 val pr = githubClient.createBranchAndPR(
@@ -186,6 +218,78 @@ class ToolExecutor @Inject constructor(
                         "**URL**: ${pr.url}"
             }
 
+            "github_merge_pr" -> {
+                val owner = args["owner"] ?: activeProj?.owner ?: return errResult(toolCall, "Missing owner and no active project anchored")
+                val repo = args["repo"] ?: activeProj?.repo ?: return errResult(toolCall, "Missing repo and no active project anchored")
+                val pullNumber = args["pull_number"]?.toIntOrNull() ?: return errResult(toolCall, "Missing or invalid pull_number")
+                val commitTitle = args["commit_title"]
+                val commitMessage = args["commit_message"]
+                val mergeMethod = args["merge_method"] ?: "squash"
+
+                val result = githubClient.mergePullRequest(
+                    owner = owner,
+                    repo = repo,
+                    pullNumber = pullNumber,
+                    commitTitle = commitTitle,
+                    commitMessage = commitMessage,
+                    mergeMethod = mergeMethod
+                ).getOrElse { return errResult(toolCall, it.message ?: "Failed to merge PR") }
+
+                if (result.merged) {
+                    "Pull Request #$pullNumber merged successfully!\n" +
+                            "**Merge Commit SHA**: `${result.sha.take(7)}`\n" +
+                            "**Message**: ${result.message}"
+                } else {
+                    "PR #$pullNumber could not be merged: ${result.message}"
+                }
+            }
+
+            "github_get_pr_status" -> {
+                val owner = args["owner"] ?: activeProj?.owner ?: return errResult(toolCall, "Missing owner and no active project anchored")
+                val repo = args["repo"] ?: activeProj?.repo ?: return errResult(toolCall, "Missing repo and no active project anchored")
+                val pullNumber = args["pull_number"]?.toIntOrNull() ?: return errResult(toolCall, "Missing or invalid pull_number")
+
+                val status = githubClient.getPullRequest(owner, repo, pullNumber)
+                    .getOrElse { return errResult(toolCall, it.message ?: "Failed to get PR status") }
+
+                buildString {
+                    appendLine("### PR #$pullNumber Status:")
+                    appendLine("- **State**: `${status.state}`")
+                    appendLine("- **Merged**: ${status.merged}")
+                    appendLine("- **Mergeable**: ${status.mergeable ?: "calculating..."}")
+                    status.mergeableState?.let { appendLine("- **Mergeable State**: `$it`") }
+                    appendLine("- **Head Branch**: `${status.headRef}` (`${status.headSha.take(7)}`)")
+                    if (status.htmlUrl.isNotBlank()) appendLine("- **URL**: ${status.htmlUrl}")
+                }
+            }
+
+            "github_create_release" -> {
+                val owner = args["owner"] ?: activeProj?.owner ?: return errResult(toolCall, "Missing owner and no active project anchored")
+                val repo = args["repo"] ?: activeProj?.repo ?: return errResult(toolCall, "Missing repo and no active project anchored")
+                val tagName = args["tag_name"] ?: return errResult(toolCall, "Missing tag_name")
+                val name = args["name"] ?: tagName
+                val body = args["body"] ?: "Release $tagName created by Dettle AI Agent"
+                val targetBranch = args["target_branch"] ?: activeProj?.branch ?: "main"
+                val draft = args["draft"]?.toBooleanStrictOrNull() ?: false
+                val prerelease = args["prerelease"]?.toBooleanStrictOrNull() ?: false
+
+                val release = githubClient.createRelease(
+                    owner = owner,
+                    repo = repo,
+                    tagName = tagName,
+                    name = name,
+                    body = body,
+                    targetCommitish = targetBranch,
+                    draft = draft,
+                    prerelease = prerelease
+                ).getOrElse { return errResult(toolCall, it.message ?: "Failed to create release") }
+
+                "GitHub Release Created Successfully!\n" +
+                        "**Tag**: `${release.tagName}`\n" +
+                        "**Name**: ${release.name ?: tagName}\n" +
+                        "**Release URL**: ${release.htmlUrl}"
+            }
+
             "github_trigger_action" -> {
                 val owner = args["owner"] ?: activeProj?.owner ?: return errResult(toolCall, "Missing owner and no active project anchored")
                 val repo = args["repo"] ?: activeProj?.repo ?: return errResult(toolCall, "Missing repo and no active project anchored")
@@ -193,8 +297,10 @@ class ToolExecutor @Inject constructor(
                 val ref = args["ref"] ?: activeProj?.branch ?: "main"
                 val inputsJson = args["inputs"] ?: "{}"
                 val inputs = try {
-                    json.parseToJsonElement(inputsJson).jsonObject
-                        .entries.associate { it.key to it.value.jsonPrimitive.content }
+                    val el = json.parseToJsonElement(inputsJson)
+                    (el as? kotlinx.serialization.json.JsonObject)?.entries?.associate {
+                        it.key to ((it.value as? kotlinx.serialization.json.JsonPrimitive)?.content ?: it.value.toString())
+                    } ?: emptyMap()
                 } catch (_: Exception) { emptyMap() }
 
                 githubClient.triggerWorkflow(owner, repo, workflowId, ref, inputs)
@@ -216,6 +322,34 @@ class ToolExecutor @Inject constructor(
                             "**Status**: `${latest.status}`\n" +
                             "**Conclusion**: `${latest.conclusion ?: "running"}`\n" +
                             "**URL**: ${latest.url}"
+                }
+            }
+
+            "github_list_workflow_runs" -> {
+                val owner = args["owner"] ?: activeProj?.owner ?: return errResult(toolCall, "Missing owner and no active project anchored")
+                val repo = args["repo"] ?: activeProj?.repo ?: return errResult(toolCall, "Missing repo and no active project anchored")
+                val branch = args["branch"] ?: activeProj?.branch
+                val limit = args["limit"]?.toIntOrNull() ?: 10
+
+                val runs = githubClient.listWorkflowRuns(owner, repo, branch, limit)
+                    .getOrElse { return errResult(toolCall, it.message ?: "Failed to list workflow runs") }
+
+                if (runs.isEmpty()) {
+                    "No workflow runs found in **$owner/$repo**" + (if (branch != null) " on branch `$branch`" else "")
+                } else {
+                    buildString {
+                        appendLine("### Recent Workflow Runs in **$owner/$repo**:")
+                        runs.forEach { r ->
+                            val conclusion = r.conclusion ?: "in progress"
+                            val icon = when (conclusion) {
+                                "success" -> "✅"
+                                "failure" -> "❌"
+                                "cancelled" -> "⏹️"
+                                else -> "⏳"
+                            }
+                            appendLine("- $icon Run #${r.id}: **${r.status}** (${conclusion}) - [View Run](${r.url})")
+                        }
+                    }
                 }
             }
 
@@ -247,6 +381,70 @@ class ToolExecutor @Inject constructor(
                         "**Worker**: ${deploy.name}\n" +
                         "**Live URL**: ${deploy.url}\n" +
                         "**Script Size**: ${deploy.scriptSize} bytes"
+            }
+
+            "cloudflare_get_deploy_status" -> {
+                val projectName = args["project_name"]?.ifBlank { null }
+                    ?: activeProj?.cloudflareProjectName
+                    ?: "dettle-site"
+                val deploymentId = args["deployment_id"]?.ifBlank { null }
+
+                if (deploymentId != null) {
+                    val deploy = cloudflareClient.getDeployment(projectName, deploymentId)
+                        .getOrElse { return errResult(toolCall, it.message ?: "Failed to get deployment status") }
+                    buildString {
+                        appendLine("### Cloudflare Pages Deployment `$deploymentId`")
+                        appendLine("- **Project**: ${deploy.projectName}")
+                        appendLine("- **Stage**: `${deploy.stage}`")
+                        appendLine("- **Preview URL**: ${deploy.url}")
+                        appendLine("- **Production URL**: ${deploy.productionUrl}")
+                        if (deploy.createdAt.isNotBlank()) appendLine("- **Created**: ${deploy.createdAt}")
+                    }
+                } else {
+                    val deployments = cloudflareClient.listDeployments(projectName)
+                        .getOrElse { return errResult(toolCall, it.message ?: "Failed to list deployments") }
+                    if (deployments.isEmpty()) {
+                        "No deployments found for Cloudflare Pages project `$projectName`."
+                    } else {
+                        val latest = deployments.first()
+                        buildString {
+                            appendLine("### Latest Deployment for `$projectName`")
+                            appendLine("- **ID**: `${latest.id}`")
+                            appendLine("- **Stage**: `${latest.stage}`")
+                            appendLine("- **Preview URL**: ${latest.url}")
+                            appendLine("- **Production URL**: ${latest.productionUrl}")
+                            if (latest.createdAt.isNotBlank()) appendLine("- **Created**: ${latest.createdAt}")
+                            appendLine("\nTotal recent deployments: ${deployments.size}")
+                        }
+                    }
+                }
+            }
+
+            "cloudflare_list_projects" -> {
+                val pages = cloudflareClient.listPagesProjects().getOrNull() ?: emptyList()
+                val workers = cloudflareClient.listWorkers().getOrNull() ?: emptyList()
+                buildString {
+                    appendLine("### Cloudflare Resources")
+                    appendLine("#### Pages Projects (${pages.size}):")
+                    if (pages.isEmpty()) appendLine("_No Pages projects found._")
+                    else pages.forEach { p ->
+                        appendLine("- **${p.name}** → [${p.productionUrl}](${p.productionUrl})")
+                    }
+                    appendLine()
+                    appendLine("#### Workers Scripts (${workers.size}):")
+                    if (workers.isEmpty()) appendLine("_No Workers scripts found._")
+                    else workers.forEach { w ->
+                        appendLine("- **$w**")
+                    }
+                }
+            }
+
+            "cloudflare_purge_cache" -> {
+                val zoneId = args["zone_id"] ?: return errResult(toolCall, "Missing zone_id")
+                val success = cloudflareClient.purgeCache(zoneId)
+                    .getOrElse { return errResult(toolCall, it.message ?: "Failed to purge cache") }
+                if (success) "Successfully purged Cloudflare cache for zone `$zoneId`."
+                else "Failed to purge cache for zone `$zoneId`."
             }
 
             "codebase_search" -> {

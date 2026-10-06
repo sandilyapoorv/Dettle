@@ -7,11 +7,10 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -37,7 +36,8 @@ class GitHubClient @Inject constructor(
 
     /**
      * Fetches the complete file tree of a repository in a single GraphQL call.
-     * Returns a map of path -> file type ("blob" or "tree")
+     * Returns a list of RepoFile (path, name, type, size, isBinary).
+     * Defensively handles JsonNull, non-existent branches, and auto-falls back to repo default branch.
      */
     suspend fun getRepoTree(owner: String, repo: String, branch: String = "main"): Result<List<RepoFile>> =
         withContext(Dispatchers.IO) {
@@ -75,13 +75,22 @@ class GitHubClient @Inject constructor(
                 }
 
                 val response = graphql(query, variables)
-                val entries = response["data"]?.jsonObject
-                    ?.get("repository")?.jsonObject
-                    ?.get("object")?.jsonObject
-                    ?.get("entries")?.jsonArray
+                val repoObj = (response["data"] as? JsonObject)?.get("repository") as? JsonObject
+                val objectTree = repoObj?.get("object") as? JsonObject
 
+                // If branch object is null, attempt fallback to the repo's actual default branch if different
+                if (objectTree == null) {
+                    val actualDefaultBranch = (repoObj?.get("defaultBranchRef") as? JsonObject)
+                        ?.get("name")?.let { (it as? JsonPrimitive)?.content }
+                    if (!actualDefaultBranch.isNullOrBlank() && actualDefaultBranch != branch) {
+                        Log.d(TAG, "Branch '$branch' has no tree; retrying with repo default branch '$actualDefaultBranch'")
+                        return@withContext getRepoTree(owner, repo, actualDefaultBranch)
+                    }
+                }
+
+                val entries = objectTree?.get("entries") as? JsonArray
                 val files = entries?.flatMap { entry ->
-                    parseEntries(entry.jsonObject, "")
+                    (entry as? JsonObject)?.let { parseEntries(it, "") } ?: emptyList()
                 } ?: emptyList()
 
                 Result.success(files)
@@ -92,18 +101,19 @@ class GitHubClient @Inject constructor(
         }
 
     private fun parseEntries(entry: JsonObject, parentPath: String): List<RepoFile> {
-        val name = entry["name"]?.jsonPrimitive?.content ?: return emptyList()
-        val path = entry["path"]?.jsonPrimitive?.content ?: "$parentPath/$name"
-        val type = entry["type"]?.jsonPrimitive?.content ?: "blob"
-        val sizeObj = entry["object"]?.jsonObject
+        val name = (entry["name"] as? JsonPrimitive)?.content ?: return emptyList()
+        val path = (entry["path"] as? JsonPrimitive)?.content ?: if (parentPath.isEmpty()) name else "$parentPath/$name"
+        val type = (entry["type"] as? JsonPrimitive)?.content ?: "blob"
+        val sizeObj = entry["object"] as? JsonObject
 
         return if (type == "blob") {
-            val size = sizeObj?.get("byteSize")?.jsonPrimitive?.content?.toIntOrNull() ?: 0
-            val isBinary = sizeObj?.get("isBinary")?.jsonPrimitive?.content?.toBoolean() ?: false
+            val size = (sizeObj?.get("byteSize") as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
+            val isBinary = (sizeObj?.get("isBinary") as? JsonPrimitive)?.content?.toBooleanStrictOrNull() ?: false
             listOf(RepoFile(path, name, FileType.FILE, size, isBinary))
         } else {
-            val subEntries = sizeObj?.get("entries")?.jsonArray
-                ?.flatMap { parseEntries(it.jsonObject, path) } ?: emptyList()
+            val subEntries = (sizeObj?.get("entries") as? JsonArray)
+                ?.flatMap { (it as? JsonObject)?.let { sub -> parseEntries(sub, path) } ?: emptyList() }
+                ?: emptyList()
             listOf(RepoFile(path, name, FileType.DIRECTORY, 0, false)) + subEntries
         }
     }
@@ -120,19 +130,20 @@ class GitHubClient @Inject constructor(
                 val url = "$GITHUB_API/repos/$owner/$repo/contents/$path?ref=$branch"
                 val response = rest("GET", url)
 
-                val content = response["content"]?.jsonPrimitive?.content
-                    ?: return@withContext Result.failure(Exception("No content in response"))
+                val content = (response["content"] as? JsonPrimitive)?.content
+                    ?: return@withContext Result.failure(Exception("No content in response for $path"))
 
                 // GitHub returns base64-encoded content with newlines
-                val decoded = Base64.getDecoder().decode(content.replace("\n", ""))
-                Result.success(String(decoded))
+                val cleanContent = content.replace("\n", "").replace("\r", "")
+                val decoded = Base64.getDecoder().decode(cleanContent)
+                Result.success(String(decoded, Charsets.UTF_8))
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to read file $path", e)
                 Result.failure(e)
             }
         }
 
-    // ─── Create Branch + Commit + PR ─────────────────────────────────────
+    // ─── Convenience Wrappers ─────────────────────────────────────────────
 
     /** Convenience wrapper — throws on failure instead of returning Result. Used by ReposViewModel. */
     suspend fun getRepoFileTree(owner: String, repo: String): List<RepoFile> =
@@ -141,6 +152,23 @@ class GitHubClient @Inject constructor(
     /** Convenience wrapper — throws on failure. Used by ReposViewModel. */
     suspend fun readFile(owner: String, repo: String, path: String): String =
         readFile(owner, repo, path, "main").getOrThrow()
+
+    /**
+     * Gets default branch of repository (e.g. "main", "master").
+     */
+    suspend fun getDefaultBranch(owner: String, repo: String): Result<String> =
+        withContext(Dispatchers.IO) {
+            try {
+                val repoObj = rest("GET", "$GITHUB_API/repos/$owner/$repo")
+                val branch = (repoObj["default_branch"] as? JsonPrimitive)?.content ?: "main"
+                Result.success(branch)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to fetch default branch for $owner/$repo", e)
+                Result.failure(e)
+            }
+        }
+
+    // ─── Create Branch + Commit + PR ─────────────────────────────────────
 
     /**
      * Creates a new branch, commits the provided file changes, and opens a Pull Request.
@@ -166,13 +194,12 @@ class GitHubClient @Inject constructor(
                 put("ref", "refs/heads/$branchName")
                 put("sha", baseSha)
             }.toString()
-            rest("POST", "$GITHUB_API/repos/$owner/$repo/git/refs",
-                body = createBranchBody)
+            rest("POST", "$GITHUB_API/repos/$owner/$repo/git/refs", body = createBranchBody)
 
             // 3. Commit each file change
             for (change in fileChanges) {
                 val existingSha = getFileSha(owner, repo, change.path, branchName)
-                val encodedContent = Base64.getEncoder().encodeToString(change.content.toByteArray())
+                val encodedContent = Base64.getEncoder().encodeToString(change.content.toByteArray(Charsets.UTF_8))
 
                 val commitBody = buildJsonObject {
                     put("message", commitMessage)
@@ -181,8 +208,7 @@ class GitHubClient @Inject constructor(
                     if (existingSha != null) put("sha", existingSha)
                 }.toString()
 
-                rest("PUT", "$GITHUB_API/repos/$owner/$repo/contents/${change.path}",
-                    body = commitBody)
+                rest("PUT", "$GITHUB_API/repos/$owner/$repo/contents/${change.path}", body = commitBody)
             }
 
             // 4. Open the Pull Request
@@ -194,21 +220,141 @@ class GitHubClient @Inject constructor(
                 put("draft", false)
             }.toString()
 
-            val prResponse = rest("POST", "$GITHUB_API/repos/$owner/$repo/pulls",
-                body = prBody2)
+            val prResponse = rest("POST", "$GITHUB_API/repos/$owner/$repo/pulls", body = prBody2)
 
-            val prNumber = prResponse["number"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
-            val prUrl = prResponse["html_url"]?.jsonPrimitive?.content ?: ""
+            val prNumber = (prResponse["number"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
+            val prUrl = (prResponse["html_url"] as? JsonPrimitive)?.content ?: ""
 
-            Result.success(PullRequest(
-                number = prNumber,
-                title = prTitle,
-                url = prUrl,
-                branch = branchName,
-                filesChanged = fileChanges.size
-            ))
+            Result.success(
+                PullRequest(
+                    number = prNumber,
+                    title = prTitle,
+                    url = prUrl,
+                    branch = branchName,
+                    filesChanged = fileChanges.size
+                )
+            )
         } catch (e: Exception) {
             Log.e(TAG, "Failed to create branch/PR", e)
+            Result.failure(e)
+        }
+    }
+
+    // ─── Merge Pull Request ──────────────────────────────────────────────
+
+    /**
+     * Merges a Pull Request once CI and review checks succeed.
+     */
+    suspend fun mergePullRequest(
+        owner: String,
+        repo: String,
+        pullNumber: Int,
+        commitTitle: String? = null,
+        commitMessage: String? = null,
+        mergeMethod: String = "squash"
+    ): Result<MergeResult> = withContext(Dispatchers.IO) {
+        try {
+            val payload = buildJsonObject {
+                if (!commitTitle.isNullOrBlank()) put("commit_title", commitTitle)
+                if (!commitMessage.isNullOrBlank()) put("commit_message", commitMessage)
+                put("merge_method", mergeMethod)
+            }.toString()
+
+            val response = rest("PUT", "$GITHUB_API/repos/$owner/$repo/pulls/$pullNumber/merge", body = payload)
+            val sha = (response["sha"] as? JsonPrimitive)?.content ?: ""
+            val merged = (response["merged"] as? JsonPrimitive)?.content?.toBooleanStrictOrNull() ?: true
+            val message = (response["message"] as? JsonPrimitive)?.content ?: "PR #$pullNumber merged"
+
+            Result.success(MergeResult(sha = sha, merged = merged, message = message))
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to merge PR #$pullNumber for $owner/$repo", e)
+            Result.failure(e)
+        }
+    }
+
+    // ─── Get Pull Request Status ──────────────────────────────────────────
+
+    /**
+     * Gets PR details including mergeability, state, and head commit.
+     */
+    suspend fun getPullRequest(
+        owner: String,
+        repo: String,
+        pullNumber: Int
+    ): Result<PullRequestStatus> = withContext(Dispatchers.IO) {
+        try {
+            val response = rest("GET", "$GITHUB_API/repos/$owner/$repo/pulls/$pullNumber")
+            val number = (response["number"] as? JsonPrimitive)?.content?.toIntOrNull() ?: pullNumber
+            val state = (response["state"] as? JsonPrimitive)?.content ?: "unknown"
+            val merged = (response["merged"] as? JsonPrimitive)?.content?.toBooleanStrictOrNull() ?: false
+            val mergeable = (response["mergeable"] as? JsonPrimitive)?.content?.toBooleanStrictOrNull()
+            val mergeableState = (response["mergeable_state"] as? JsonPrimitive)?.content
+            val headObj = response["head"] as? JsonObject
+            val headSha = (headObj?.get("sha") as? JsonPrimitive)?.content ?: ""
+            val headRef = (headObj?.get("ref") as? JsonPrimitive)?.content ?: ""
+            val htmlUrl = (response["html_url"] as? JsonPrimitive)?.content ?: ""
+
+            Result.success(
+                PullRequestStatus(
+                    number = number,
+                    state = state,
+                    merged = merged,
+                    mergeable = mergeable,
+                    mergeableState = mergeableState,
+                    headSha = headSha,
+                    headRef = headRef,
+                    htmlUrl = htmlUrl
+                )
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get PR #$pullNumber status for $owner/$repo", e)
+            Result.failure(e)
+        }
+    }
+
+    // ─── Create GitHub Release ────────────────────────────────────────────
+
+    /**
+     * Tags and creates a GitHub Release.
+     */
+    suspend fun createRelease(
+        owner: String,
+        repo: String,
+        tagName: String,
+        name: String,
+        body: String,
+        targetCommitish: String = "main",
+        draft: Boolean = false,
+        prerelease: Boolean = false
+    ): Result<GitHubRelease> = withContext(Dispatchers.IO) {
+        try {
+            val payload = buildJsonObject {
+                put("tag_name", tagName)
+                put("target_commitish", targetCommitish)
+                put("name", name)
+                put("body", body)
+                put("draft", draft)
+                put("prerelease", prerelease)
+            }.toString()
+
+            val response = rest("POST", "$GITHUB_API/repos/$owner/$repo/releases", body = payload)
+            val id = (response["id"] as? JsonPrimitive)?.content?.toLongOrNull() ?: 0L
+            val htmlUrl = (response["html_url"] as? JsonPrimitive)?.content ?: ""
+            val returnedTag = (response["tag_name"] as? JsonPrimitive)?.content ?: tagName
+            val releaseName = (response["name"] as? JsonPrimitive)?.content ?: name
+            val releaseBody = (response["body"] as? JsonPrimitive)?.content ?: body
+
+            Result.success(
+                GitHubRelease(
+                    id = id,
+                    tagName = returnedTag,
+                    name = releaseName,
+                    htmlUrl = htmlUrl,
+                    body = releaseBody
+                )
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to create release $tagName for $owner/$repo", e)
             Result.failure(e)
         }
     }
@@ -231,8 +377,7 @@ class GitHubClient @Inject constructor(
                     })
                 }
             }.toString()
-            rest("POST", "$GITHUB_API/repos/$owner/$repo/actions/workflows/$workflowId/dispatches",
-                body = body)
+            rest("POST", "$GITHUB_API/repos/$owner/$repo/actions/workflows/$workflowId/dispatches", body = body)
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -249,20 +394,51 @@ class GitHubClient @Inject constructor(
     ): Result<List<WorkflowRun>> = withContext(Dispatchers.IO) {
         try {
             val response = rest("GET", "$GITHUB_API/repos/$owner/$repo/actions/workflows/$workflowId/runs?per_page=5")
-            val runsArray = response["workflow_runs"]?.let {
-                runCatching { it.jsonArray }.getOrNull()
-            } ?: emptyList()
+            val runsArray = (response["workflow_runs"] as? JsonArray) ?: JsonArray(emptyList())
 
             val runs = runsArray.mapNotNull { item ->
-                val obj = runCatching { item.jsonObject }.getOrNull() ?: return@mapNotNull null
-                val id = obj["id"]?.jsonPrimitive?.content?.toLongOrNull() ?: return@mapNotNull null
-                val status = obj["status"]?.jsonPrimitive?.content ?: "unknown"
-                val conclusion = obj["conclusion"]?.let { runCatching { it.jsonPrimitive.content }.getOrNull() }
-                val url = obj["html_url"]?.jsonPrimitive?.content ?: ""
+                val obj = item as? JsonObject ?: return@mapNotNull null
+                val id = (obj["id"] as? JsonPrimitive)?.content?.toLongOrNull() ?: return@mapNotNull null
+                val status = (obj["status"] as? JsonPrimitive)?.content ?: "unknown"
+                val conclusion = (obj["conclusion"] as? JsonPrimitive)?.content
+                val url = (obj["html_url"] as? JsonPrimitive)?.content ?: ""
                 WorkflowRun(id, status, conclusion, url)
             }
             Result.success(runs)
         } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Lists recent workflow runs across the entire repository, optionally filtered by branch.
+     */
+    suspend fun listWorkflowRuns(
+        owner: String,
+        repo: String,
+        branch: String? = null,
+        limit: Int = 10
+    ): Result<List<WorkflowRun>> = withContext(Dispatchers.IO) {
+        try {
+            val queryParams = buildString {
+                append("?per_page=").append(limit.coerceIn(1, 30))
+                if (!branch.isNullOrBlank()) {
+                    append("&branch=").append(branch)
+                }
+            }
+            val response = rest("GET", "$GITHUB_API/repos/$owner/$repo/actions/runs$queryParams")
+            val runsArray = (response["workflow_runs"] as? JsonArray) ?: JsonArray(emptyList())
+            val runs = runsArray.mapNotNull { item ->
+                val obj = item as? JsonObject ?: return@mapNotNull null
+                val id = (obj["id"] as? JsonPrimitive)?.content?.toLongOrNull() ?: return@mapNotNull null
+                val status = (obj["status"] as? JsonPrimitive)?.content ?: "unknown"
+                val conclusion = (obj["conclusion"] as? JsonPrimitive)?.content
+                val url = (obj["html_url"] as? JsonPrimitive)?.content ?: ""
+                WorkflowRun(id, status, conclusion, url)
+            }
+            Result.success(runs)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to list workflow runs for $owner/$repo", e)
             Result.failure(e)
         }
     }
@@ -274,10 +450,6 @@ class GitHubClient @Inject constructor(
     private var cacheTimestampMs: Long = 0L
     private val CACHE_TTL_MS = 60_000L // 60 seconds
 
-    /**
-     * Fetches details of the authenticated GitHub user.
-     * Failsafe: Returns cached user if network fails.
-     */
     suspend fun getAuthenticatedUser(forceRefresh: Boolean = false): Result<GitHubUser> = withContext(Dispatchers.IO) {
         val token = pat
         if (token.isNullOrBlank()) {
@@ -290,12 +462,12 @@ class GitHubClient @Inject constructor(
 
         try {
             val response = rest("GET", "$GITHUB_API/user")
-            val login = response["login"]?.jsonPrimitive?.content ?: throw Exception("GitHub API response missing login")
-            val name = response["name"]?.let { runCatching { it.jsonPrimitive.content }.getOrNull() }
-            val avatarUrl = response["avatar_url"]?.let { runCatching { it.jsonPrimitive.content }.getOrNull() }
-            val bio = response["bio"]?.let { runCatching { it.jsonPrimitive.content }.getOrNull() }
-            val publicRepos = response["public_repos"]?.let { runCatching { it.jsonPrimitive.content.toInt() }.getOrNull() } ?: 0
-            val totalPrivateRepos = response["total_private_repos"]?.let { runCatching { it.jsonPrimitive.content.toInt() }.getOrNull() }
+            val login = (response["login"] as? JsonPrimitive)?.content ?: throw Exception("GitHub API response missing login")
+            val name = (response["name"] as? JsonPrimitive)?.content
+            val avatarUrl = (response["avatar_url"] as? JsonPrimitive)?.content
+            val bio = (response["bio"] as? JsonPrimitive)?.content
+            val publicRepos = (response["public_repos"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
+            val totalPrivateRepos = (response["total_private_repos"] as? JsonPrimitive)?.content?.toIntOrNull()
 
             val user = GitHubUser(
                 login = login,
@@ -320,11 +492,6 @@ class GitHubClient @Inject constructor(
         }
     }
 
-    /**
-     * Lists repositories belonging to or accessible by the authenticated user.
-     * Sorted by recently updated, up to 100 repositories.
-     * Failsafe: Falls back to cached repository list if network or rate limit fails.
-     */
     suspend fun getUserRepositories(forceRefresh: Boolean = false): Result<List<GitHubRepoSummary>> = withContext(Dispatchers.IO) {
         val token = pat
         if (token.isNullOrBlank()) {
@@ -338,17 +505,17 @@ class GitHubClient @Inject constructor(
         try {
             val array = restArray("GET", "$GITHUB_API/user/repos?sort=updated&per_page=100&affiliation=owner,collaborator,organization_member")
             val repos = array.mapNotNull { element ->
-                val obj = runCatching { element.jsonObject }.getOrNull() ?: return@mapNotNull null
-                val name = obj["name"]?.jsonPrimitive?.content ?: return@mapNotNull null
-                val fullName = obj["full_name"]?.jsonPrimitive?.content ?: name
-                val ownerObj = obj["owner"]?.let { runCatching { it.jsonObject }.getOrNull() }
-                val owner = ownerObj?.get("login")?.jsonPrimitive?.content ?: fullName.substringBefore('/', "")
-                val description = obj["description"]?.let { runCatching { it.jsonPrimitive.content }.getOrNull() }
-                val isPrivate = obj["private"]?.let { runCatching { it.jsonPrimitive.content.toBoolean() }.getOrNull() } ?: false
-                val defaultBranch = obj["default_branch"]?.jsonPrimitive?.content ?: "main"
-                val language = obj["language"]?.let { runCatching { it.jsonPrimitive.content }.getOrNull() }
-                val stars = obj["stargazers_count"]?.let { runCatching { it.jsonPrimitive.content.toInt() }.getOrNull() } ?: 0
-                val updatedAt = obj["updated_at"]?.let { runCatching { it.jsonPrimitive.content }.getOrNull() }
+                val obj = element as? JsonObject ?: return@mapNotNull null
+                val name = (obj["name"] as? JsonPrimitive)?.content ?: return@mapNotNull null
+                val fullName = (obj["full_name"] as? JsonPrimitive)?.content ?: name
+                val ownerObj = obj["owner"] as? JsonObject
+                val owner = (ownerObj?.get("login") as? JsonPrimitive)?.content ?: fullName.substringBefore('/', "")
+                val description = (obj["description"] as? JsonPrimitive)?.content
+                val isPrivate = (obj["private"] as? JsonPrimitive)?.content?.toBooleanStrictOrNull() ?: false
+                val defaultBranch = (obj["default_branch"] as? JsonPrimitive)?.content ?: "main"
+                val language = (obj["language"] as? JsonPrimitive)?.content
+                val stars = (obj["stargazers_count"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
+                val updatedAt = (obj["updated_at"] as? JsonPrimitive)?.content
 
                 GitHubRepoSummary(
                     name = name,
@@ -374,23 +541,20 @@ class GitHubClient @Inject constructor(
         }
     }
 
-    /**
-     * Get detailed information for a specific repository.
-     */
     suspend fun getRepoDetails(owner: String, repo: String): Result<GitHubRepoDetails> = withContext(Dispatchers.IO) {
         try {
             val obj = rest("GET", "$GITHUB_API/repos/$owner/$repo")
-            val name = obj["name"]?.jsonPrimitive?.content ?: repo
-            val fullName = obj["full_name"]?.jsonPrimitive?.content ?: "$owner/$repo"
-            val description = obj["description"]?.let { runCatching { it.jsonPrimitive.content }.getOrNull() }
-            val isPrivate = obj["private"]?.let { runCatching { it.jsonPrimitive.content.toBoolean() }.getOrNull() } ?: false
-            val defaultBranch = obj["default_branch"]?.jsonPrimitive?.content ?: "main"
-            val language = obj["language"]?.let { runCatching { it.jsonPrimitive.content }.getOrNull() }
-            val stars = obj["stargazers_count"]?.let { runCatching { it.jsonPrimitive.content.toInt() }.getOrNull() } ?: 0
-            val forks = obj["forks_count"]?.let { runCatching { it.jsonPrimitive.content.toInt() }.getOrNull() } ?: 0
-            val openIssues = obj["open_issues_count"]?.let { runCatching { it.jsonPrimitive.content.toInt() }.getOrNull() } ?: 0
-            val cloneUrl = obj["clone_url"]?.let { runCatching { it.jsonPrimitive.content }.getOrNull() }
-            val htmlUrl = obj["html_url"]?.let { runCatching { it.jsonPrimitive.content }.getOrNull() }
+            val name = (obj["name"] as? JsonPrimitive)?.content ?: repo
+            val fullName = (obj["full_name"] as? JsonPrimitive)?.content ?: "$owner/$repo"
+            val description = (obj["description"] as? JsonPrimitive)?.content
+            val isPrivate = (obj["private"] as? JsonPrimitive)?.content?.toBooleanStrictOrNull() ?: false
+            val defaultBranch = (obj["default_branch"] as? JsonPrimitive)?.content ?: "main"
+            val language = (obj["language"] as? JsonPrimitive)?.content
+            val stars = (obj["stargazers_count"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
+            val forks = (obj["forks_count"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
+            val openIssues = (obj["open_issues_count"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
+            val cloneUrl = (obj["clone_url"] as? JsonPrimitive)?.content
+            val htmlUrl = (obj["html_url"] as? JsonPrimitive)?.content
 
             Result.success(
                 GitHubRepoDetails(
@@ -414,14 +578,12 @@ class GitHubClient @Inject constructor(
         }
     }
 
-    /**
-     * List all branches in a repository.
-     */
     suspend fun listRepoBranches(owner: String, repo: String): Result<List<String>> = withContext(Dispatchers.IO) {
         try {
             val array = restArray("GET", "$GITHUB_API/repos/$owner/$repo/branches?per_page=30")
             val branches = array.mapNotNull { el ->
-                runCatching { el.jsonObject["name"]?.jsonPrimitive?.content }.getOrNull()
+                val obj = el as? JsonObject ?: return@mapNotNull null
+                (obj["name"] as? JsonPrimitive)?.content
             }
             Result.success(branches)
         } catch (e: Exception) {
@@ -430,20 +592,17 @@ class GitHubClient @Inject constructor(
         }
     }
 
-    /**
-     * List recent commits on a repository branch.
-     */
     suspend fun listRepoCommits(owner: String, repo: String, branch: String = "main", limit: Int = 10): Result<List<GitHubCommitSummary>> = withContext(Dispatchers.IO) {
         try {
             val array = restArray("GET", "$GITHUB_API/repos/$owner/$repo/commits?sha=$branch&per_page=${limit.coerceIn(1, 30)}")
             val commits = array.mapNotNull { el ->
-                val obj = runCatching { el.jsonObject }.getOrNull() ?: return@mapNotNull null
-                val sha = obj["sha"]?.jsonPrimitive?.content?.take(7) ?: ""
-                val commitObj = obj["commit"]?.let { runCatching { it.jsonObject }.getOrNull() }
-                val message = commitObj?.get("message")?.jsonPrimitive?.content?.lines()?.firstOrNull() ?: ""
-                val authorObj = commitObj?.get("author")?.let { runCatching { it.jsonObject }.getOrNull() }
-                val author = authorObj?.get("name")?.jsonPrimitive?.content ?: "unknown"
-                val date = authorObj?.get("date")?.jsonPrimitive?.content ?: ""
+                val obj = el as? JsonObject ?: return@mapNotNull null
+                val sha = (obj["sha"] as? JsonPrimitive)?.content?.take(7) ?: ""
+                val commitObj = obj["commit"] as? JsonObject
+                val message = (commitObj?.get("message") as? JsonPrimitive)?.content?.lines()?.firstOrNull() ?: ""
+                val authorObj = commitObj?.get("author") as? JsonObject
+                val author = (authorObj?.get("name") as? JsonPrimitive)?.content ?: "unknown"
+                val date = (authorObj?.get("date") as? JsonPrimitive)?.content ?: ""
 
                 GitHubCommitSummary(sha = sha, message = message, author = author, date = date)
             }
@@ -454,21 +613,18 @@ class GitHubClient @Inject constructor(
         }
     }
 
-    /**
-     * List open issues and pull requests on a repository.
-     */
     suspend fun listRepoIssues(owner: String, repo: String, state: String = "open", limit: Int = 10): Result<List<GitHubIssueSummary>> = withContext(Dispatchers.IO) {
         try {
             val array = restArray("GET", "$GITHUB_API/repos/$owner/$repo/issues?state=$state&per_page=${limit.coerceIn(1, 30)}")
             val issues = array.mapNotNull { el ->
-                val obj = runCatching { el.jsonObject }.getOrNull() ?: return@mapNotNull null
-                val number = obj["number"]?.jsonPrimitive?.content?.toIntOrNull() ?: return@mapNotNull null
-                val title = obj["title"]?.jsonPrimitive?.content ?: ""
-                val issueState = obj["state"]?.jsonPrimitive?.content ?: state
-                val userObj = obj["user"]?.let { runCatching { it.jsonObject }.getOrNull() }
-                val author = userObj?.get("login")?.jsonPrimitive?.content ?: "unknown"
+                val obj = el as? JsonObject ?: return@mapNotNull null
+                val number = (obj["number"] as? JsonPrimitive)?.content?.toIntOrNull() ?: return@mapNotNull null
+                val title = (obj["title"] as? JsonPrimitive)?.content ?: ""
+                val issueState = (obj["state"] as? JsonPrimitive)?.content ?: state
+                val userObj = obj["user"] as? JsonObject
+                val author = (userObj?.get("login") as? JsonPrimitive)?.content ?: "unknown"
                 val isPR = obj.containsKey("pull_request")
-                val url = obj["html_url"]?.jsonPrimitive?.content ?: ""
+                val url = (obj["html_url"] as? JsonPrimitive)?.content ?: ""
 
                 GitHubIssueSummary(
                     number = number,
@@ -508,84 +664,91 @@ class GitHubClient @Inject constructor(
             .build()
 
         val response = client.newCall(request).execute()
+        val rawBody = response.body?.string().orEmpty()
         if (!response.isSuccessful) {
-            throw Exception("GitHub GraphQL error ${response.code}: ${response.body?.string()}")
+            throw Exception("GitHub GraphQL error ${response.code}: $rawBody")
         }
-        return json.parseToJsonElement(response.body?.string() ?: "{}").jsonObject
+        val element = if (rawBody.isBlank()) JsonObject(emptyMap()) else json.parseToJsonElement(rawBody)
+        return (element as? JsonObject) ?: JsonObject(emptyMap())
+    }
+
+    private suspend fun restElement(method: String, url: String, body: String? = null): JsonElement {
+        val requestBody = body?.toRequestBody("application/json".toMediaType())
+
+        val token = pat
+        if (token.isNullOrBlank()) {
+            throw IllegalStateException("GitHub Personal Access Token is not configured. Please add it in Settings or Onboarding.")
+        }
+
+        val request = Request.Builder()
+            .url(url)
+            .method(method, requestBody)
+            .header("Authorization", "Bearer $token")
+            .header("User-Agent", "Dettle-App/1.0")
+            .header("Accept", "application/vnd.github+json")
+            .header("X-GitHub-Api-Version", "2022-11-28")
+            .build()
+
+        val response = client.newCall(request).execute()
+        val rawBody = response.body?.string().orEmpty()
+        if (!response.isSuccessful && response.code != 201 && response.code != 204) {
+            if (response.code == 401) {
+                throw IllegalStateException("GitHub PAT is invalid or expired (401 Unauthorized)")
+            } else if (response.code == 403) {
+                throw IllegalStateException("GitHub API rate limit exceeded or missing scopes (403 Forbidden)")
+            }
+            throw Exception("GitHub REST error ${response.code}: $rawBody")
+        }
+        if (rawBody.isBlank()) {
+            return JsonObject(emptyMap())
+        }
+        return json.parseToJsonElement(rawBody)
     }
 
     private suspend fun rest(method: String, url: String, body: String? = null): JsonObject {
-        val requestBody = body?.toRequestBody("application/json".toMediaType())
-
-        val token = pat
-        if (token.isNullOrBlank()) {
-            throw IllegalStateException("GitHub Personal Access Token is not configured. Please add it in Settings or Onboarding.")
+        val element = restElement(method, url, body)
+        return when (element) {
+            is JsonObject -> element
+            is JsonArray -> (element.firstOrNull() as? JsonObject) ?: JsonObject(emptyMap())
+            else -> JsonObject(emptyMap())
         }
-
-        val request = Request.Builder()
-            .url(url)
-            .method(method, requestBody)
-            .header("Authorization", "Bearer $token")
-            .header("User-Agent", "Dettle-App/1.0")
-            .header("Accept", "application/vnd.github+json")
-            .header("X-GitHub-Api-Version", "2022-11-28")
-            .build()
-
-        val response = client.newCall(request).execute()
-        if (!response.isSuccessful && response.code != 201) {
-            val errBody = response.body?.string().orEmpty()
-            if (response.code == 401) {
-                throw IllegalStateException("GitHub PAT is invalid or expired (401 Unauthorized)")
-            } else if (response.code == 403) {
-                throw IllegalStateException("GitHub API rate limit exceeded or missing scopes (403 Forbidden)")
-            }
-            throw Exception("GitHub REST error ${response.code}: $errBody")
-        }
-        return json.parseToJsonElement(response.body?.string() ?: "{}").jsonObject
     }
 
     private suspend fun restArray(method: String, url: String, body: String? = null): JsonArray {
-        val requestBody = body?.toRequestBody("application/json".toMediaType())
-
-        val token = pat
-        if (token.isNullOrBlank()) {
-            throw IllegalStateException("GitHub Personal Access Token is not configured. Please add it in Settings or Onboarding.")
+        val element = restElement(method, url, body)
+        return when (element) {
+            is JsonArray -> element
+            is JsonObject -> JsonArray(listOf(element))
+            else -> JsonArray(emptyList())
         }
-
-        val request = Request.Builder()
-            .url(url)
-            .method(method, requestBody)
-            .header("Authorization", "Bearer $token")
-            .header("User-Agent", "Dettle-App/1.0")
-            .header("Accept", "application/vnd.github+json")
-            .header("X-GitHub-Api-Version", "2022-11-28")
-            .build()
-
-        val response = client.newCall(request).execute()
-        if (!response.isSuccessful && response.code != 201) {
-            val errBody = response.body?.string().orEmpty()
-            if (response.code == 401) {
-                throw IllegalStateException("GitHub PAT is invalid or expired (401 Unauthorized)")
-            } else if (response.code == 403) {
-                throw IllegalStateException("GitHub API rate limit exceeded or missing scopes (403 Forbidden)")
-            }
-            throw Exception("GitHub REST error ${response.code}: $errBody")
-        }
-        val raw = response.body?.string() ?: "[]"
-        return json.parseToJsonElement(raw).jsonArray
     }
 
     private suspend fun getRefSha(owner: String, repo: String, ref: String): String? {
+        val cleanRef = ref.removePrefix("refs/")
         return try {
-            val response = rest("GET", "$GITHUB_API/repos/$owner/$repo/git/refs/$ref")
-            response["object"]?.jsonObject?.get("sha")?.jsonPrimitive?.content
-        } catch (_: Exception) { null }
+            val element = restElement("GET", "$GITHUB_API/repos/$owner/$repo/git/ref/$cleanRef")
+            extractSha(element)
+        } catch (_: Exception) {
+            try {
+                val element = restElement("GET", "$GITHUB_API/repos/$owner/$repo/git/refs/$cleanRef")
+                extractSha(element)
+            } catch (_: Exception) { null }
+        }
+    }
+
+    private fun extractSha(element: JsonElement): String? = when (element) {
+        is JsonObject -> (element["object"] as? JsonObject)?.get("sha")?.let { (it as? JsonPrimitive)?.content }
+            ?: (element["sha"] as? JsonPrimitive)?.content
+        is JsonArray -> element.firstNotNullOfOrNull { item ->
+            (item as? JsonObject)?.let { extractSha(it) }
+        }
+        else -> null
     }
 
     private suspend fun getFileSha(owner: String, repo: String, path: String, branch: String): String? {
         return try {
             val response = rest("GET", "$GITHUB_API/repos/$owner/$repo/contents/$path?ref=$branch")
-            response["sha"]?.jsonPrimitive?.content
+            (response["sha"] as? JsonPrimitive)?.content
         } catch (_: Exception) { null }
     }
 }
@@ -624,6 +787,31 @@ data class PullRequest(
     val url: String,
     val branch: String,
     val filesChanged: Int
+)
+
+data class MergeResult(
+    val sha: String,
+    val merged: Boolean,
+    val message: String
+)
+
+data class PullRequestStatus(
+    val number: Int,
+    val state: String,
+    val merged: Boolean,
+    val mergeable: Boolean?,
+    val mergeableState: String?,
+    val headSha: String,
+    val headRef: String,
+    val htmlUrl: String
+)
+
+data class GitHubRelease(
+    val id: Long,
+    val tagName: String,
+    val name: String?,
+    val htmlUrl: String,
+    val body: String?
 )
 
 data class WorkflowRun(

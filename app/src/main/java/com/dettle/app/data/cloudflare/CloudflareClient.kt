@@ -5,7 +5,6 @@ import com.dettle.app.data.settings.ApiKeyStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
@@ -19,7 +18,7 @@ private const val TAG = "CloudflareClient"
 private const val CF_API = "https://api.cloudflare.com/client/v4"
 
 /**
- * Cloudflare API client for Pages + Workers + R2.
+ * Cloudflare API client for Pages + Workers + CDN Cache.
  *
  * All operations use the Cloudflare API token stored in ApiKeyStore.
  * Free tier limits enforced in architecture:
@@ -30,7 +29,8 @@ private const val CF_API = "https://api.cloudflare.com/client/v4"
  * Primary use-cases for Dettle:
  *  - Deploy generated websites/apps directly to Cloudflare Pages
  *  - Create Workers for thin API endpoints / webhooks
- *  - Store build artifacts in R2
+ *  - Check live deployment status & verify URLs
+ *  - Purge CDN cache
  */
 @Singleton
 class CloudflareClient @Inject constructor(
@@ -53,6 +53,9 @@ class CloudflareClient @Inject constructor(
      */
     suspend fun createPagesProject(projectName: String): Result<PagesProject> =
         withContext(Dispatchers.IO) {
+            if (token.isBlank() || accountId.isBlank()) {
+                return@withContext Result.failure(IllegalStateException("Cloudflare API Token and Account ID must be configured in Settings."))
+            }
             try {
                 val body = """{"name":"$projectName","production_branch":"main"}"""
                 val request = authHeaders(
@@ -62,17 +65,19 @@ class CloudflareClient @Inject constructor(
                 ).build()
 
                 val response = client.newCall(request).execute()
-                val responseBody = response.body?.string() ?: ""
+                val responseBody = response.body?.string().orEmpty()
                 val parsed = json.decodeFromString<CfResponse<PagesProjectResult>>(responseBody)
 
                 if (parsed.success && parsed.result != null) {
-                    Result.success(PagesProject(
-                        name = parsed.result.name,
-                        subdomain = parsed.result.subdomain,
-                        productionUrl = "https://${parsed.result.subdomain}.pages.dev"
-                    ))
+                    Result.success(
+                        PagesProject(
+                            name = parsed.result.name,
+                            subdomain = parsed.result.subdomain,
+                            productionUrl = "https://${parsed.result.subdomain}.pages.dev"
+                        )
+                    )
                 } else {
-                    Result.failure(Exception(parsed.errors.joinToString { it.message }))
+                    Result.failure(Exception(parsed.errors.joinToString { it.message }.ifBlank { "Failed to create Pages project $projectName" }))
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "createPagesProject failed", e)
@@ -91,6 +96,9 @@ class CloudflareClient @Inject constructor(
         projectName: String,
         files: Map<String, String>
     ): Result<PagesDeployment> = withContext(Dispatchers.IO) {
+        if (token.isBlank() || accountId.isBlank()) {
+            return@withContext Result.failure(IllegalStateException("Cloudflare API Token and Account ID must be configured in Settings."))
+        }
         try {
             // Step 1: Create deployment
             val createRequest = authHeaders(
@@ -99,7 +107,7 @@ class CloudflareClient @Inject constructor(
                     .post("{}".toRequestBody("application/json".toMediaType()))
             ).build()
             val createResponse = client.newCall(createRequest).execute()
-            val createBody = createResponse.body?.string() ?: ""
+            val createBody = createResponse.body?.string().orEmpty()
             val createParsed = json.decodeFromString<CfResponse<PagesDeploymentResult>>(createBody)
 
             if (!createParsed.success || createParsed.result == null) {
@@ -136,15 +144,59 @@ class CloudflareClient @Inject constructor(
             client.newCall(finalizeRequest).execute()
 
             Log.d(TAG, "Deployed $projectName: ${files.size} files")
-            Result.success(PagesDeployment(
-                id = deploymentId,
-                projectName = projectName,
-                url = "https://$deploymentId.$projectName.pages.dev",
-                productionUrl = "https://$projectName.pages.dev",
-                fileCount = files.size
-            ))
+            Result.success(
+                PagesDeployment(
+                    id = deploymentId,
+                    projectName = projectName,
+                    url = "https://$deploymentId.$projectName.pages.dev",
+                    productionUrl = "https://$projectName.pages.dev",
+                    fileCount = files.size
+                )
+            )
         } catch (e: Exception) {
             Log.e(TAG, "deployToPages failed", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Fetches details of a specific Pages deployment.
+     */
+    suspend fun getDeployment(
+        projectName: String,
+        deploymentId: String
+    ): Result<PagesDeployment> = withContext(Dispatchers.IO) {
+        if (token.isBlank() || accountId.isBlank()) {
+            return@withContext Result.failure(IllegalStateException("Cloudflare API Token and Account ID must be configured in Settings."))
+        }
+        try {
+            val request = authHeaders(
+                Request.Builder()
+                    .url("$CF_API/accounts/$accountId/pages/projects/$projectName/deployments/$deploymentId")
+                    .get()
+            ).build()
+            val response = client.newCall(request).execute()
+            val body = response.body?.string().orEmpty()
+            val parsed = json.decodeFromString<CfResponse<PagesDeploymentResult>>(body)
+
+            if (parsed.success && parsed.result != null) {
+                val r = parsed.result
+                Result.success(
+                    PagesDeployment(
+                        id = r.id.ifBlank { deploymentId },
+                        projectName = projectName,
+                        url = r.url ?: "https://$deploymentId.$projectName.pages.dev",
+                        productionUrl = "https://$projectName.pages.dev",
+                        fileCount = 0,
+                        createdAt = r.created_on ?: "",
+                        stage = r.latest_stage?.name ?: "active"
+                    )
+                )
+            } else {
+                Result.failure(Exception(parsed.errors.joinToString { it.message }.ifBlank { "Deployment $deploymentId not found" }))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "getDeployment failed for $projectName/$deploymentId", e)
             Result.failure(e)
         }
     }
@@ -154,27 +206,32 @@ class CloudflareClient @Inject constructor(
      */
     suspend fun listDeployments(projectName: String): Result<List<PagesDeployment>> =
         withContext(Dispatchers.IO) {
+            if (token.isBlank() || accountId.isBlank()) {
+                return@withContext Result.failure(IllegalStateException("Cloudflare API Token and Account ID must be configured in Settings."))
+            }
             try {
                 val request = authHeaders(
                     Request.Builder()
                         .url("$CF_API/accounts/$accountId/pages/projects/$projectName/deployments")
                         .get()
                 ).build()
-                val body = client.newCall(request).execute().body?.string() ?: ""
+                val body = client.newCall(request).execute().body?.string().orEmpty()
                 val parsed = json.decodeFromString<CfResponse<List<PagesDeploymentResult>>>(body)
 
                 if (parsed.success) {
-                    Result.success(parsed.result?.map { r ->
-                        PagesDeployment(
-                            id = r.id,
-                            projectName = projectName,
-                            url = r.url ?: "",
-                            productionUrl = "https://$projectName.pages.dev",
-                            fileCount = 0,
-                            createdAt = r.created_on ?: "",
-                            stage = r.latest_stage?.name ?: "unknown"
-                        )
-                    } ?: emptyList())
+                    Result.success(
+                        parsed.result?.map { r ->
+                            PagesDeployment(
+                                id = r.id,
+                                projectName = projectName,
+                                url = r.url ?: "",
+                                productionUrl = "https://$projectName.pages.dev",
+                                fileCount = 0,
+                                createdAt = r.created_on ?: "",
+                                stage = r.latest_stage?.name ?: "unknown"
+                            )
+                        } ?: emptyList()
+                    )
                 } else {
                     Result.failure(Exception(parsed.errors.joinToString { it.message }))
                 }
@@ -182,6 +239,41 @@ class CloudflareClient @Inject constructor(
                 Result.failure(e)
             }
         }
+
+    /**
+     * Lists all Pages projects in the account.
+     */
+    suspend fun listPagesProjects(): Result<List<PagesProject>> = withContext(Dispatchers.IO) {
+        if (token.isBlank() || accountId.isBlank()) {
+            return@withContext Result.failure(IllegalStateException("Cloudflare API Token and Account ID must be configured in Settings."))
+        }
+        try {
+            val request = authHeaders(
+                Request.Builder()
+                    .url("$CF_API/accounts/$accountId/pages/projects")
+                    .get()
+            ).build()
+            val response = client.newCall(request).execute()
+            val body = response.body?.string().orEmpty()
+            val parsed = json.decodeFromString<CfResponse<List<PagesProjectResult>>>(body)
+
+            if (parsed.success) {
+                val projects = parsed.result?.map { r ->
+                    PagesProject(
+                        name = r.name,
+                        subdomain = r.subdomain,
+                        productionUrl = "https://${r.subdomain}.pages.dev"
+                    )
+                } ?: emptyList()
+                Result.success(projects)
+            } else {
+                Result.failure(Exception(parsed.errors.joinToString { it.message }))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "listPagesProjects failed", e)
+            Result.failure(e)
+        }
+    }
 
     // ── Workers ───────────────────────────────────────────────────────────
 
@@ -194,6 +286,9 @@ class CloudflareClient @Inject constructor(
         workerName: String,
         scriptBody: String
     ): Result<WorkerDeployment> = withContext(Dispatchers.IO) {
+        if (token.isBlank() || accountId.isBlank()) {
+            return@withContext Result.failure(IllegalStateException("Cloudflare API Token and Account ID must be configured in Settings."))
+        }
         try {
             val multipart = MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
@@ -217,15 +312,17 @@ class CloudflareClient @Inject constructor(
             ).removeHeader("Content-Type").build()
 
             val response = client.newCall(request).execute()
-            val body = response.body?.string() ?: ""
+            val body = response.body?.string().orEmpty()
 
             if (response.isSuccessful) {
                 Log.d(TAG, "Worker deployed: $workerName")
-                Result.success(WorkerDeployment(
-                    name = workerName,
-                    url = "https://$workerName.$accountId.workers.dev",
-                    scriptSize = scriptBody.length
-                ))
+                Result.success(
+                    WorkerDeployment(
+                        name = workerName,
+                        url = "https://$workerName.$accountId.workers.dev",
+                        scriptSize = scriptBody.length
+                    )
+                )
             } else {
                 Result.failure(Exception("Worker deploy failed (${response.code}): $body"))
             }
@@ -239,13 +336,16 @@ class CloudflareClient @Inject constructor(
      * Lists all Workers in the account.
      */
     suspend fun listWorkers(): Result<List<String>> = withContext(Dispatchers.IO) {
+        if (token.isBlank() || accountId.isBlank()) {
+            return@withContext Result.failure(IllegalStateException("Cloudflare API Token and Account ID must be configured in Settings."))
+        }
         try {
             val request = authHeaders(
                 Request.Builder()
                     .url("$CF_API/accounts/$accountId/workers/scripts")
                     .get()
             ).build()
-            val body = client.newCall(request).execute().body?.string() ?: ""
+            val body = client.newCall(request).execute().body?.string().orEmpty()
             val parsed = json.decodeFromString<CfResponse<List<WorkerScript>>>(body)
             Result.success(parsed.result?.map { it.id } ?: emptyList())
         } catch (e: Exception) {
@@ -253,14 +353,47 @@ class CloudflareClient @Inject constructor(
         }
     }
 
+    // ── CDN Cache ─────────────────────────────────────────────────────────
+
+    /**
+     * Purges all cached files from Cloudflare edge nodes for a specific zone.
+     */
+    suspend fun purgeCache(zoneId: String): Result<Boolean> = withContext(Dispatchers.IO) {
+        if (token.isBlank()) {
+            return@withContext Result.failure(IllegalStateException("Cloudflare API Token must be configured in Settings."))
+        }
+        try {
+            val body = """{"purge_everything":true}"""
+            val request = authHeaders(
+                Request.Builder()
+                    .url("$CF_API/zones/$zoneId/purge_cache")
+                    .post(body.toRequestBody("application/json".toMediaType()))
+            ).build()
+            val response = client.newCall(request).execute()
+            val responseBody = response.body?.string().orEmpty()
+            val parsed = json.decodeFromString<CfResponse<PurgeResult>>(responseBody)
+            if (parsed.success) {
+                Result.success(true)
+            } else {
+                Result.failure(Exception(parsed.errors.joinToString { it.message }.ifBlank { "Cache purge failed" }))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "purgeCache failed for zone $zoneId", e)
+            Result.failure(e)
+        }
+    }
+
     // ── Account info ──────────────────────────────────────────────────────
 
     suspend fun verifyToken(): Result<String> = withContext(Dispatchers.IO) {
+        if (token.isBlank()) {
+            return@withContext Result.failure(IllegalStateException("Cloudflare API Token is not configured."))
+        }
         try {
             val request = authHeaders(
                 Request.Builder().url("$CF_API/user/tokens/verify").get()
             ).build()
-            val body = client.newCall(request).execute().body?.string() ?: ""
+            val body = client.newCall(request).execute().body?.string().orEmpty()
             val parsed = json.decodeFromString<CfResponse<TokenVerifyResult>>(body)
             if (parsed.success) Result.success(parsed.result?.status ?: "active")
             else Result.failure(Exception("Token invalid"))
@@ -300,6 +433,7 @@ class CloudflareClient @Inject constructor(
 )
 @Serializable data class PagesStage(val name: String = "")
 @Serializable data class WorkerScript(val id: String = "")
+@Serializable data class PurgeResult(val id: String = "")
 @Serializable data class TokenVerifyResult(val status: String = "")
 
 // ── Domain models ─────────────────────────────────────────────────────────

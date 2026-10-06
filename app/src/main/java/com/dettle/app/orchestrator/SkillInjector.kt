@@ -147,8 +147,15 @@ class SkillInjector @Inject constructor(
 
     private fun buildDeliveryBlock(cfg: DettleAgentConfig): String = buildString {
         val d = cfg.delivery
-        appendLine("## Delivery Requirements (${cfg.project})")
+        appendLine("## Developer & Delivery Pipeline (${cfg.project})")
         appendLine("Done = **implemented, wired, tested, built, and committed** — not just written.")
+        appendLine()
+        appendLine("**End-to-End Autonomous Pipeline Flow:**")
+        appendLine("1. Explore & Map: Detect default branch (`github_get_default_branch`), map architecture (`github_map_repo`), and inspect relevant code files (`github_read_file`).")
+        appendLine("2. Branch & PR: Write changes to a feature branch and open a PR (`github_create_branch_pr`). NEVER commit directly to main.")
+        appendLine("3. CI Verification: Trigger CI workflow (`github_trigger_action`) and poll status (`github_poll_run`, `github_list_workflow_runs`).")
+        appendLine("4. Merge: Check PR mergeability (`github_get_pr_status`) and merge (`github_merge_pr`) once CI passes.")
+        appendLine("5. Release & Deploy: Create GitHub Release with version tag (`github_create_release`), verify deployment on Cloudflare (`cloudflare_deploy_preview`, `cloudflare_get_deploy_status`, `cloudflare_list_projects`).")
         appendLine()
         appendLine("**Required for substantial work:**")
         if (d.requirePR) appendLine("- All code goes to a `${d.branchPrefix}*` branch → PR → merge. **Never push to `${d.defaultBranch}`.**")
@@ -256,9 +263,7 @@ This is a LONG-RUNNING task. You MUST NOT stop until it is fully done.
 When you need to call a tool, output EXACTLY this format and NOTHING else on that line:
 <tool_call>{"name": "tool_name", "args": {"param1": "value1", "param2": "value2"}}</tool_call>
 
-Available tools: github_map_repo, github_read_file, github_create_branch_pr, 
-github_trigger_action, cloudflare_deploy_preview, cloudflare_publish_worker,
-web_search, read_url, memory_recall, final_answer
+Available tools: github_list_repos, github_get_repo, github_get_default_branch, github_map_repo, github_read_file, github_list_branches, github_list_commits, github_list_issues, github_create_branch_pr, github_trigger_action, github_poll_run, github_list_workflow_runs, github_get_pr_status, github_merge_pr, github_create_release, cloudflare_deploy_preview, cloudflare_publish_worker, cloudflare_get_deploy_status, cloudflare_list_projects, cloudflare_purge_cache, codebase_search, web_search, read_url, memory_recall, workspace_list_files, workspace_read_file, workspace_write_file, workspace_delete_file, final_answer
 
 When your task is complete, call final_answer with a clear summary.
         """.trimIndent()

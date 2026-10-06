@@ -509,6 +509,8 @@ class ReActLoop @Inject constructor(
     private fun toolCallToApprovalType(toolName: String): ApprovalActionType = when (toolName) {
         "github_create_branch_pr" -> ApprovalActionType.GITHUB_CREATE_PR
         "github_trigger_action" -> ApprovalActionType.GITHUB_TRIGGER_ACTION
+        "github_create_release" -> ApprovalActionType.GITHUB_CREATE_RELEASE
+        "github_merge_pr" -> ApprovalActionType.GITHUB_MERGE_PR
         "cloudflare_publish_worker" -> ApprovalActionType.CLOUDFLARE_DEPLOY_WORKER
         else -> ApprovalActionType.CUSTOM
     }

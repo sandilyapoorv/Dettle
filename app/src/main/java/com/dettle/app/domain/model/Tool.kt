@@ -324,10 +324,126 @@ object AgentTools {
     )
 
 
+    val GITHUB_GET_DEFAULT_BRANCH = Tool(
+        name = "github_get_default_branch",
+        description = "Get the default branch name of a GitHub repository (e.g. 'main' or 'master') to avoid assuming 'main'.",
+        parameters = ToolParameters(
+            properties = mapOf(
+                "owner" to ToolProperty("string", "GitHub repository owner/org name (defaults to active project owner)"),
+                "repo" to ToolProperty("string", "Repository name (defaults to active project repo)")
+            ),
+            required = emptyList()
+        ),
+        safetyLevel = SafetyLevel.AUTO
+    )
+
+    val GITHUB_CREATE_RELEASE = Tool(
+        name = "github_create_release",
+        description = "Create and publish a new GitHub Release with a Git tag and release notes.",
+        parameters = ToolParameters(
+            properties = mapOf(
+                "owner" to ToolProperty("string", "GitHub repository owner/org name (defaults to active project owner)"),
+                "repo" to ToolProperty("string", "Repository name (defaults to active project repo)"),
+                "tag_name" to ToolProperty("string", "Git tag name, e.g. v1.12.0"),
+                "name" to ToolProperty("string", "Release title, e.g. 'v1.12.0 - Dark Mode Toggle'"),
+                "body" to ToolProperty("string", "Release notes description in Markdown"),
+                "target_branch" to ToolProperty("string", "Target branch or commit SHA (defaults to default branch)"),
+                "draft" to ToolProperty("boolean", "Whether to create as draft (default false)"),
+                "prerelease" to ToolProperty("boolean", "Whether this is a prerelease (default false)")
+            ),
+            required = listOf("tag_name")
+        ),
+        requiresApproval = true,
+        safetyLevel = SafetyLevel.REQUIRE
+    )
+
+    val GITHUB_MERGE_PR = Tool(
+        name = "github_merge_pr",
+        description = "Merge an approved pull request into the base branch once CI tests pass.",
+        parameters = ToolParameters(
+            properties = mapOf(
+                "owner" to ToolProperty("string", "GitHub repository owner/org name (defaults to active project owner)"),
+                "repo" to ToolProperty("string", "Repository name (defaults to active project repo)"),
+                "pull_number" to ToolProperty("integer", "Pull request number to merge"),
+                "commit_title" to ToolProperty("string", "Optional commit title for the merge commit"),
+                "commit_message" to ToolProperty("string", "Optional commit message"),
+                "merge_method" to ToolProperty("string", "Merge method: 'squash', 'merge', or 'rebase' (default 'squash')")
+            ),
+            required = listOf("pull_number")
+        ),
+        requiresApproval = true,
+        safetyLevel = SafetyLevel.REQUIRE
+    )
+
+    val GITHUB_GET_PR_STATUS = Tool(
+        name = "github_get_pr_status",
+        description = "Check the status, mergeability, and head branch of an open Pull Request before merging.",
+        parameters = ToolParameters(
+            properties = mapOf(
+                "owner" to ToolProperty("string", "GitHub repository owner/org name (defaults to active project owner)"),
+                "repo" to ToolProperty("string", "Repository name (defaults to active project repo)"),
+                "pull_number" to ToolProperty("integer", "Pull request number")
+            ),
+            required = listOf("pull_number")
+        ),
+        safetyLevel = SafetyLevel.AUTO
+    )
+
+    val GITHUB_LIST_WORKFLOW_RUNS = Tool(
+        name = "github_list_workflow_runs",
+        description = "List recent GitHub Actions workflow runs across the repository, optionally filtered by branch.",
+        parameters = ToolParameters(
+            properties = mapOf(
+                "owner" to ToolProperty("string", "GitHub repository owner/org name (defaults to active project owner)"),
+                "repo" to ToolProperty("string", "Repository name (defaults to active project repo)"),
+                "branch" to ToolProperty("string", "Optional branch name filter"),
+                "limit" to ToolProperty("integer", "Max runs to return (default 10)")
+            ),
+            required = emptyList()
+        ),
+        safetyLevel = SafetyLevel.AUTO
+    )
+
+    val CLOUDFLARE_GET_DEPLOY_STATUS = Tool(
+        name = "cloudflare_get_deploy_status",
+        description = "Check the deployment status, stage, and live URL of a Cloudflare Pages project deployment.",
+        parameters = ToolParameters(
+            properties = mapOf(
+                "project_name" to ToolProperty("string", "Cloudflare Pages project name (defaults to active project)"),
+                "deployment_id" to ToolProperty("string", "Optional specific deployment ID (defaults to latest deployment)")
+            ),
+            required = emptyList()
+        ),
+        safetyLevel = SafetyLevel.AUTO
+    )
+
+    val CLOUDFLARE_LIST_PROJECTS = Tool(
+        name = "cloudflare_list_projects",
+        description = "List all Cloudflare Pages projects and Workers scripts linked to the configured Cloudflare account.",
+        parameters = ToolParameters(
+            properties = emptyMap(),
+            required = emptyList()
+        ),
+        safetyLevel = SafetyLevel.AUTO
+    )
+
+    val CLOUDFLARE_PURGE_CACHE = Tool(
+        name = "cloudflare_purge_cache",
+        description = "Purge Cloudflare CDN edge cache for a zone after deployment.",
+        parameters = ToolParameters(
+            properties = mapOf(
+                "zone_id" to ToolProperty("string", "Cloudflare Zone ID to purge")
+            ),
+            required = listOf("zone_id")
+        ),
+        safetyLevel = SafetyLevel.AUTO
+    )
+
     /** All tools available to agents by default */
     val ALL: List<Tool> = listOf(
         GITHUB_LIST_REPOS,
         GITHUB_GET_REPO,
+        GITHUB_GET_DEFAULT_BRANCH,
         GITHUB_MAP_REPO,
         GITHUB_READ_FILE,
         GITHUB_LIST_BRANCHES,
@@ -336,8 +452,15 @@ object AgentTools {
         GITHUB_CREATE_BRANCH_PR,
         GITHUB_TRIGGER_ACTION,
         GITHUB_POLL_RUN,
+        GITHUB_LIST_WORKFLOW_RUNS,
+        GITHUB_GET_PR_STATUS,
+        GITHUB_MERGE_PR,
+        GITHUB_CREATE_RELEASE,
         CLOUDFLARE_DEPLOY_PREVIEW,
         CLOUDFLARE_PUBLISH_WORKER,
+        CLOUDFLARE_GET_DEPLOY_STATUS,
+        CLOUDFLARE_LIST_PROJECTS,
+        CLOUDFLARE_PURGE_CACHE,
         WORKSPACE_LIST_FILES,
         WORKSPACE_READ_FILE,
         WORKSPACE_WRITE_FILE,
@@ -353,12 +476,17 @@ object AgentTools {
     val READ_ONLY: List<Tool> = listOf(
         GITHUB_LIST_REPOS,
         GITHUB_GET_REPO,
+        GITHUB_GET_DEFAULT_BRANCH,
         GITHUB_MAP_REPO,
         GITHUB_READ_FILE,
         GITHUB_LIST_BRANCHES,
         GITHUB_LIST_COMMITS,
         GITHUB_LIST_ISSUES,
         GITHUB_POLL_RUN,
+        GITHUB_LIST_WORKFLOW_RUNS,
+        GITHUB_GET_PR_STATUS,
+        CLOUDFLARE_GET_DEPLOY_STATUS,
+        CLOUDFLARE_LIST_PROJECTS,
         CODEBASE_SEARCH,
         WORKSPACE_LIST_FILES,
         WORKSPACE_READ_FILE,
@@ -370,6 +498,17 @@ object AgentTools {
 
     /** Tools for the DEPLOYER agent */
     val DEPLOY: List<Tool> = listOf(
-        GITHUB_TRIGGER_ACTION, GITHUB_POLL_RUN, CLOUDFLARE_DEPLOY_PREVIEW, CLOUDFLARE_PUBLISH_WORKER, WORKSPACE_READ_FILE, FINAL_ANSWER
+        GITHUB_TRIGGER_ACTION,
+        GITHUB_POLL_RUN,
+        GITHUB_LIST_WORKFLOW_RUNS,
+        GITHUB_GET_PR_STATUS,
+        GITHUB_MERGE_PR,
+        GITHUB_CREATE_RELEASE,
+        CLOUDFLARE_DEPLOY_PREVIEW,
+        CLOUDFLARE_PUBLISH_WORKER,
+        CLOUDFLARE_GET_DEPLOY_STATUS,
+        CLOUDFLARE_PURGE_CACHE,
+        WORKSPACE_READ_FILE,
+        FINAL_ANSWER
     )
 }
