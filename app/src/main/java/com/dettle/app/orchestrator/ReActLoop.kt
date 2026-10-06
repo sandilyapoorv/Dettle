@@ -197,12 +197,30 @@ class ReActLoop @Inject constructor(
                             ))
                         }
                         currentResponse.append(chunk.text)
-                        emit(LoopEvent.TokenStreamed(
-                            messageId = streamingMessageId,
-                            token = chunk.text,
-                            fullText = currentResponse.toString()
-                        ))
+
+                        // Fix 2: Suppress rendering of <tool_call>...</tool_call> blocks.
+                        // If we're currently inside an unclosed <tool_call> block, the model is
+                        // emitting tool call JSON as text (happens when native models also get the
+                        // XML text format instruction). Don't stream these tokens to the UI.
+                        val bufferText = currentResponse.toString()
+                        val openTagIdx = bufferText.lastIndexOf("<tool_call>")
+                        val closeTagIdx = bufferText.lastIndexOf("</tool_call>")
+                        val insideToolCallBlock = openTagIdx >= 0 && closeTagIdx < openTagIdx
+
+                        if (!insideToolCallBlock) {
+                            // Also strip any fully completed tool_call blocks from the displayed text
+                            val displayText = bufferText.replace(
+                                Regex("<tool_call>.*?</tool_call>", setOf(RegexOption.DOT_MATCHES_ALL)),
+                                ""
+                            ).trim()
+                            emit(LoopEvent.TokenStreamed(
+                                messageId = streamingMessageId,
+                                token = chunk.text,
+                                fullText = displayText.ifBlank { bufferText }
+                            ))
+                        }
                     }
+
                     is StreamChunk.ToolCallDetected -> {
                         detectedToolCallJson = chunk.rawJson
                     }
@@ -218,9 +236,16 @@ class ReActLoop @Inject constructor(
                                 offsetMs = elapsed
                             )
                         ))
+                        // Fix 3: Strip any <tool_call>...</tool_call> blocks from the displayed text.
+                        // This is the safety net — even if suppression in TokenStreamed missed something,
+                        // the final rendered message is always clean.
+                        val cleanedForDisplay = currentResponse.toString().replace(
+                            Regex("<tool_call>.*?</tool_call>", setOf(RegexOption.DOT_MATCHES_ALL)),
+                            ""
+                        ).trim()
                         emit(LoopEvent.StreamComplete(
                             messageId = streamingMessageId,
-                            fullText = currentResponse.toString(),
+                            fullText = cleanedForDisplay.ifBlank { currentResponse.toString() },
                             usage = chunk.usage
                         ))
                     }
@@ -241,23 +266,36 @@ class ReActLoop @Inject constructor(
                 }
             }
 
+            // Fix 3b: Strip tool_call blocks from history (keeps context clean for next AI turn)
             val assistantText = currentResponse.toString()
+            val assistantTextForHistory = assistantText.replace(
+                Regex("<tool_call>.*?</tool_call>", setOf(RegexOption.DOT_MATCHES_ALL)),
+                ""
+            ).trim()
 
             // Add assistant response to history
-            if (assistantText.isNotBlank()) {
+            if (assistantTextForHistory.isNotBlank()) {
+                history.add(ApiMessage(role = "assistant", content = assistantTextForHistory))
+            } else if (assistantText.isNotBlank()) {
+                // If stripping left nothing (rare: full response was tool call), keep raw for history
                 history.add(ApiMessage(role = "assistant", content = assistantText))
             }
 
             // ── Parse tool call ────────────────────────────────────────────
             // Provider returned a structured tool call
             val toolCall = detectedToolCallJson?.let { parseToolCall(it) }
-                // OR: AI embedded a tool call in text (WebView providers)
+                // OR: AI embedded a tool call in text (WebView providers / Ollama)
                 ?: extractTextToolCall(assistantText)
 
             if (toolCall == null) {
                 // No tool call → AI is done
                 done = true
-                val finalAnswer = if (assistantText.isNotBlank()) assistantText else "Hello! How can I help you today?"
+                // Show clean text (no tool call XML) as the final answer
+                val cleanedFinalAnswer = assistantText.replace(
+                    Regex("<tool_call>.*?</tool_call>", setOf(RegexOption.DOT_MATCHES_ALL)),
+                    ""
+                ).trim()
+                val finalAnswer = if (cleanedFinalAnswer.isNotBlank()) cleanedFinalAnswer else "Hello! How can I help you today?"
                 emit(LoopEvent.TraceStepEmitted(
                     TraceStep(
                         icon = "🏁",
@@ -269,6 +307,7 @@ class ReActLoop @Inject constructor(
                 emit(LoopEvent.FinalAnswer(finalAnswer))
                 break
             }
+
 
             Log.d(TAG, "Tool call detected: ${toolCall.name}(${toolCall.arguments})")
 

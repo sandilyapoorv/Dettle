@@ -34,7 +34,13 @@ class SkillInjector @Inject constructor(
     private val memoryInjector: MemoryInjector
 ) {
 
-    suspend fun buildSystemPrompt(context: TaskContext, userPrompt: String = "", isUncensored: Boolean = false, enforcedProtocolJson: String? = null): String = buildString {
+    suspend fun buildSystemPrompt(
+        context: TaskContext,
+        userPrompt: String = "",
+        isUncensored: Boolean = false,
+        enforcedProtocolJson: String? = null,
+        isNativeToolCalling: Boolean = true
+    ): String = buildString {
         // -1. LOCKED IDENTITY — highest priority, prepended before everything else
         appendLine(DETTLE_IDENTITY_BLOCK)
         appendLine()
@@ -107,8 +113,13 @@ class SkillInjector @Inject constructor(
         appendLine("You can use this workspace to write local files, scripts, or outputs without committing to GitHub.")
         appendLine()
 
-        // 9. Tool calling format (for WebView providers without native tool calling)
-        appendLine(TOOL_CALLING_FORMAT)
+        // 9. Tool calling format — ONLY for text-based/WebView providers (Ollama, local models)
+        // Native API providers (Gemini, Claude, OpenAI, Groq) receive tool declarations via the
+        // API request body. Injecting this XML format into their system prompt confuses them and
+        // causes them to emit raw <tool_call> text alongside their native function calls.
+        if (!isNativeToolCalling) {
+            appendLine(TOOL_CALLING_FORMAT)
+        }
     }
 
     // ─── Config-driven blocks ─────────────────────────────────────────────────

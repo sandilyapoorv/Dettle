@@ -231,19 +231,23 @@ class GeminiProvider(
                 if (data.isEmpty() || data == "[DONE]") continue
 
                 try {
-                    // Check for functionCall tool execution
+                    // Fix 5: Dual-emit guard — check for functionCall FIRST.
+                    // If this SSE chunk contains a functionCall, do NOT emit any text tokens from
+                    // it. The extractGeminiText regex could match "text" fields inside the
+                    // functionCall JSON body itself, causing tool call args to leak as text.
                     val toolCallJson = extractGeminiToolCall(data)
                     if (toolCallJson != null) {
                         emit(StreamChunk.ToolCallDetected(toolCallJson))
+                        // Skip text extraction for this chunk — it's a tool call, not a text token
+                    } else {
+                        // Only extract text when this chunk is NOT a tool call
+                        val text = extractGeminiText(data)
+                        if (text.isNotEmpty()) {
+                            emit(StreamChunk.Token(text))
+                        }
                     }
 
-                    // Extract regular text and thoughts
-                    val text = extractGeminiText(data)
-                    if (text.isNotEmpty()) {
-                        emit(StreamChunk.Token(text))
-                    }
-
-                    // Extract usage metadata
+                    // Extract usage metadata (always, regardless of tool call or text)
                     val usageTokens = extractGeminiUsage(data)
                     if (usageTokens != null) {
                         promptTokens = usageTokens.first
@@ -251,6 +255,7 @@ class GeminiProvider(
                     }
 
                 } catch (_: Exception) { /* skip malformed chunk */ }
+
             }
 
             emit(StreamChunk.Done(

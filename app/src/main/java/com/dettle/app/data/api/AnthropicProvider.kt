@@ -144,6 +144,16 @@ class AnthropicProvider(
             var promptTokens = 0
             var completionTokens = 0
 
+            // Fix 4: Accumulate tool call fragments correctly.
+            // Anthropic streams tool calls across multiple events:
+            //   content_block_start  → type=tool_use, id, name
+            //   content_block_delta  → type=input_json_delta, partial_json (many of these)
+            //   message_delta        → stop_reason=tool_use (emit final assembled call here)
+            var toolCallId = ""
+            var toolCallName = ""
+            val toolCallArgsBuffer = StringBuilder()
+            var hasToolCall = false
+
             while (!source.exhausted()) {
                 val line = source.readUtf8Line() ?: break
                 if (!line.startsWith("data: ")) continue
@@ -162,6 +172,16 @@ class AnthropicProvider(
                                 }
                             }
                         }
+                        "content_block_start" -> {
+                            // Capture tool_use block header (id + name)
+                            val contentBlock = chunk["content_block"]?.let { runCatching { it.jsonObject }.getOrNull() }
+                            if (contentBlock?.get("type")?.jsonPrimitive?.content == "tool_use") {
+                                toolCallId = contentBlock["id"]?.jsonPrimitive?.content ?: ""
+                                toolCallName = contentBlock["name"]?.jsonPrimitive?.content ?: ""
+                                toolCallArgsBuffer.clear()
+                                hasToolCall = true
+                            }
+                        }
                         "content_block_delta" -> {
                             val delta = chunk["delta"]?.let { runCatching { it.jsonObject }.getOrNull() }
                             val deltaType = delta?.get("type")?.jsonPrimitive?.content
@@ -177,9 +197,10 @@ class AnthropicProvider(
                                     emit(StreamChunk.Token(thinking))
                                 }
                             } else if (deltaType == "input_json_delta") {
+                                // Accumulate — don't emit yet, JSON is partial / incomplete
                                 val partialJson = delta["partial_json"]?.jsonPrimitive?.content
                                 if (!partialJson.isNullOrEmpty()) {
-                                    emit(StreamChunk.ToolCallDetected(partialJson))
+                                    toolCallArgsBuffer.append(partialJson)
                                 }
                             }
                         }
@@ -189,6 +210,15 @@ class AnthropicProvider(
                             }
                             val stopReason = chunk["delta"]?.let { runCatching { it.jsonObject }.getOrNull() }
                                 ?.get("stop_reason")?.jsonPrimitive?.content ?: "stop"
+
+                            // If we accumulated a tool call, emit the fully assembled JSON now
+                            if (hasToolCall && toolCallName.isNotBlank()) {
+                                val argsJson = toolCallArgsBuffer.toString().trim().let {
+                                    if (it.isBlank() || (!it.startsWith("{") && !it.startsWith("["))) "{}" else it
+                                }
+                                val toolCallJson = """{"id":"$toolCallId","type":"function","name":"$toolCallName","arguments":$argsJson,"function":{"name":"$toolCallName","arguments":$argsJson}}"""
+                                emit(StreamChunk.ToolCallDetected(toolCallJson))
+                            }
 
                             emit(StreamChunk.Done(
                                 finishReason = stopReason,
