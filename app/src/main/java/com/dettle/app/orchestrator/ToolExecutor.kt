@@ -579,7 +579,7 @@ class ToolExecutor @Inject constructor(
 
     private suspend fun resolveBranch(owner: String, repo: String, specified: String?): String {
         if (!specified.isNullOrBlank()) return specified
-        val projBranch = activeProj?.branch
+        val projBranch = projectContextManager.activeProject.value?.branch
         if (!projBranch.isNullOrBlank()) return projBranch
         return githubClient.getDefaultBranch(owner, repo).getOrDefault("main")
     }
