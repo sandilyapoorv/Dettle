@@ -7,8 +7,6 @@ import com.dettle.app.data.db.dao.UserProfileDao
 import com.dettle.app.data.db.entity.UserProfileEntity
 import com.dettle.app.orchestrator.MemoryInjector
 import com.dettle.app.domain.model.ApiMessage
-import com.dettle.app.domain.model.AIModel
-import com.dettle.app.domain.model.ALL_KNOWN_MODELS
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -95,7 +93,7 @@ AI responded: ${snapshot.aiResponse.take(500)}
             messages = listOf(ApiMessage(role = "user", content = userContent)),
             systemPrompt = systemPrompt,
             maxTokens = 150,
-            preferModel = ALL_KNOWN_MODELS.values.firstOrNull()
+            preferModel = null  // Let the pool's waterfall pick the best available provider
         ).collect { chunk ->
             if (chunk is StreamChunk.Token) response += chunk.text
         }

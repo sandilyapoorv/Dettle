@@ -158,9 +158,9 @@ object AgentModes {
         defaultConfig = ModeConfig(
             enabledTools = AgentTools.ALL.map { it.name },
             modelWaterfall = listOf(
-                FreeModels.GROQ_LLAMA_8B.modelId,   // fast inner loop
-                FreeModels.GEMINI_FLASH.modelId,     // heavy code writing
-                FreeModels.GITHUB_GPT4O.modelId      // hard problems
+                FreeModels.GEMINI_FLASH.modelId,     // primary code writing
+                FreeModels.GITHUB_GPT4O.modelId,     // hard problems fallback
+                FreeModels.GROQ_LLAMA_8B.modelId     // speed fallback (Groq key optional)
             ),
             maxSteps = 12,
             completionGates = listOf("build_passed", "tests_passed", "pr_created"),
