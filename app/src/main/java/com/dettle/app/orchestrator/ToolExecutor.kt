@@ -517,17 +517,81 @@ class ToolExecutor @Inject constructor(
                 else files.joinToString("\n")
             }
 
-            "workspace_read_file" -> {
-                val path = args["path"] ?: return errResult(toolCall, "Missing path")
+            "workspace_read_file", "file_read" -> {
+                val path = args["path"] ?: args["file_path"] ?: return errResult(toolCall, "Missing path or file_path")
+                val offset = args["offset"]?.toIntOrNull() ?: 1
+                val limit = args["limit"]?.toIntOrNull() ?: 2000
                 try {
-                    workspaceManager.readFile(path)
+                    workspaceManager.readFile(path, offset, limit)
                 } catch (e: Exception) {
                     errResult(toolCall, e.message ?: "Failed to read file").content
                 }
             }
 
+            "workspace_file_edit", "file_edit" -> {
+                val path = args["file_path"] ?: args["path"] ?: return errResult(toolCall, "Missing file_path")
+                val oldString = args["old_string"] ?: args["old_str"] ?: args["search"] ?: return errResult(toolCall, "Missing old_string")
+                val newString = args["new_string"] ?: args["new_str"] ?: args["replace"] ?: return errResult(toolCall, "Missing new_string")
+                val replaceAll = args["replace_all"]?.toBooleanStrictOrNull() ?: false
+                try {
+                    workspaceManager.editFile(path, oldString, newString, replaceAll)
+                } catch (e: Exception) {
+                    errResult(toolCall, e.message ?: "Failed to edit file").content
+                }
+            }
+
+            "workspace_grep", "grep" -> {
+                val pattern = args["pattern"] ?: args["query"] ?: return errResult(toolCall, "Missing pattern")
+                val subPath = args["path"] ?: args["dir"] ?: ""
+                val mode = args["mode"] ?: "content"
+                val contextLines = args["context_lines"]?.toIntOrNull() ?: 2
+                val caseSensitive = args["case_sensitive"]?.toBooleanStrictOrNull() ?: true
+                try {
+                    workspaceManager.grep(pattern, subPath, mode, isRegex = true, caseSensitive, contextLines)
+                } catch (e: Exception) {
+                    errResult(toolCall, e.message ?: "Failed to grep files").content
+                }
+            }
+
+            "workspace_glob", "glob" -> {
+                val pattern = args["pattern"] ?: args["glob"] ?: return errResult(toolCall, "Missing pattern")
+                val subPath = args["path"] ?: args["dir"] ?: ""
+                val matches = workspaceManager.glob(pattern, subPath)
+                if (matches.isEmpty()) "No files matched pattern: $pattern"
+                else matches.joinToString("\n")
+            }
+
+            "workspace_bash", "bash" -> {
+                val command = args["command"] ?: args["cmd"] ?: return errResult(toolCall, "Missing command")
+                val timeout = args["timeout_seconds"]?.toLongOrNull() ?: 60L
+                workspaceManager.executeBash(command, timeout)
+            }
+
+            "ask_user_question" -> {
+                val question = args["question"] ?: return errResult(toolCall, "Missing question")
+                val options = args["options"] ?: "[]"
+                buildString {
+                    appendLine("### Question for User")
+                    appendLine(question)
+                    appendLine("\nOptions:")
+                    try {
+                        val parsed = json.parseToJsonElement(options)
+                        if (parsed is kotlinx.serialization.json.JsonArray) {
+                            parsed.forEachIndexed { i, opt ->
+                                val text = (opt as? kotlinx.serialization.json.JsonPrimitive)?.content ?: opt.toString()
+                                appendLine("${i + 1}. $text")
+                            }
+                        } else {
+                            appendLine(options)
+                        }
+                    } catch (_: Exception) {
+                        appendLine(options)
+                    }
+                }
+            }
+
             "workspace_write_file" -> {
-                val path = args["path"] ?: return errResult(toolCall, "Missing path")
+                val path = args["path"] ?: args["file_path"] ?: return errResult(toolCall, "Missing path")
                 val writeContent = args["content"] ?: return errResult(toolCall, "Missing content")
                 try {
                     workspaceManager.writeFile(path, writeContent)
@@ -538,7 +602,7 @@ class ToolExecutor @Inject constructor(
             }
 
             "workspace_delete_file" -> {
-                val path = args["path"] ?: return errResult(toolCall, "Missing path")
+                val path = args["path"] ?: args["file_path"] ?: return errResult(toolCall, "Missing path")
                 try {
                     if (workspaceManager.deleteFile(path)) "Deleted $path" else "Failed to delete $path"
                 } catch (e: Exception) {

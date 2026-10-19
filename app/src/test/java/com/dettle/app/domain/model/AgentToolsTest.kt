@@ -38,7 +38,9 @@ class AgentToolsTest {
         assertFalse(readOnlyNames.contains(AgentTools.CLOUDFLARE_PUBLISH_WORKER.name))
         assertFalse(readOnlyNames.contains(AgentTools.CLOUDFLARE_PURGE_CACHE.name))
         assertFalse(readOnlyNames.contains(AgentTools.WORKSPACE_WRITE_FILE.name))
+        assertFalse(readOnlyNames.contains(AgentTools.WORKSPACE_FILE_EDIT.name))
         assertFalse(readOnlyNames.contains(AgentTools.WORKSPACE_DELETE_FILE.name))
+        assertFalse(readOnlyNames.contains(AgentTools.WORKSPACE_BASH.name))
     }
 
     @Test
@@ -58,6 +60,11 @@ class AgentToolsTest {
         assertTrue(allNames.contains(AgentTools.CLOUDFLARE_LIST_PROJECTS.name))
         assertTrue(allNames.contains(AgentTools.CLOUDFLARE_PURGE_CACHE.name))
         assertTrue(allNames.contains(AgentTools.WORKSPACE_WRITE_FILE.name))
+        assertTrue(allNames.contains(AgentTools.WORKSPACE_FILE_EDIT.name))
+        assertTrue(allNames.contains(AgentTools.WORKSPACE_GREP.name))
+        assertTrue(allNames.contains(AgentTools.WORKSPACE_GLOB.name))
+        assertTrue(allNames.contains(AgentTools.WORKSPACE_BASH.name))
+        assertTrue(allNames.contains(AgentTools.ASK_USER_QUESTION.name))
     }
 
     @Test

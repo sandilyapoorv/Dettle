@@ -289,12 +289,85 @@ object AgentTools {
 
     val WORKSPACE_READ_FILE = Tool(
         name = "workspace_read_file",
-        description = "Read the contents of a file from the local agent workspace.",
+        description = "Read a file from the workspace with line numbers. Use offset and limit to inspect specific line ranges and conserve tokens.",
         parameters = ToolParameters(
             properties = mapOf(
-                "path" to ToolProperty("string", "Path to the file relative to the workspace root")
+                "path" to ToolProperty("string", "Path to the file relative to the workspace root"),
+                "offset" to ToolProperty("integer", "Line number to start reading from (1-indexed, default 1)"),
+                "limit" to ToolProperty("integer", "Number of lines to read (default 2000)")
             ),
             required = listOf("path")
+        ),
+        safetyLevel = SafetyLevel.AUTO
+    )
+
+    val WORKSPACE_FILE_EDIT = Tool(
+        name = "workspace_file_edit",
+        description = "Surgically edit a file by replacing old_string with new_string (Claude Code contract). old_string must be an exact, unique character-for-character match including indentation. If not unique, supply 1-2 lines of surrounding context. Never overwrites whole files.",
+        parameters = ToolParameters(
+            properties = mapOf(
+                "file_path" to ToolProperty("string", "Path to file relative to workspace root"),
+                "old_string" to ToolProperty("string", "Exact string to replace. Must be unique in the file."),
+                "new_string" to ToolProperty("string", "Replacement string"),
+                "replace_all" to ToolProperty("boolean", "If true, replaces all occurrences. Default false.")
+            ),
+            required = listOf("file_path", "old_string", "new_string")
+        ),
+        safetyLevel = SafetyLevel.AUTO
+    )
+
+    val WORKSPACE_GREP = Tool(
+        name = "workspace_grep",
+        description = "Fast regex search across files (ripgrep / Claude Code Grep). Mode 'files_with_matches' returns only matching file paths (zero token waste). Mode 'content' returns lines with context. Mode 'count' returns match counts.",
+        parameters = ToolParameters(
+            properties = mapOf(
+                "pattern" to ToolProperty("string", "Regex or text pattern to search for"),
+                "path" to ToolProperty("string", "Directory or file path to search within (defaults to workspace root)"),
+                "mode" to ToolProperty("string", "Search mode: 'files_with_matches', 'content', or 'count' (default 'content')", enum = listOf("files_with_matches", "content", "count")),
+                "context_lines" to ToolProperty("integer", "Number of lines of context before and after match for 'content' mode (default 2)"),
+                "case_sensitive" to ToolProperty("boolean", "Case sensitive search (default true)")
+            ),
+            required = listOf("pattern")
+        ),
+        safetyLevel = SafetyLevel.AUTO
+    )
+
+    val WORKSPACE_GLOB = Tool(
+        name = "workspace_glob",
+        description = "Fast file pattern search across workspace (Claude Code Glob). Accepts wildcards like **/*.kt, src/**/*.ts, *.json.",
+        parameters = ToolParameters(
+            properties = mapOf(
+                "pattern" to ToolProperty("string", "Glob pattern (e.g. '**/*.kt', '*.md')"),
+                "path" to ToolProperty("string", "Optional directory path to search within")
+            ),
+            required = listOf("pattern")
+        ),
+        safetyLevel = SafetyLevel.AUTO
+    )
+
+    val WORKSPACE_BASH = Tool(
+        name = "workspace_bash",
+        description = "Execute a deterministic shell command in the local workspace directory. Output is automatically truncated if over 40 lines (preserving head and tail error traces), and the complete log is persisted to disk.",
+        parameters = ToolParameters(
+            properties = mapOf(
+                "command" to ToolProperty("string", "Shell command to execute"),
+                "timeout_seconds" to ToolProperty("integer", "Timeout in seconds (default 60)")
+            ),
+            required = listOf("command")
+        ),
+        requiresApproval = true,
+        safetyLevel = SafetyLevel.REQUIRE
+    )
+
+    val ASK_USER_QUESTION = Tool(
+        name = "ask_user_question",
+        description = "Halt execution and ask the user a structured question with selectable choices to resolve ambiguity or architectural trade-offs rather than making unverified assumptions.",
+        parameters = ToolParameters(
+            properties = mapOf(
+                "question" to ToolProperty("string", "The question to ask the user"),
+                "options" to ToolProperty("string", "JSON array of strings representing selectable options for the user")
+            ),
+            required = listOf("question", "options")
         ),
         safetyLevel = SafetyLevel.AUTO
     )
@@ -465,7 +538,12 @@ object AgentTools {
         WORKSPACE_LIST_FILES,
         WORKSPACE_READ_FILE,
         WORKSPACE_WRITE_FILE,
+        WORKSPACE_FILE_EDIT,
         WORKSPACE_DELETE_FILE,
+        WORKSPACE_GREP,
+        WORKSPACE_GLOB,
+        WORKSPACE_BASH,
+        ASK_USER_QUESTION,
         CODEBASE_SEARCH,
         WEB_SEARCH,
         READ_URL,
@@ -491,6 +569,9 @@ object AgentTools {
         CODEBASE_SEARCH,
         WORKSPACE_LIST_FILES,
         WORKSPACE_READ_FILE,
+        WORKSPACE_GREP,
+        WORKSPACE_GLOB,
+        ASK_USER_QUESTION,
         MEMORY_RECALL,
         WEB_SEARCH,
         READ_URL,

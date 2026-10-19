@@ -67,6 +67,8 @@ class ReActLoop @Inject constructor(
     private val reflexEngine: ProceduralReflexEngine,
     private val codebaseRagService: com.dettle.app.orchestrator.rag.CodebaseRagService,
     private val projectContextManager: com.dettle.app.orchestrator.project.ProjectContextManager,
+    private val workspaceManager: com.dettle.app.data.workspace.LocalWorkspaceManager,
+    private val repoMapper: RepoMapper,
     private val json: Json
 ) {
     fun run(
@@ -112,6 +114,11 @@ class ReActLoop @Inject constructor(
             isUncensored = effectiveUncensored
         )
 
+        val workspaceFiles = runCatching { workspaceManager.readAllFiles() }.getOrDefault(emptyMap())
+        val workspaceRepoMap = if (workspaceFiles.isNotEmpty()) {
+            repoMapper.buildWorkspaceRepoMap(workspaceFiles)
+        } else ""
+
         val activeProj = projectContextManager.activeProject.value
         val ragBlock = if (activeProj != null) {
             codebaseRagService.buildRagContextBlock(activeProj.id, userMessage)
@@ -119,6 +126,10 @@ class ReActLoop @Inject constructor(
 
         val systemPrompt = buildString {
             append(baseSystemPrompt)
+            if (workspaceRepoMap.isNotBlank()) {
+                appendLine()
+                appendLine(workspaceRepoMap)
+            }
             if (activeProj != null) {
                 appendLine()
                 appendLine("=== ACTIVE ANCHORED PROJECT ===")
@@ -169,9 +180,11 @@ class ReActLoop @Inject constructor(
             var detectedToolCallJson: String? = null
             var streamingMessageId = java.util.UUID.randomUUID().toString()
 
+            val inferenceHistory = compactHistoryForInference(history)
+
             // Stream from AI provider
             keyPoolManager.chat(
-                messages = history,
+                messages = inferenceHistory,
                 tools = effectiveTools,
                 systemPrompt = systemPrompt
             ).collect { chunk ->
@@ -471,9 +484,71 @@ class ReActLoop @Inject constructor(
         "github_create_release" -> ApprovalActionType.GITHUB_CREATE_RELEASE
         "github_merge_pr" -> ApprovalActionType.GITHUB_MERGE_PR
         "cloudflare_publish_worker" -> ApprovalActionType.CLOUDFLARE_DEPLOY_WORKER
+        "workspace_bash", "bash" -> ApprovalActionType.CUSTOM
         else -> ApprovalActionType.CUSTOM
     }
 
+    /**
+     * Compacts tool outputs in older turns to conserve tokens and align prompt cache.
+     * Keeps the most recent [keepRecentCount] messages completely uncompacted.
+     */
+    internal fun compactHistoryForInference(
+        rawHistory: List<ApiMessage>,
+        keepRecentCount: Int = 4
+    ): List<ApiMessage> {
+        if (rawHistory.size <= keepRecentCount) return rawHistory
+
+        val splitIndex = (rawHistory.size - keepRecentCount).coerceAtLeast(0)
+        val older = rawHistory.subList(0, splitIndex)
+        val recent = rawHistory.subList(splitIndex, rawHistory.size)
+
+        val compactedOlder = older.map { msg ->
+            if (msg.role == "tool" && msg.content.length > 200) {
+                val toolName = msg.name ?: "tool"
+                val summary = summarizeToolOutput(toolName, msg.content)
+                msg.copy(content = summary)
+            } else {
+                msg
+            }
+        }
+
+        return compactedOlder + recent
+    }
+
+    private fun summarizeToolOutput(toolName: String, content: String): String {
+        return when (toolName) {
+            "workspace_read_file", "file_read" -> {
+                val lines = content.lines()
+                "[Read: ${lines.size} lines — ${content.length} chars (compacted for cache)]"
+            }
+            "workspace_file_edit", "file_edit" -> {
+                content.lines().firstOrNull() ?: "[File edit completed]"
+            }
+            "workspace_grep", "grep" -> {
+                val lines = content.lines().filter { it.isNotBlank() }
+                "[Grep: ${lines.size} lines matched (compacted)]"
+            }
+            "workspace_glob", "glob" -> {
+                val lines = content.lines().filter { it.isNotBlank() }
+                "[Glob: ${lines.size} paths matched (compacted)]"
+            }
+            "workspace_bash", "bash" -> {
+                val exitLine = content.lines().firstOrNull { it.contains("Exit Code") } ?: "[Exit 0]"
+                "$exitLine — output compacted (${content.length} chars)"
+            }
+            "github_read_file" -> {
+                "[GitHub Read: ${content.length} chars (compacted)]"
+            }
+            "github_map_repo" -> {
+                "[GitHub Repo Map: ${content.lines().size} entries (compacted)]"
+            }
+            else -> {
+                if (content.length > 200) {
+                    content.take(120) + "... [Truncated ${content.length} chars to conserve tokens]"
+                } else content
+            }
+        }
+    }
 }
 
 // ─── Context and Events ────────────────────────────────────────────────────

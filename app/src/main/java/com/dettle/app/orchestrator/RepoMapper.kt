@@ -18,9 +18,14 @@ import javax.inject.Singleton
  * Cached by commit SHA — never re-fetches an unchanged repo.
  */
 @Singleton
-class RepoMapper @Inject constructor(
-    private val githubClient: GitHubClient
+class RepoMapper(
+    private val githubClient: GitHubClient?,
+    @Suppress("UNUSED_PARAMETER") forTesting: Boolean
 ) {
+    @Inject
+    constructor(githubClient: GitHubClient) : this(githubClient, false)
+
+    constructor() : this(null, true)
     private val cache = mutableMapOf<String, String>()  // key = "owner/repo@branch"
 
     suspend fun buildRepoMap(
@@ -29,10 +34,11 @@ class RepoMapper @Inject constructor(
         branch: String = "main",
         maxSignatureFiles: Int = 20  // Limit deep-parsing to avoid rate limits
     ): Result<String> {
+        val client = githubClient ?: return Result.failure(IllegalStateException("GitHubClient not initialized"))
         val cacheKey = "$owner/$repo@$branch"
         cache[cacheKey]?.let { return Result.success(it) }
 
-        val treeResult = githubClient.getRepoTree(owner, repo, branch)
+        val treeResult = client.getRepoTree(owner, repo, branch)
         val files = treeResult.getOrElse { return Result.failure(it) }
 
         val map = buildString {
@@ -68,7 +74,7 @@ class RepoMapper @Inject constructor(
 
             for (file in codeFiles) {
                 appendLine("### `${file.path}`")
-                val sigResult = githubClient.readFile(owner, repo, file.path, branch)
+                val sigResult = client.readFile(owner, repo, file.path, branch)
                 val signatures = sigResult.getOrNull()?.let { extractSignatures(it, file.extension) }
                 if (!signatures.isNullOrEmpty()) {
                     appendLine("```${file.extension}")
@@ -89,6 +95,42 @@ class RepoMapper @Inject constructor(
 
         cache[cacheKey] = map
         return Result.success(map)
+    }
+
+    /** Build a compact AST signature map for local workspace files (under ~1000 tokens) */
+    fun buildWorkspaceRepoMap(workspaceFiles: Map<String, String>, maxSignatureFiles: Int = 15): String {
+        if (workspaceFiles.isEmpty()) return ""
+        return buildString {
+            appendLine("## Workspace Map (Compact Signatures)")
+            appendLine("```")
+            workspaceFiles.keys.sorted().forEach { path ->
+                appendLine(path)
+            }
+            appendLine("```")
+            appendLine()
+
+            val codeFiles = workspaceFiles.entries
+                .filter { (path, content) ->
+                    val ext = path.substringAfterLast('.', "")
+                    ext in listOf("kt", "java", "py", "js", "ts", "jsx", "tsx", "go", "rs", "swift") && content.length < 100_000
+                }
+                .sortedByDescending { it.value.length }
+                .take(maxSignatureFiles)
+
+            if (codeFiles.isNotEmpty()) {
+                appendLine("## Key Workspace Signatures")
+                for ((path, content) in codeFiles) {
+                    val ext = path.substringAfterLast('.', "")
+                    val signatures = extractSignatures(content, ext)
+                    if (signatures.isNotEmpty()) {
+                        appendLine("### `$path`")
+                        appendLine("```$ext")
+                        signatures.take(30).forEach { appendLine(it) }
+                        appendLine("```")
+                    }
+                }
+            }
+        }
     }
 
     /** Extract function/class signatures from code content using language-aware regex */
