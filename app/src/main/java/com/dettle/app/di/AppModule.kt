@@ -52,9 +52,9 @@ object AppModule {
             level = HttpLoggingInterceptor.Level.BODY
         }
         return OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(120, TimeUnit.SECONDS)   // Long timeout for AI streaming
-            .writeTimeout(30, TimeUnit.SECONDS)
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)   // Fast failover for TTFT (streaming packets reset timeout)
+            .writeTimeout(15, TimeUnit.SECONDS)
             .addInterceptor(logging)
             .build()
     }

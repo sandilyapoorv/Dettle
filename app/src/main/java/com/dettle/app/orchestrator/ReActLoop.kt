@@ -80,7 +80,9 @@ class ReActLoop @Inject constructor(
         goal: Goal? = null,
         isUncensored: Boolean = taskContext.isUncensored,
         maxSteps: Int = DEFAULT_MAX_STEPS,
-        startTimeMs: Long = System.currentTimeMillis()
+        startTimeMs: Long = System.currentTimeMillis(),
+        preferredModel: com.dettle.app.domain.model.AIModel? = null,
+        selectedModelId: String? = null
     ): Flow<LoopEvent> {
         
         // 1. Motor Cortex: Fast Reflex Intercept
@@ -182,11 +184,20 @@ class ReActLoop @Inject constructor(
 
             val inferenceHistory = compactHistoryForInference(history)
 
+            val resolvedPreferredModel: com.dettle.app.domain.model.AIModel? = preferredModel ?: selectedModelId?.let { id ->
+                if (id != "Dettle AI" && id.isNotBlank()) {
+                    ALL_KNOWN_MODELS[id] ?: ALL_KNOWN_MODELS.values.firstOrNull { it.displayName.equals(id, ignoreCase = true) }
+                } else null
+            } ?: mode?.effectiveConfig?.modelWaterfall?.firstNotNullOfOrNull { id ->
+                ALL_KNOWN_MODELS[id] ?: ALL_KNOWN_MODELS.values.firstOrNull { it.displayName.equals(id, ignoreCase = true) }
+            }
+
             // Stream from AI provider
             keyPoolManager.chat(
                 messages = inferenceHistory,
                 tools = effectiveTools,
-                systemPrompt = systemPrompt
+                systemPrompt = systemPrompt,
+                preferModel = resolvedPreferredModel
             ).collect { chunk ->
                 when (chunk) {
                     is StreamChunk.ProviderSelected -> {

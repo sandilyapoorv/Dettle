@@ -194,7 +194,8 @@ class AgentExecutionManager @Inject constructor(
                             goal = goal,
                             isUncensored = isUncensored,
                             maxSteps = 30,
-                            startTimeMs = startTimeMs
+                            startTimeMs = startTimeMs,
+                            selectedModelId = selectedModel
                         )
                     }
                 }

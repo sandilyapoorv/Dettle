@@ -136,7 +136,13 @@ class KeyPoolManager @Inject constructor(
                                 } else {
                                     hitError = true
                                     lastError = chunk.message
-                                    Log.w(TAG, "Error on ${state.model.displayName}: ${chunk.message}")
+                                    if (!streamBegan) {
+                                        state.isOnCooldown = true
+                                        state.cooldownUntilMs = System.currentTimeMillis() + 60_000L
+                                        Log.w(TAG, "Hard error on ${state.model.displayName} before stream, cooling down 60s: ${chunk.message}")
+                                    } else {
+                                        Log.w(TAG, "Error on ${state.model.displayName}: ${chunk.message}")
+                                    }
                                 }
                             }
                             else -> {}
@@ -161,6 +167,9 @@ class KeyPoolManager @Inject constructor(
             } catch (e: Exception) {
                 Log.e(TAG, "Provider ${state.model.displayName} failed with exception: ${e.message}", e)
                 lastError = e.message ?: "Provider error"
+                state.isOnCooldown = true
+                state.cooldownUntilMs = System.currentTimeMillis() + 60_000L
+                Log.w(TAG, "Placed ${state.model.displayName} on 60s cooldown due to exception: ${e.message}")
                 if (streamBegan) return@flow
             }
         }
