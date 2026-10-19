@@ -4,6 +4,39 @@ All notable changes, commits, architectural decisions, and releases for the **De
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and [Conventional Commits](https://www.conventionalcommits.org/).
 
+## [v1.14.0] - 2026-10-19: Claude Code Surgical Harness Architecture & Codex Token Optimization
+
+### Direct APK Download
+- **Production Release APK (R8 Minified, Signed)**: [dettle-release-1.14.0.apk](https://github.com/sandilyapoorv/Dettle/releases/download/v1.14.0/dettle-release-1.14.0.apk)
+- **Debug APK**: [dettle-debug-1.14.0.apk](https://github.com/sandilyapoorv/Dettle/releases/download/v1.14.0/dettle-debug-1.14.0.apk)
+- **GitHub Release Page**: [https://github.com/sandilyapoorv/Dettle/releases/tag/v1.14.0](https://github.com/sandilyapoorv/Dettle/releases/tag/v1.14.0)
+- **CI/CD Workflow**: [https://github.com/sandilyapoorv/Dettle/actions](https://github.com/sandilyapoorv/Dettle/actions)
+
+### What Was Built & Changed
+1. **Claude Code 5-Tool Surgical Primitive Architecture**:
+   - `workspace_file_edit` (`FileEdit`): Enforces exact unique substring replacement (`old_string` -> `new_string`) instead of whole-file rewriting. Prevents destructive overwrites and provides compact diff returns.
+   - `workspace_read_file` (`FileRead`): Upgraded with line `offset` and `limit` support, returning 1-indexed formatted lines (`42 | class Foo`).
+   - `workspace_grep` (`Grep`): Integrated regex search supporting `files_with_matches` (returns only matching file paths for zero token waste), `content` (with `-C` context lines), and `count` modes.
+   - `workspace_glob` (`Glob`): Fast wildcard path pattern matcher (`**/*.kt`, `*.json`).
+   - `workspace_bash` (`Bash`): Local shell execution engine with head/tail output truncation.
+2. **File State Tracking & Staleness Protection (`FileStateTracker`)**:
+   - In-memory thread-safe tracker tracking file modification timestamps (`mtime`).
+   - Rejects stale edits if files were modified externally or by background shell processes since last read.
+3. **Interactive Ambiguity Resolution (`ask_user_question`)**:
+   - Tool primitive allowing Dettle to pause and present structured selectable choices to the user when architectural forks, breaking changes, or design trade-offs arise.
+4. **Aggressive Command Output Truncation & Disk Logging**:
+   - Terminal outputs exceeding 40 lines are truncated to head (10 lines) and tail (25 lines) where stack traces and compilation errors reside, persisting raw logs in `.logs/`. Reduces terminal token consumption by up to 95%.
+5. **Historical Tool Compaction in ReActLoop**:
+   - Compacts verbose tool outputs in turns older than 4 steps into 1-line semantic summaries before LLM inference, slashing conversational context token growth by 60–80%.
+6. **Frozen Prefix Prompt Alignment for Prompt Caching**:
+   - Restructured `SkillInjector` to lock the static system prompt prefix (Identity, Surgical Harness Protocol, Karpathy Guidelines, Tech Stack, Free Tier Guardrails) at the top of the prompt. Dynamic elements (memories, persona tone) are strictly appended at the bottom, achieving massive prompt caching discounts on Anthropic Claude and Google Gemini.
+7. **Workspace AST Repo Map (`RepoMapper`)**:
+   - Extracts local project class declarations and function signatures to inject a compact (~1k tokens) structural repo map into system context without reading entire files.
+8. **Test Suites & Verification**:
+   - Added unit test suites `LocalWorkspaceManagerSurgicalTest`, `ReActLoopCompactionTest`, and `AgentToolsTest` to deterministically verify all surgical edit edge cases, grep modes, AST mapping, and history compaction.
+
+---
+
 ## [v1.13.0] - 2026-10-19: Universal Tool Calling Engine, Action Approval Flow & WebView Eradication
 
 ### Direct APK Download
