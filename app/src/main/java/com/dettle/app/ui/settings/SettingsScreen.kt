@@ -26,6 +26,16 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.ui.platform.LocalView
+import com.dettle.app.ui.components.Haptics
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.material3.BottomSheetDefaults
@@ -108,6 +118,13 @@ import com.dettle.app.ui.theme.DettleOrange
 import com.dettle.app.ui.theme.ThemeConfig
 import com.dettle.app.ui.theme.ThemeMode
 
+enum class SettingsTab(val label: String, val icon: ImageVector) {
+    AI("AI Providers", Icons.Outlined.Key),
+    CLOUD("Cloud & Git", Icons.Outlined.CloudUpload),
+    APPEARANCE("Appearance", Icons.Outlined.Palette),
+    BACKUPS("Backups", Icons.Outlined.CloudSync)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -115,230 +132,239 @@ fun SettingsScreen(
     onBack: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val view = LocalView.current
     val state = viewModel.state
     val themeConfig by viewModel.themeConfig.collectAsState(initial = ThemeConfig())
+    var selectedTab by remember { mutableStateOf(SettingsTab.AI) }
     var showBackupSheet by remember { mutableStateOf(false) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            CenterAlignedTopAppBar(
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                ),
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = MaterialTheme.colorScheme.onBackground
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.background)
+            ) {
+                CenterAlignedTopAppBar(
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background
+                    ),
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+                    },
+                    title = {
+                        Text(
+                            "Settings",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
                         )
                     }
-                },
-                title = {
-                    Text(
-                        "Settings",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                )
+
+                // ── Modern Segmented Category Tabs ──
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .background(
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            RoundedCornerShape(14.dp)
+                        )
+                        .padding(3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    SettingsTab.entries.forEach { tab ->
+                        val isSelected = selectedTab == tab
+                        Surface(
+                            onClick = {
+                                Haptics.tick(view)
+                                selectedTab = tab
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(11.dp),
+                            color = if (isSelected)
+                                MaterialTheme.colorScheme.surface
+                            else
+                                Color.Transparent,
+                            border = if (isSelected)
+                                BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                            else null,
+                            shadowElevation = if (isSelected) 1.5.dp else 0.dp
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(vertical = 7.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Icon(
+                                    imageVector = tab.icon,
+                                    contentDescription = tab.label,
+                                    tint = if (isSelected)
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(17.dp)
+                                )
+                                Text(
+                                    text = tab.label,
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        fontSize = 10.5.sp
+                                    ),
+                                    color = if (isSelected)
+                                        MaterialTheme.colorScheme.onSurface
+                                    else
+                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
                 }
-            )
+            }
         }
     ) { paddingValues ->
-        LazyColumn(
+        AnimatedContent(
+            targetState = selectedTab,
+            transitionSpec = {
+                (fadeIn(tween(180)) + slideInHorizontally(
+                    initialOffsetX = { if (targetState.ordinal > initialState.ordinal) 50 else -50 },
+                    animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
+                )).togetherWith(
+                    fadeOut(tween(130))
+                )
+            },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues),
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Theme & Appearance Customization Card
-            item {
-                ThemeAppearanceCard(
-                    config = themeConfig,
-                    onSelectTheme = viewModel::setTheme,
-                    onSelectMode = viewModel::setThemeMode,
-                    onToggleOled = viewModel::setPureOled,
-                    onSelectAccent = viewModel::setCustomAccent,
-                    onReset = viewModel::resetTheme
-                )
-            }
-
-            // Aggregate Mathematics & Token Metrics Card
-            item {
-                AggregateMetricsCard(metrics = state.aggregateMetrics)
-            }
-
-            // Developer Mode Card
-            item {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = if (state.isUnleashed) DettleGreen.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    border = BorderStroke(
-                        1.dp,
-                        if (state.isUnleashed) DettleGreen.copy(alpha = 0.6f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .background(if (state.isUnleashed) DettleGreen.copy(alpha = 0.2f) else MaterialTheme.colorScheme.primaryContainer),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        Icons.Outlined.ElectricBolt,
-                                        contentDescription = null,
-                                        tint = if (state.isUnleashed) DettleGreen else MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                                Column {
-                                    Text(
-                                        "Developer Mode",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (state.isUnleashed) DettleGreen else MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        if (state.isUnleashed) "Deep Tech Explanations Active" else "Standard Engine (Karpathy Baseline)",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                            Switch(
-                                checked = state.isUnleashed,
-                                onCheckedChange = { viewModel.setUnleashed(it) },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.White,
-                                    checkedTrackColor = DettleGreen
-                                )
+            label = "settingsTabContent"
+        ) { tab ->
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                when (tab) {
+                    SettingsTab.AI -> {
+                        item(key = "multi_account_pool") {
+                            MultiAccountPoolSection(
+                                accounts = state.providerAccounts,
+                                onAddAccount = viewModel::addProviderAccount,
+                                onToggleAccount = viewModel::toggleProviderAccount,
+                                onDeleteAccount = viewModel::deleteProviderAccount
                             )
                         }
-
-                        Text(
-                            "When enabled, removes AI apologies and boilerplate disclaimers. " +
-                            "Directs the AI to act as an expert systems architect and provide highly technical, unrestricted explanations of software, security, and authentication for developers.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            lineHeight = 18.sp
-                        )
+                        item(key = "aggregate_metrics") {
+                            AggregateMetricsCard(metrics = state.aggregateMetrics)
+                        }
+                        item(key = "daily_budget") {
+                            SettingsSection(
+                                title = "Daily Provider Budget",
+                                subtitle = "Rolling usage counters reset at midnight"
+                            ) {
+                                state.providerStatuses.forEach { status ->
+                                    ProviderStatusRow(status)
+                                    Spacer(Modifier.height(6.dp))
+                                }
+                            }
+                        }
+                    }
+                    SettingsTab.CLOUD -> {
+                        item(key = "github_accounts") {
+                            GitHubMultiAccountSection(
+                                accounts = state.gitHubAccounts,
+                                selectedScopes = state.selectedGitHubScopes,
+                                onToggleScope = viewModel::toggleGitHubScope,
+                                onGenerateTokenLink = {
+                                    val url = viewModel.buildCustomGitHubTokenUrl()
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                },
+                                onAddAccount = { label, pat, user ->
+                                    viewModel.addGitHubAccount(label, pat, user)
+                                },
+                                onSetActiveAccount = viewModel::setActiveGitHubAccount,
+                                onDeleteAccount = viewModel::deleteGitHubAccount
+                            )
+                        }
+                        item(key = "cloudflare") {
+                            SettingsSection(
+                                title = "Cloudflare Pages & Workers",
+                                subtitle = "Free tier: 500 builds/month, 100K Worker requests/day"
+                            ) {
+                                ApiKeyField(
+                                    label = "Cloudflare API Token",
+                                    hint = "API Token with Pages write access",
+                                    value = state.cloudflareToken,
+                                    isSaved = state.cloudflareSaved,
+                                    onSave = viewModel::saveCloudflareToken,
+                                    link = "dash.cloudflare.com/profile/api-tokens"
+                                )
+                                Spacer(Modifier.height(10.dp))
+                                SimpleTextField(
+                                    label = "Cloudflare Account ID",
+                                    hint = "32-character hex account string",
+                                    value = state.cloudflareAccountId,
+                                    onValueChange = viewModel::setCloudflareAccountId
+                                )
+                            }
+                        }
+                    }
+                    SettingsTab.APPEARANCE -> {
+                        item(key = "theme_appearance") {
+                            ThemeAppearanceCard(
+                                config = themeConfig,
+                                onSelectTheme = viewModel::setTheme,
+                                onSelectMode = viewModel::setThemeMode,
+                                onToggleOled = viewModel::setPureOled,
+                                onSelectAccent = viewModel::setCustomAccent,
+                                onReset = viewModel::resetTheme
+                            )
+                        }
+                        item(key = "developer_mode") {
+                            DeveloperModeCard(
+                                isUnleashed = state.isUnleashed,
+                                onToggle = viewModel::setUnleashed
+                            )
+                        }
+                        item(key = "voice_typing") {
+                            VoiceTypingSettingsCard(
+                                selectedEngine = state.voiceTypingEngine,
+                                openWhisprUrl = state.openWhisprUrl,
+                                onEngineSelected = viewModel::setVoiceTypingEngine,
+                                onUrlChanged = viewModel::setOpenWhisprUrl
+                            )
+                        }
+                    }
+                    SettingsTab.BACKUPS -> {
+                        item(key = "google_drive") {
+                            GoogleDriveCard(
+                                isConnected = state.driveConnected,
+                                userEmail = state.driveUserEmail,
+                                onConnect = { },
+                                onDisconnect = viewModel::disconnectDrive
+                            )
+                        }
+                        item(key = "backup_restore") {
+                            BackupRestoreCard(
+                                summary = viewModel.backupSummary,
+                                onOpenBackup = {
+                                    viewModel.refreshBackupSummary()
+                                    showBackupSheet = true
+                                }
+                            )
+                        }
                     }
                 }
-            }
 
-            // Unlimited Multi-Account API Pool Section
-            item {
-                MultiAccountPoolSection(
-                    accounts = state.providerAccounts,
-                    onAddAccount = viewModel::addProviderAccount,
-                    onToggleAccount = viewModel::toggleProviderAccount,
-                    onDeleteAccount = viewModel::deleteProviderAccount
-                )
+                item { Spacer(Modifier.height(80.dp)) }
             }
-
-            // GitHub Multi-Account & Interactive Scopes Builder
-            item {
-                GitHubMultiAccountSection(
-                    accounts = state.gitHubAccounts,
-                    selectedScopes = state.selectedGitHubScopes,
-                    onToggleScope = viewModel::toggleGitHubScope,
-                    onGenerateTokenLink = {
-                        val url = viewModel.buildCustomGitHubTokenUrl()
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                    },
-                    onAddAccount = { label, pat, user ->
-                        viewModel.addGitHubAccount(label, pat, user)
-                    },
-                    onSetActiveAccount = viewModel::setActiveGitHubAccount,
-                    onDeleteAccount = viewModel::deleteGitHubAccount
-                )
-            }
-
-            // Cloudflare
-            item {
-                SettingsSection(
-                    title = "Cloudflare Pages & Workers",
-                    subtitle = "Free tier: 500 builds/month, 100K Worker requests/day"
-                ) {
-                    ApiKeyField(
-                        label = "Cloudflare API Token",
-                        hint = "API Token with Pages write access",
-                        value = state.cloudflareToken,
-                        isSaved = state.cloudflareSaved,
-                        onSave = viewModel::saveCloudflareToken,
-                        link = "dash.cloudflare.com/profile/api-tokens"
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    SimpleTextField(
-                        label = "Cloudflare Account ID",
-                        hint = "32-character hex account string",
-                        value = state.cloudflareAccountId,
-                        onValueChange = viewModel::setCloudflareAccountId
-                    )
-                }
-            }
-
-            // Google Drive Card
-            item {
-                GoogleDriveCard(
-                    isConnected = state.driveConnected,
-                    userEmail = state.driveUserEmail,
-                    onConnect = { },
-                    onDisconnect = viewModel::disconnectDrive
-                )
-            }
-
-            // Granular Backup & Restore
-            item {
-                BackupRestoreCard(
-                    summary = viewModel.backupSummary,
-                    onOpenBackup = {
-                        viewModel.refreshBackupSummary()
-                        showBackupSheet = true
-                    }
-                )
-            }
-
-            // Voice Typing (OpenWhispr)
-            item {
-                VoiceTypingSettingsCard(
-                    selectedEngine = state.voiceTypingEngine,
-                    openWhisprUrl = state.openWhisprUrl,
-                    onEngineSelected = viewModel::setVoiceTypingEngine,
-                    onUrlChanged = viewModel::setOpenWhisprUrl
-                )
-            }
-
-            // Provider Budget
-            item {
-                SettingsSection(
-                    title = "Daily Provider Budget",
-                    subtitle = "Rolling usage counters reset at midnight"
-                ) {
-                    state.providerStatuses.forEach { status ->
-                        ProviderStatusRow(status)
-                        Spacer(Modifier.height(6.dp))
-                    }
-                }
-            }
-
-            item { Spacer(Modifier.height(80.dp)) }
         }
     }
 
@@ -351,6 +377,83 @@ fun SettingsScreen(
             onExportToFile = viewModel::exportBackupToFile,
             onReadFromUri = viewModel::readBackupUri
         )
+    }
+}
+
+@Composable
+fun DeveloperModeCard(
+    isUnleashed: Boolean,
+    onToggle: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = if (isUnleashed) DettleGreen.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        border = BorderStroke(
+            1.dp,
+            if (isUnleashed) DettleGreen.copy(alpha = 0.6f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        ),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(if (isUnleashed) DettleGreen.copy(alpha = 0.2f) else MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Outlined.ElectricBolt,
+                            contentDescription = null,
+                            tint = if (isUnleashed) DettleGreen else MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            "Developer Mode",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isUnleashed) DettleGreen else MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            if (isUnleashed) "Deep Tech Explanations Active" else "Standard Engine (Karpathy Baseline)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Switch(
+                    checked = isUnleashed,
+                    onCheckedChange = onToggle,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = DettleGreen
+                    )
+                )
+            }
+
+            Text(
+                "When enabled, removes AI apologies and boilerplate disclaimers. " +
+                "Directs the AI to act as an expert systems architect and provide highly technical, unrestricted explanations of software, security, and authentication for developers.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 18.sp
+            )
+        }
     }
 }
 
