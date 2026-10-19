@@ -1,14 +1,18 @@
 package com.dettle.app.orchestrator
 
+import com.dettle.app.data.api.OpenAICompatProvider
 import com.dettle.app.data.github.FileChange
 import com.dettle.app.domain.model.ApiMessage
+import com.dettle.app.domain.model.FreeModels
 import com.dettle.app.domain.model.ToolCall
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -187,5 +191,90 @@ class ReActLoopToolCallingTest {
         assertNotNull(history[1].tool_calls)
         assertEquals("tool", history[2].role)
         assertEquals("call_cf_1", history[2].tool_call_id)
+    }
+
+    @Test
+    fun testOpenAICompatProviderNormalizesToolCallsStrictSchema() {
+        val provider = OpenAICompatProvider(
+            model = FreeModels.GROQ_LLAMA_70B,
+            apiKey = "gsk_test",
+            client = OkHttpClient(),
+            json = json
+        )
+
+        // Case 1: Tool call without "type": "function" (missing type bug)
+        val legacyToolCall = """{"id":"call_legacy_1","name":"github_list_repos","arguments":{"force_refresh":"true"}}"""
+        val messagesCase1 = listOf(
+            ApiMessage(role = "user", content = "List repos"),
+            ApiMessage(
+                role = "assistant",
+                content = "Calling tool: github_list_repos",
+                tool_call_id = "call_legacy_1",
+                name = "github_list_repos",
+                tool_calls = legacyToolCall
+            ),
+            ApiMessage(
+                role = "tool",
+                content = "Repo1, Repo2",
+                tool_call_id = "call_legacy_1",
+                name = "github_list_repos"
+            )
+        )
+
+        val body1Json = json.parseToJsonElement(provider.buildRequestBody(messagesCase1, emptyList(), 1000)).jsonObject
+        val messages1 = body1Json["messages"]!!.jsonArray
+        val assistantMsg1 = messages1[1].jsonObject
+        val toolCalls1 = assistantMsg1["tool_calls"]!!.jsonArray
+        assertEquals(1, toolCalls1.size)
+        val toolCall1 = toolCalls1[0].jsonObject
+
+        // Verify strict OpenAI/Groq requirements
+        assertEquals("function", toolCall1["type"]?.jsonPrimitive?.content)
+        assertEquals("call_legacy_1", toolCall1["id"]?.jsonPrimitive?.content)
+        val functionObj1 = toolCall1["function"]?.jsonObject
+        assertNotNull(functionObj1)
+        assertEquals("github_list_repos", functionObj1!!["name"]?.jsonPrimitive?.content)
+        // arguments must be a JSON-encoded string
+        assertTrue(functionObj1["arguments"] is JsonPrimitive)
+        assertTrue(functionObj1["arguments"]!!.jsonPrimitive.isString)
+        assertTrue(functionObj1["arguments"]!!.jsonPrimitive.content.contains("force_refresh"))
+
+        // Case 2: Gemini-style tool call (only name & args, no type, no id)
+        val geminiToolCall = """{"name":"github_list_repos","args":{"force_refresh":true}}"""
+        val messagesCase2 = listOf(
+            ApiMessage(role = "user", content = "List repos"),
+            ApiMessage(
+                role = "assistant",
+                content = "",
+                tool_call_id = "call_gemini_uuid",
+                name = "github_list_repos",
+                tool_calls = geminiToolCall
+            ),
+            ApiMessage(
+                role = "tool",
+                content = "Repo1",
+                tool_call_id = "call_gemini_uuid",
+                name = "github_list_repos"
+            )
+        )
+
+        val body2Json = json.parseToJsonElement(provider.buildRequestBody(messagesCase2, emptyList(), 1000)).jsonObject
+        val messages2 = body2Json["messages"]!!.jsonArray
+        val assistantMsg2 = messages2[1].jsonObject
+        val toolCalls2 = assistantMsg2["tool_calls"]!!.jsonArray
+        assertEquals(1, toolCalls2.size)
+        val toolCall2 = toolCalls2[0].jsonObject
+
+        assertEquals("function", toolCall2["type"]?.jsonPrimitive?.content)
+        assertEquals("call_gemini_uuid", toolCall2["id"]?.jsonPrimitive?.content)
+        val functionObj2 = toolCall2["function"]?.jsonObject
+        assertNotNull(functionObj2)
+        assertEquals("github_list_repos", functionObj2!!["name"]?.jsonPrimitive?.content)
+        assertTrue(functionObj2["arguments"]!!.jsonPrimitive.content.contains("force_refresh"))
+
+        // Case 3: Tool message has tool_call_id guaranteed
+        val toolMsg2 = messages2[2].jsonObject
+        assertEquals("tool", toolMsg2["role"]?.jsonPrimitive?.content)
+        assertEquals("call_gemini_uuid", toolMsg2["tool_call_id"]?.jsonPrimitive?.content)
     }
 }

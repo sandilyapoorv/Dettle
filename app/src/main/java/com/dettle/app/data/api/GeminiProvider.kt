@@ -378,7 +378,20 @@ class GeminiProvider(
                 for (part in parts) {
                     val functionCall = part.jsonObject["functionCall"]?.jsonObject
                     if (functionCall != null) {
-                        return functionCall.toString()
+                        val name = functionCall["name"]?.jsonPrimitive?.content ?: ""
+                        val argsObj = functionCall["args"]?.jsonObject ?: kotlinx.serialization.json.JsonObject(emptyMap())
+                        val callId = "call_${java.util.UUID.randomUUID().toString().replace("-", "").take(12)}"
+                        val argsStr = argsObj.toString()
+                        return buildJsonObject {
+                            put("id", JsonPrimitive(callId))
+                            put("type", JsonPrimitive("function"))
+                            put("name", JsonPrimitive(name))
+                            put("arguments", argsObj)
+                            put("function", buildJsonObject {
+                                put("name", JsonPrimitive(name))
+                                put("arguments", JsonPrimitive(argsStr))
+                            })
+                        }.toString()
                     }
                 }
             }

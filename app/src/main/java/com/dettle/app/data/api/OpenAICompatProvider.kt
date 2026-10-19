@@ -186,7 +186,7 @@ class OpenAICompatProvider(
         }
     }.flowOn(Dispatchers.IO)
 
-    private fun buildRequestBody(
+    internal fun buildRequestBody(
         messages: List<ApiMessage>,
         tools: List<Tool>,
         maxTokens: Int
@@ -200,16 +200,57 @@ class OpenAICompatProvider(
                     } else {
                         put("content", JsonPrimitive(null as String?))
                     }
-                    val toolsElement = runCatching {
+                    val normalizedToolCalls = runCatching {
                         val parsed = json.parseToJsonElement(msg.tool_calls)
-                        if (parsed is kotlinx.serialization.json.JsonArray) parsed else kotlinx.serialization.json.JsonArray(listOf(parsed))
+                        val array = if (parsed is kotlinx.serialization.json.JsonArray) parsed else kotlinx.serialization.json.JsonArray(listOf(parsed))
+                        kotlinx.serialization.json.JsonArray(
+                            array.mapNotNull { item ->
+                                val obj = item as? kotlinx.serialization.json.JsonObject ?: return@mapNotNull null
+                                val functionObj = obj["function"] as? kotlinx.serialization.json.JsonObject
+
+                                val id = (obj["id"] as? JsonPrimitive)?.content?.ifBlank { null }
+                                    ?: (functionObj?.get("id") as? JsonPrimitive)?.content?.ifBlank { null }
+                                    ?: msg.tool_call_id?.ifBlank { null }
+                                    ?: "call_${System.currentTimeMillis()}"
+
+                                val name = (functionObj?.get("name") as? JsonPrimitive)?.content?.ifBlank { null }
+                                    ?: (obj["name"] as? JsonPrimitive)?.content?.ifBlank { null }
+                                    ?: msg.name?.ifBlank { null }
+                                    ?: ""
+
+                                val argsEl = functionObj?.get("arguments")
+                                    ?: obj["arguments"]
+                                    ?: obj["args"]
+
+                                val argsStr = when (argsEl) {
+                                    is JsonPrimitive -> if (argsEl.isString) argsEl.content else argsEl.toString()
+                                    is kotlinx.serialization.json.JsonObject -> argsEl.toString()
+                                    is kotlinx.serialization.json.JsonArray -> argsEl.toString()
+                                    else -> "{}"
+                                }
+
+                                buildJsonObject {
+                                    put("id", JsonPrimitive(id))
+                                    put("type", JsonPrimitive("function"))
+                                    put("function", buildJsonObject {
+                                        put("name", JsonPrimitive(name))
+                                        put("arguments", JsonPrimitive(argsStr))
+                                    })
+                                }
+                            }
+                        )
                     }.getOrNull()
-                    if (toolsElement != null) {
-                        put("tool_calls", toolsElement)
+                    if (normalizedToolCalls != null && normalizedToolCalls.isNotEmpty()) {
+                        put("tool_calls", normalizedToolCalls)
                     }
                 } else {
                     put("content", JsonPrimitive(msg.content))
-                    if (msg.tool_call_id != null) put("tool_call_id", JsonPrimitive(msg.tool_call_id))
+                    if (msg.role == "tool") {
+                        val toolCallId = msg.tool_call_id?.ifBlank { null } ?: "call_default"
+                        put("tool_call_id", JsonPrimitive(toolCallId))
+                    } else if (msg.tool_call_id != null) {
+                        put("tool_call_id", JsonPrimitive(msg.tool_call_id))
+                    }
                     if (msg.name != null) put("name", JsonPrimitive(msg.name))
                 }
             }

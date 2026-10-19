@@ -309,12 +309,17 @@ class ReActLoop @Inject constructor(
 
             // Add assistant response to history
             if (toolCall != null) {
-                val rawToolCallJson = detectedToolCallJson ?: buildJsonObject {
+                val argsObj = buildJsonObject {
+                    toolCall.arguments.forEach { (k, v) -> put(k, kotlinx.serialization.json.JsonPrimitive(v)) }
+                }
+                val rawToolCallJson = buildJsonObject {
                     put("id", kotlinx.serialization.json.JsonPrimitive(toolCall.id))
                     put("type", kotlinx.serialization.json.JsonPrimitive("function"))
                     put("name", kotlinx.serialization.json.JsonPrimitive(toolCall.name))
-                    put("arguments", buildJsonObject {
-                        toolCall.arguments.forEach { (k, v) -> put(k, kotlinx.serialization.json.JsonPrimitive(v)) }
+                    put("arguments", argsObj)
+                    put("function", buildJsonObject {
+                        put("name", kotlinx.serialization.json.JsonPrimitive(toolCall.name))
+                        put("arguments", kotlinx.serialization.json.JsonPrimitive(argsObj.toString()))
                     })
                 }.toString()
                 val assistantContent = if (assistantTextForHistory.isNotBlank()) assistantTextForHistory else "Calling tool: ${toolCall.name}"
