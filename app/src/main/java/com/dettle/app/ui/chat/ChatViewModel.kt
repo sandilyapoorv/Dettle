@@ -570,6 +570,11 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    fun stopExecution() {
+        agentExecutionManager.stopExecution()
+        _uiState.update { it.copy(isAgentRunning = false, inputEnabled = true, thinkingStep = 0) }
+    }
+
     private suspend fun resolveMode(text: String): AgentMode {
         // If user locked a mode, use that
         lockedModeId?.let { locked ->

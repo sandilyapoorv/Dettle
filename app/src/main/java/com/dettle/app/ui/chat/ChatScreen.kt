@@ -82,6 +82,8 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalView
+import com.dettle.app.ui.components.Haptics
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material.icons.outlined.AutoAwesome
@@ -425,6 +427,7 @@ fun ChatScreen(
                             }
                         },
                         onMicClick = { handleMicClick() },
+                        onStopAgent = viewModel::stopExecution,
                         onStopVoiceClick = { voiceTypingManager.stopListening() },
                         onCancelVoiceClick = {
                             voiceTypingManager.stopListening()
@@ -1751,108 +1754,13 @@ fun LiveStepRow(
 
 // ─── Input Bar & Dynamic Action Button ─────────────────────────────────────
 
+// ─── Input Bar & Dynamic Action Button ─────────────────────────────────────
+
 enum class ActionButtonState {
     MIC,
     HOLD,
-    SEND
-}
-
-@Composable
-fun EffortSlideBar(
-    effortLevel: String,
-    onEffortChange: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val options = remember { listOf("Low", "Medium", "Max") }
-    val selectedIndex = remember(effortLevel) {
-        when {
-            effortLevel.startsWith("Low", ignoreCase = true) -> 0
-            effortLevel.startsWith("Max", ignoreCase = true) -> 2
-            else -> 1
-        }
-    }
-
-    val animatedIndex by animateFloatAsState(
-        targetValue = selectedIndex.toFloat(),
-        animationSpec = spring(
-            dampingRatio = 0.82f,
-            stiffness = Spring.StiffnessMediumLow
-        ),
-        label = "effortSlide"
-    )
-
-    BoxWithConstraints(
-        modifier = modifier
-            .height(28.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
-            .border(
-                0.5.dp,
-                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                RoundedCornerShape(14.dp)
-            )
-            .pointerInput(Unit) {
-                detectTapGestures { offset ->
-                    val segW = size.width / 3f
-                    val idx = (offset.x / segW).toInt().coerceIn(0, 2)
-                    onEffortChange(options[idx])
-                }
-            }
-            .pointerInput(Unit) {
-                detectHorizontalDragGestures { change, _ ->
-                    val segW = size.width / 3f
-                    val idx = (change.position.x / segW).toInt().coerceIn(0, 2)
-                    onEffortChange(options[idx])
-                }
-            }
-    ) {
-        val segmentWidth = maxWidth / 3
-
-        // Sliding Active Capsule
-        Box(
-            modifier = Modifier
-                .padding(vertical = 2.dp, horizontal = 2.dp)
-                .offset(x = segmentWidth * animatedIndex)
-                .width(segmentWidth - 4.dp)
-                .fillMaxHeight()
-                .shadow(1.5.dp, RoundedCornerShape(12.dp))
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.primaryContainer)
-                .border(
-                    0.5.dp,
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
-                    RoundedCornerShape(12.dp)
-                )
-        )
-
-        // 3 Components (Low, Medium, Max)
-        Row(
-            modifier = Modifier.fillMaxSize(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            options.forEachIndexed { index, option ->
-                val isSelected = selectedIndex == index
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = option,
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            fontSize = 10.5.sp
-                        ),
-                        color = if (isSelected)
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        else
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    )
-                }
-            }
-        }
-    }
+    SEND,
+    STOP
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -1864,7 +1772,7 @@ fun ChatInputBar(
     isListening: Boolean,
     voiceRmsFlow: StateFlow<Float>,
     focusRequester: FocusRequester? = null,
-    // ── New streamlined mode selector ───────────────────────────────────
+    // ── Streamlined mode selector ───────────────────────────────────
     activeChatMode: SimpleChatMode = SimpleChatMode.NORMAL,
     onModeSelect: (SimpleChatMode) -> Unit = {},
     // ── Legacy params (kept for call-site compatibility) ─────────────────
@@ -1880,13 +1788,13 @@ fun ChatInputBar(
     onRemoveAttachment: (ChatAttachment) -> Unit = {},
     onValueChange: (String) -> Unit,
     onSend: () -> Unit,
+    onStopAgent: () -> Unit = {},
     onMicClick: () -> Unit,
     onStopVoiceClick: () -> Unit,
     onCancelVoiceClick: () -> Unit
 ) {
+    val view = LocalView.current
     val rmsValue by voiceRmsFlow.collectAsState()
-    var isModeBarOpen by remember { mutableStateOf(false) }
-    val efforts = remember { listOf("Low", "Medium", "Max Effort") }
 
     Box(
         modifier = Modifier
@@ -1953,7 +1861,10 @@ fun ChatInputBar(
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier
                                             .size(14.dp)
-                                            .clickable { onRemoveAttachment(att) }
+                                            .clickable {
+                                                Haptics.tick(view)
+                                                onRemoveAttachment(att)
+                                            }
                                     )
                                 }
                             }
@@ -1985,7 +1896,10 @@ fun ChatInputBar(
                         ) {
                             // Plus (+) Icon on the LEFT of the text field to upload documents & photos
                             IconButton(
-                                onClick = onAddAttachmentClick,
+                                onClick = {
+                                    Haptics.tick(view)
+                                    onAddAttachmentClick()
+                                },
                                 modifier = Modifier.size(34.dp)
                             ) {
                                 Surface(
@@ -2045,142 +1959,172 @@ fun ChatInputBar(
                     }
                 }
 
-                // ── Streamlined 3-pill Mode Selector ────────────────────────────────
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    SimpleChatMode.entries.forEach { mode ->
-                        val isSelected = activeChatMode == mode
-                        Surface(
-                            onClick = { onModeSelect(mode) },
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (isSelected)
-                                MaterialTheme.colorScheme.primaryContainer
-                            else
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                            border = BorderStroke(
-                                0.5.dp,
-                                if (isSelected)
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-                                else
-                                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
-                            )
-                        ) {
-                            Text(
-                                text = when (mode) {
-                                    SimpleChatMode.NORMAL -> "Normal"
-                                    SimpleChatMode.WEB    -> "🌐 Web"
-                                    SimpleChatMode.SWARM  -> "⚡ Swarm"
-                                },
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    fontSize = 11.sp
-                                ),
-                                color = if (isSelected)
-                                    MaterialTheme.colorScheme.onPrimaryContainer
-                                else
-                                    MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                            )
-                        }
-                    }
-                }
-
-                // Bottom toolbar — just send/mic button
+                // ── Streamlined Bottom Row (Mode Pills + Dynamic Action Button) ──
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(start = 10.dp, end = 10.dp, bottom = 8.dp, top = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Spacer(Modifier.weight(1f))
-
-                    // Audio wave visualizer overlay when recording
-                    if (isListening) {
-                        Row(
-                            modifier = Modifier.padding(end = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(3.dp)
-                        ) {
-                            repeat(5) { i ->
-                                val barHeight by animateDpAsState(
-                                    targetValue = (6 + (rmsValue.coerceIn(0f, 1f) * (14 + i * 3))).dp,
-                                    animationSpec = tween(80),
-                                    label = "waveBar$i"
+                    // Mode Selector
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SimpleChatMode.entries.forEach { mode ->
+                            val isSelected = activeChatMode == mode
+                            Surface(
+                                onClick = {
+                                    Haptics.tick(view)
+                                    onModeSelect(mode)
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isSelected)
+                                    MaterialTheme.colorScheme.primaryContainer
+                                else
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                border = BorderStroke(
+                                    0.5.dp,
+                                    if (isSelected)
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                                    else
+                                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
                                 )
-                                Box(
-                                    modifier = Modifier
-                                        .width(2.5.dp)
-                                        .height(barHeight)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.primary)
+                            ) {
+                                Text(
+                                    text = when (mode) {
+                                        SimpleChatMode.NORMAL -> "Normal"
+                                        SimpleChatMode.WEB    -> "🌐 Web"
+                                        SimpleChatMode.SWARM  -> "⚡ Swarm"
+                                    },
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        fontSize = 11.sp
+                                    ),
+                                    color = if (isSelected)
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    else
+                                        MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
                                 )
                             }
                         }
                     }
 
-                    // Circular Action Button (Mic / Stop / Send)
-                    val canSend = (value.isNotBlank() || attachments.isNotEmpty()) && enabled
-                    val buttonState = when {
-                        isListening -> ActionButtonState.HOLD
-                        canSend -> ActionButtonState.SEND
-                        else -> ActionButtonState.MIC
-                    }
-
-                    Surface(
-                        onClick = {
-                            when (buttonState) {
-                                ActionButtonState.HOLD -> onStopVoiceClick()
-                                ActionButtonState.SEND -> if (canSend) onSend()
-                                ActionButtonState.MIC -> onMicClick()
-                            }
-                        },
-                        shape = CircleShape,
-                        color = if (buttonState == ActionButtonState.HOLD) DettleRed else MaterialTheme.colorScheme.primary,
-                        contentColor = Color.White,
-                        shadowElevation = 2.dp,
-                        modifier = Modifier.size(38.dp)
+                    // Action side: Wave visualizer + Circular Action Button (Mic / Stop / Send)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            AnimatedContent(
-                                targetState = buttonState,
-                                transitionSpec = {
-                                    (scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)) + fadeIn(tween(150)))
-                                        .togetherWith(scaleOut(spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium)) + fadeOut(tween(120)))
-                                },
-                                label = "circleActionMorph"
-                            ) { state ->
-                                when (state) {
+                        if (isListening) {
+                            Row(
+                                modifier = Modifier.padding(end = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                repeat(5) { i ->
+                                    val barHeight by animateDpAsState(
+                                        targetValue = (6 + (rmsValue.coerceIn(0f, 1f) * (14 + i * 3))).dp,
+                                        animationSpec = tween(80),
+                                        label = "waveBar$i"
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .width(2.5.dp)
+                                            .height(barHeight)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primary)
+                                    )
+                                }
+                            }
+                        }
+
+                        val canSend = (value.isNotBlank() || attachments.isNotEmpty()) && enabled
+                        val buttonState = when {
+                            isRunning -> ActionButtonState.STOP
+                            isListening -> ActionButtonState.HOLD
+                            canSend -> ActionButtonState.SEND
+                            else -> ActionButtonState.MIC
+                        }
+
+                        Surface(
+                            onClick = {
+                                when (buttonState) {
+                                    ActionButtonState.STOP -> {
+                                        Haptics.reject(view)
+                                        onStopAgent()
+                                    }
                                     ActionButtonState.HOLD -> {
-                                        Icon(
-                                            Icons.Filled.Stop,
-                                            contentDescription = "Stop recording",
-                                            tint = Color.White,
-                                            modifier = Modifier.size(18.dp)
-                                        )
+                                        Haptics.tick(view)
+                                        onStopVoiceClick()
                                     }
                                     ActionButtonState.SEND -> {
-                                        Icon(
-                                            Icons.AutoMirrored.Filled.Send,
-                                            contentDescription = "Send",
-                                            tint = Color.White,
-                                            modifier = Modifier.size(16.dp)
-                                        )
+                                        if (canSend) {
+                                            Haptics.confirm(view)
+                                            onSend()
+                                        }
                                     }
                                     ActionButtonState.MIC -> {
-                                        Icon(
-                                            Icons.Filled.Mic,
-                                            contentDescription = "Voice input",
-                                            tint = Color.White,
-                                            modifier = Modifier.size(18.dp)
-                                        )
+                                        Haptics.tick(view)
+                                        onMicClick()
+                                    }
+                                }
+                            },
+                            shape = CircleShape,
+                            color = when (buttonState) {
+                                ActionButtonState.STOP, ActionButtonState.HOLD -> DettleRed
+                                else -> MaterialTheme.colorScheme.primary
+                            },
+                            contentColor = Color.White,
+                            shadowElevation = 2.dp,
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                AnimatedContent(
+                                    targetState = buttonState,
+                                    transitionSpec = {
+                                        (scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)) + fadeIn(tween(150)))
+                                            .togetherWith(scaleOut(spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium)) + fadeOut(tween(120)))
+                                    },
+                                    label = "circleActionMorph"
+                                ) { state ->
+                                    when (state) {
+                                        ActionButtonState.STOP -> {
+                                            Icon(
+                                                Icons.Filled.Stop,
+                                                contentDescription = "Stop agent execution",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                        ActionButtonState.HOLD -> {
+                                            Icon(
+                                                Icons.Filled.Stop,
+                                                contentDescription = "Stop recording",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                        ActionButtonState.SEND -> {
+                                            Icon(
+                                                Icons.AutoMirrored.Filled.Send,
+                                                contentDescription = "Send",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                        ActionButtonState.MIC -> {
+                                            Icon(
+                                                Icons.Filled.Mic,
+                                                contentDescription = "Voice input",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }
