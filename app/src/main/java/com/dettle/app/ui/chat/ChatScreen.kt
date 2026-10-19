@@ -204,6 +204,8 @@ import com.dettle.app.ui.theme.DettleGreen
 import com.dettle.app.ui.theme.DettleOrange
 import com.dettle.app.ui.theme.DettleRed
 import com.dettle.app.ui.components.MarkdownText
+import com.dettle.app.ui.components.TerminalToolCallCard
+import com.dettle.app.ui.components.TerminalToolResultCard
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
@@ -959,8 +961,8 @@ fun MessageItem(
 ) {
     when (message.type) {
         MessageType.TEXT -> TextMessageBubble(message)
-        MessageType.TOOL_CALL -> ToolCallCard(message)
-        MessageType.TOOL_RESULT -> ToolResultCard(message)
+        MessageType.TOOL_CALL -> TerminalToolCallCard(message)
+        MessageType.TOOL_RESULT -> TerminalToolResultCard(message)
         MessageType.APPROVAL -> ApprovalCard(message, onApprove, onReject)
         MessageType.SYSTEM, MessageType.ERROR -> SystemMessage(message)
         MessageType.POLICY_BLOCKED -> PolicyBlockedCard(message)
