@@ -35,10 +35,7 @@ class AIProviderFactory @Inject constructor(
                 model = model,
                 apiKey = apiKey,
                 client = client,
-                json = json,
-                extraHeaders = mapOf(
-                    "X-Groq-Organization" to "dettle"
-                )
+                json = json
             )
 
             AIProviderType.GEMINI -> GeminiProvider(

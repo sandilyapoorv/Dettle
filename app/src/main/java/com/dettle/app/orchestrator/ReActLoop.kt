@@ -322,7 +322,7 @@ class ReActLoop @Inject constructor(
                         put("arguments", kotlinx.serialization.json.JsonPrimitive(argsObj.toString()))
                     })
                 }.toString()
-                val assistantContent = if (assistantTextForHistory.isNotBlank()) assistantTextForHistory else "Calling tool: ${toolCall.name}"
+                val assistantContent = if (assistantTextForHistory.isNotBlank()) assistantTextForHistory else ""
                 history.add(ApiMessage(
                     role = "assistant",
                     content = assistantContent,

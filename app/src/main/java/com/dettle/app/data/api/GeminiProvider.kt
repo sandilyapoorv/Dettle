@@ -64,10 +64,10 @@ class GeminiProvider(
                         "assistant" -> {
                             put("role", JsonPrimitive("model"))
                             put("parts", buildJsonArray {
-                                if (msg.content.isNotBlank()) {
-                                    add(buildJsonObject { put("text", JsonPrimitive(msg.content)) })
-                                }
                                 if (!msg.tool_calls.isNullOrBlank()) {
+                                    if (msg.content.isNotBlank() && !msg.content.startsWith("Calling tool:")) {
+                                        add(buildJsonObject { put("text", JsonPrimitive(msg.content)) })
+                                    }
                                     val parsedTools = runCatching {
                                         val el = json.parseToJsonElement(msg.tool_calls)
                                         if (el is kotlinx.serialization.json.JsonArray) el else kotlinx.serialization.json.JsonArray(listOf(el))
@@ -89,6 +89,8 @@ class GeminiProvider(
                                             })
                                         })
                                     }
+                                } else if (msg.content.isNotBlank()) {
+                                    add(buildJsonObject { put("text", JsonPrimitive(msg.content)) })
                                 }
                             })
                         }
