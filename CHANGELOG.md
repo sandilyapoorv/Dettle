@@ -4,22 +4,22 @@ All notable changes, commits, architectural decisions, and releases for the **De
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and [Conventional Commits](https://www.conventionalcommits.org/).
 
-## [v1.8.0] - 2026-10-05: Apple Liquid Glass Redesign, Auth Vault Eradication, Top Segmented Mode Control, Onboarding & Clean Carbon Theme
+## [v1.13.0] - 2026-10-19: Universal Tool Calling Engine, Action Approval Flow & WebView Eradication
 
 ### Direct APK Download
-- **Production Release APK (R8 Minified, Signed)**: [app-release.apk](https://github.com/sandilyapoorv/Dettle/releases/download/v1.8.0/app-release.apk)
-- **Debug APK**: [app-debug.apk](https://github.com/sandilyapoorv/Dettle/releases/download/v1.8.0/app-debug.apk)
-- **GitHub Release Page**: [https://github.com/sandilyapoorv/Dettle/releases/tag/v1.8.0](https://github.com/sandilyapoorv/Dettle/releases/tag/v1.8.0)
+- **Production Release APK (R8 Minified, Signed)**: [dettle-release-1.13.0.apk](https://github.com/sandilyapoorv/Dettle/releases/download/v1.13.0/dettle-release-1.13.0.apk)
+- **Debug APK**: [dettle-debug-1.13.0.apk](https://github.com/sandilyapoorv/Dettle/releases/download/v1.13.0/dettle-debug-1.13.0.apk)
+- **GitHub Release Page**: [https://github.com/sandilyapoorv/Dettle/releases/tag/v1.13.0](https://github.com/sandilyapoorv/Dettle/releases/tag/v1.13.0)
 - **CI/CD Workflow**: [https://github.com/sandilyapoorv/Dettle/actions](https://github.com/sandilyapoorv/Dettle/actions)
 
 ### What Was Built & Changed
-1. **Total AuthVault Eradication**: Completely deleted `AuthVaultScreen`, `AuthVaultViewModel`, and all related routes, navigation drawer entries, and cookie capturing logic across the codebase.
-2. **Apple Liquid Glass Design System**: Applied Apple's frosted liquid glass styling with subtle specular light highlights, clean hairline borders, and translucent elevation cards across chat cards and input bars.
-3. **Onboarding & Quick Setup Sheet**: Implemented `OnboardingSheet` with 1-tap provider selection for Google AI Studio (1M Free), Groq (300+ tok/s), and OpenRouter, direct links to fetch free API keys, Keystore AES-256 persistence, and Developer Mode switch.
-4. **Clean Centered Mode Segmented Control**: Replaced legacy vertical toggle with a centered horizontal segmented control (`TopEnvironmentSegmentedControl`) with animated pill transitions between Chat and Build.
-5. **Calibrated Carbon & Neutral Bubbles**: Overhauled palette to an obsidian carbon dark canvas (`#09090B`) with elevated neutral charcoal message bubbles (`#222227`) and crisp borders, eliminating jarring bright blues.
-6. **Decluttered Build Cockpit**: Simplified Build mode into a clean single-tier developer cockpit with Build Stream, Projects, Repos, Deploy, and Overnight tabs without stacked redundant pill bars.
-7. **Cleaned Web Mode Banner & Typography**: Removed colliding top-left `Active: /web` chip and scrubbed all residual handwriting font references.
+1. **Universal ToolCallParser**: Implemented `ToolCallParser` to robustly detect, parse, and normalize tool invocations across official provider formats (OpenAI/Groq/DeepSeek `function`, Gemini `functionCall`, Anthropic `tool_use`), markdown code blocks, and embedded XML tags (`<tool_call>`).
+2. **Anthropic Native Tool Use**: Upgraded `AnthropicProvider` to full SSE streaming with native Claude `tool_use` blocks and `tool_result` message coalescing.
+3. **Gemini Function Calling Upgrades**: Upgraded `GeminiProvider` with strict schema type mapping (`INTEGER`, `NUMBER`, `BOOLEAN`, `ARRAY`, `OBJECT`), parameter normalization, and seamless `functionCall`/`functionResponse` turn sequencing.
+4. **Interactive Action Approval & Rejection Flow**: Fully wired `ChatViewModel` approval gate to execute tools via `ToolExecutor` upon user approval, insert tool messages into conversation history and database, and resume autonomous agent execution. Added clean feedback on rejection to guide model path correction.
+5. **ToolExecutor Argument Tolerances**: Added tolerant parameter aliases across GitHub release creation (`tag_name`/`tag`/`version`), action triggers (`workflow_id`/`workflow`/`action`), and Cloudflare deployments (`project_name`/`project`/`name`).
+6. **Codebase Sterilization (WebView Eradication)**: Completely eradicated legacy hidden WebView scraping components (`WebViewPool`, `DOMAutomationBridge`, `WebViewAutomationScript`, `WebViewSession`, and `WebViewAccount`). Dettle is now a 100% pure, legal, reliable official API client.
+7. **Comprehensive Unit Test Suites**: Added comprehensive unit test suites covering `ReActLoop` tool calling behavior, multi-format tool call parsing, and dispatch validation.
 
 ---
 
