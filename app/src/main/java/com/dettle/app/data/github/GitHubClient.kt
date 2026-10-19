@@ -195,7 +195,20 @@ class GitHubClient @Inject constructor(
 
             // 1. Get the SHA of the base branch's HEAD
             val baseSha = getRefSha(owner, repo, "heads/$actualBase")
-                ?: return@withContext Result.failure(Exception("Cannot get SHA of $actualBase"))
+            if (baseSha == null) {
+                // The repository is empty (no commits exist yet on base branch).
+                // Initialize the repository by committing the files directly to actualBase.
+                val commitResult = commitFiles(owner, repo, actualBase, fileChanges, commitMessage)
+                return@withContext commitResult.map { files ->
+                    PullRequest(
+                        number = 0,
+                        title = "Initial commit to $actualBase (Empty repo initialized)",
+                        url = "https://github.com/$owner/$repo/tree/$actualBase",
+                        branch = actualBase,
+                        filesChanged = files.size
+                    )
+                }
+            }
 
             // 2. Create the new branch
             val createBranchBody = buildJsonObject {
@@ -245,6 +258,44 @@ class GitHubClient @Inject constructor(
             )
         } catch (e: Exception) {
             Log.e(TAG, "Failed to create branch/PR", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Commits files directly to a repository branch.
+     * Works seamlessly on both existing repositories and completely empty repositories (initializes default branch).
+     */
+    suspend fun commitFiles(
+        owner: String,
+        repo: String,
+        branch: String = "main",
+        fileChanges: List<FileChange>,
+        commitMessage: String
+    ): Result<List<String>> = withContext(Dispatchers.IO) {
+        try {
+            val cleanBranch = branch.trim().removePrefix("refs/").removePrefix("heads/").ifBlank { "main" }
+            val committed = mutableListOf<String>()
+
+            for (change in fileChanges) {
+                val cleanPath = change.path.trim().removePrefix("/")
+                val existingSha = getFileSha(owner, repo, cleanPath, cleanBranch)
+                val encodedContent = Base64.getEncoder().encodeToString(change.content.toByteArray(Charsets.UTF_8))
+
+                val commitBody = buildJsonObject {
+                    put("message", commitMessage)
+                    put("content", encodedContent)
+                    put("branch", cleanBranch)
+                    if (existingSha != null) put("sha", existingSha)
+                }.toString()
+
+                rest("PUT", "$GITHUB_API/repos/$owner/$repo/contents/$cleanPath", body = commitBody)
+                committed.add(cleanPath)
+            }
+
+            Result.success(committed)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to commit files to $owner/$repo on branch $branch", e)
             Result.failure(e)
         }
     }
@@ -551,6 +602,59 @@ class GitHubClient @Inject constructor(
             Result.failure(e)
         }
     }
+
+    /**
+     * Gets user profile and top public repositories.
+     * If username is null/blank, fetches authenticated user.
+     */
+    suspend fun getUserProfile(username: String? = null): Result<Pair<GitHubUser, List<GitHubRepoSummary>>> =
+        withContext(Dispatchers.IO) {
+            try {
+                if (username.isNullOrBlank()) {
+                    val user = getAuthenticatedUser().getOrThrow()
+                    val repos = getUserRepositories().getOrDefault(emptyList())
+                    Result.success(Pair(user, repos))
+                } else {
+                    val userObj = rest("GET", "$GITHUB_API/users/$username")
+                    val login = (userObj["login"] as? JsonPrimitive)?.content ?: username
+                    val name = (userObj["name"] as? JsonPrimitive)?.content
+                    val avatarUrl = (userObj["avatar_url"] as? JsonPrimitive)?.content
+                    val bio = (userObj["bio"] as? JsonPrimitive)?.content
+                    val publicRepos = (userObj["public_repos"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
+
+                    val user = GitHubUser(
+                        login = login,
+                        name = name,
+                        avatarUrl = avatarUrl,
+                        bio = bio,
+                        publicRepos = publicRepos,
+                        totalPrivateRepos = null
+                    )
+
+                    val reposArray = runCatching {
+                        restArray("GET", "$GITHUB_API/users/$username/repos?sort=updated&per_page=30")
+                    }.getOrDefault(JsonArray(emptyList()))
+
+                    val repos = reposArray.mapNotNull { item ->
+                        val obj = item as? JsonObject ?: return@mapNotNull null
+                        val repoName = (obj["name"] as? JsonPrimitive)?.content ?: return@mapNotNull null
+                        val fullName = (obj["full_name"] as? JsonPrimitive)?.content ?: "$login/$repoName"
+                        val desc = (obj["description"] as? JsonPrimitive)?.content
+                        val isPriv = (obj["private"] as? JsonPrimitive)?.content?.toBooleanStrictOrNull() ?: false
+                        val defBranch = (obj["default_branch"] as? JsonPrimitive)?.content ?: "main"
+                        val lang = (obj["language"] as? JsonPrimitive)?.content
+                        val stars = (obj["stargazers_count"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
+                        val updated = (obj["updated_at"] as? JsonPrimitive)?.content
+                        GitHubRepoSummary(repoName, fullName, login, desc, isPriv, defBranch, lang, stars, updated)
+                    }
+
+                    Result.success(Pair(user, repos))
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to get user profile for ${username ?: "me"}", e)
+                Result.failure(e)
+            }
+        }
 
     suspend fun getRepoDetails(owner: String, repo: String): Result<GitHubRepoDetails> = withContext(Dispatchers.IO) {
         try {

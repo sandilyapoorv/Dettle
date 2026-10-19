@@ -42,6 +42,31 @@ class ToolExecutor @Inject constructor(
 
         val content = when (toolCall.name) {
 
+            "github_get_user", "github_user_profile" -> {
+                val username = args["username"]?.trim()?.ifBlank { null }
+                val profileResult = githubClient.getUserProfile(username)
+                    .getOrElse { return errResult(toolCall, it.message ?: "Failed to get user profile") }
+
+                val (user, repos) = profileResult
+                buildString {
+                    appendLine("### GitHub Profile: ${user.login} (${user.name ?: "No name"})")
+                    user.bio?.let { appendLine("- **Bio**: $it") }
+                    user.avatarUrl?.let { appendLine("- **Avatar**: $it") }
+                    appendLine("- **Public Repos**: ${user.publicRepos}")
+                    appendLine("- **Profile URL**: https://github.com/${user.login}")
+                    appendLine("\n#### Top & Recent Public Repositories (${repos.take(15).size}):")
+                    if (repos.isEmpty()) {
+                        appendLine("_No public repositories found._")
+                    } else {
+                        repos.take(15).forEach { r ->
+                            val desc = r.description ?: "No description"
+                            val lang = r.language ?: "Unknown"
+                            appendLine("- **[${r.name}](https://github.com/${r.fullName})** (${lang}, ⭐ ${r.stars}): $desc")
+                        }
+                    }
+                }
+            }
+
             "github_list_repos" -> {
                 val forceRefresh = args["force_refresh"]?.toBooleanStrictOrNull() ?: false
                 val repos = githubClient.getUserRepositories(forceRefresh)
@@ -167,47 +192,12 @@ class ToolExecutor @Inject constructor(
                 val repo = args["repo"] ?: activeProj?.repo ?: return errResult(toolCall, "Missing repo and no active project anchored")
                 val branch = args["branch_name"] ?: return errResult(toolCall, "Missing branch_name")
                 val baseBranch = resolveBranch(owner, repo, args["base_branch"])
-                val rawChanges = (args["file_changes"] ?: "[]").trim()
-                val cleanedJson = if (rawChanges.contains("```")) {
-                    rawChanges.substringAfter("```").let { if (it.startsWith("json", ignoreCase = true)) it.substring(4) else it }
-                        .substringBeforeLast("```").trim()
-                } else {
-                    val firstBracket = rawChanges.indexOfFirst { it == '[' || it == '{' }
-                    val lastBracket = rawChanges.indexOfLast { it == ']' || it == '}' }
-                    if (firstBracket != -1 && lastBracket > firstBracket) {
-                        rawChanges.substring(firstBracket, lastBracket + 1).trim()
-                    } else rawChanges
-                }
+                val rawChanges = args["file_changes"] ?: "[]"
+                val fileChanges = parseFileChanges(rawChanges)
 
                 val commitMsg = args["commit_message"] ?: "Update by Dettle agent"
                 val prTitle = args["pr_title"] ?: commitMsg
                 val prBody = args["pr_body"] ?: ""
-
-                val fileChanges = try {
-                    val element = json.parseToJsonElement(cleanedJson)
-                    when (element) {
-                        is kotlinx.serialization.json.JsonArray -> {
-                            element.mapNotNull { el ->
-                                val obj = el as? kotlinx.serialization.json.JsonObject ?: return@mapNotNull null
-                                val path = ((obj["path"] ?: obj["file_path"] ?: obj["filename"] ?: obj["file"] ?: obj["file_name"]) as? kotlinx.serialization.json.JsonPrimitive)?.content?.trim()
-                                val content = ((obj["content"] ?: obj["code"] ?: obj["text"] ?: obj["body"] ?: obj["source"]) as? kotlinx.serialization.json.JsonPrimitive)?.content
-                                if (!path.isNullOrBlank() && content != null) {
-                                    com.dettle.app.data.github.FileChange(path = path, content = content)
-                                } else null
-                            }
-                        }
-                        is kotlinx.serialization.json.JsonObject -> {
-                            val path = ((element["path"] ?: element["file_path"] ?: element["filename"] ?: element["file"] ?: element["file_name"]) as? kotlinx.serialization.json.JsonPrimitive)?.content?.trim()
-                            val content = ((element["content"] ?: element["code"] ?: element["text"] ?: element["body"] ?: element["source"]) as? kotlinx.serialization.json.JsonPrimitive)?.content
-                            if (!path.isNullOrBlank() && content != null) {
-                                listOf(com.dettle.app.data.github.FileChange(path = path, content = content))
-                            } else emptyList()
-                        }
-                        else -> emptyList()
-                    }
-                } catch (e: Exception) {
-                    return errResult(toolCall, "Invalid file_changes JSON: ${e.message}")
-                }
 
                 if (fileChanges.isEmpty()) {
                     return errResult(toolCall, "No valid file changes found in file_changes parameter. Expected JSON array of {path, content} objects.")
@@ -224,11 +214,49 @@ class ToolExecutor @Inject constructor(
                     baseBranch = baseBranch
                 ).getOrElse { return errResult(toolCall, it.message ?: "Failed to create PR") }
 
-                "Pull Request created successfully!\n" +
-                        "**PR #${pr.number}**: ${pr.title}\n" +
-                        "**Branch**: `${pr.branch}`\n" +
-                        "**Files changed**: ${pr.filesChanged}\n" +
-                        "**URL**: ${pr.url}"
+                if (pr.number == 0) {
+                    "Repository initialized with initial commit!\n" +
+                            "**Branch**: `${pr.branch}`\n" +
+                            "**Files committed**: ${pr.filesChanged}\n" +
+                            "**URL**: ${pr.url}"
+                } else {
+                    "Pull Request created successfully!\n" +
+                            "**PR #${pr.number}**: ${pr.title}\n" +
+                            "**Branch**: `${pr.branch}`\n" +
+                            "**Files changed**: ${pr.filesChanged}\n" +
+                            "**URL**: ${pr.url}"
+                }
+            }
+
+            "github_push_files", "push_files", "github_commit_files" -> {
+                val owner = args["owner"] ?: activeProj?.owner ?: return errResult(toolCall, "Missing owner and no active project anchored")
+                val repo = args["repo"] ?: activeProj?.repo ?: return errResult(toolCall, "Missing repo and no active project anchored")
+                val branch = resolveBranch(owner, repo, args["branch"])
+                val commitMsg = args["commit_message"] ?: args["message"] ?: "Update files by Dettle agent"
+                val rawChanges = args["file_changes"]?.trim()
+
+                val fileChanges: List<com.dettle.app.data.github.FileChange> = if (!rawChanges.isNullOrBlank()) {
+                    parseFileChanges(rawChanges)
+                } else {
+                    workspaceManager.readAllFiles().map { (path, content) ->
+                        com.dettle.app.data.github.FileChange(path, content)
+                    }
+                }
+
+                if (fileChanges.isEmpty()) {
+                    return errResult(toolCall, "No files found to push. Write files to the workspace first or provide file_changes parameter.")
+                }
+
+                val committed = githubClient.commitFiles(owner, repo, branch, fileChanges, commitMsg)
+                    .getOrElse { return errResult(toolCall, it.message ?: "Failed to commit files") }
+
+                buildString {
+                    appendLine("Successfully committed and pushed ${committed.size} file(s) to branch `$branch`!")
+                    appendLine("- **Repository**: https://github.com/$owner/$repo/tree/$branch")
+                    appendLine("- **Commit Message**: $commitMsg")
+                    appendLine("- **Committed Files**:")
+                    committed.forEach { appendLine("  - `$it`") }
+                }
             }
 
             "github_merge_pr" -> {
@@ -677,6 +705,45 @@ class ToolExecutor @Inject constructor(
                 .take(8000)
         } catch (e: Exception) {
             "Error fetching URL: ${e.message}"
+        }
+    }
+
+    private fun parseFileChanges(rawChanges: String): List<com.dettle.app.data.github.FileChange> {
+        val cleanedJson = if (rawChanges.contains("```")) {
+            rawChanges.substringAfter("```").let { if (it.startsWith("json", ignoreCase = true)) it.substring(4) else it }
+                .substringBeforeLast("```").trim()
+        } else {
+            val firstBracket = rawChanges.indexOfFirst { it == '[' || it == '{' }
+            val lastBracket = rawChanges.indexOfLast { it == ']' || it == '}' }
+            if (firstBracket != -1 && lastBracket > firstBracket) {
+                rawChanges.substring(firstBracket, lastBracket + 1).trim()
+            } else rawChanges.trim()
+        }
+
+        return try {
+            val element = json.parseToJsonElement(cleanedJson)
+            when (element) {
+                is kotlinx.serialization.json.JsonArray -> {
+                    element.mapNotNull { el ->
+                        val obj = el as? kotlinx.serialization.json.JsonObject ?: return@mapNotNull null
+                        val path = ((obj["path"] ?: obj["file_path"] ?: obj["filename"] ?: obj["file"] ?: obj["file_name"]) as? kotlinx.serialization.json.JsonPrimitive)?.content?.trim()
+                        val content = ((obj["content"] ?: obj["code"] ?: obj["text"] ?: obj["body"] ?: obj["source"]) as? kotlinx.serialization.json.JsonPrimitive)?.content
+                        if (!path.isNullOrBlank() && content != null) {
+                            com.dettle.app.data.github.FileChange(path = path, content = content)
+                        } else null
+                    }
+                }
+                is kotlinx.serialization.json.JsonObject -> {
+                    val path = ((element["path"] ?: element["file_path"] ?: element["filename"] ?: element["file"] ?: element["file_name"]) as? kotlinx.serialization.json.JsonPrimitive)?.content?.trim()
+                    val content = ((element["content"] ?: element["code"] ?: element["text"] ?: element["body"] ?: element["source"]) as? kotlinx.serialization.json.JsonPrimitive)?.content
+                    if (!path.isNullOrBlank() && content != null) {
+                        listOf(com.dettle.app.data.github.FileChange(path = path, content = content))
+                    } else emptyList()
+                }
+                else -> emptyList()
+            }
+        } catch (_: Exception) {
+            emptyList()
         }
     }
 }

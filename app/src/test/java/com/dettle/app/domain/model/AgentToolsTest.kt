@@ -31,6 +31,7 @@ class AgentToolsTest {
         val readOnlyNames = AgentTools.READ_ONLY.map { it.name }.toSet()
 
         assertFalse(readOnlyNames.contains(AgentTools.GITHUB_CREATE_BRANCH_PR.name))
+        assertFalse(readOnlyNames.contains(AgentTools.GITHUB_PUSH_FILES.name))
         assertFalse(readOnlyNames.contains(AgentTools.GITHUB_TRIGGER_ACTION.name))
         assertFalse(readOnlyNames.contains(AgentTools.GITHUB_MERGE_PR.name))
         assertFalse(readOnlyNames.contains(AgentTools.GITHUB_CREATE_RELEASE.name))
@@ -41,15 +42,18 @@ class AgentToolsTest {
         assertFalse(readOnlyNames.contains(AgentTools.WORKSPACE_FILE_EDIT.name))
         assertFalse(readOnlyNames.contains(AgentTools.WORKSPACE_DELETE_FILE.name))
         assertFalse(readOnlyNames.contains(AgentTools.WORKSPACE_BASH.name))
+        assertTrue(readOnlyNames.contains(AgentTools.GITHUB_GET_USER.name))
     }
 
     @Test
     fun testAllToolsIncludeBothReadAndWrite() {
         val allNames = AgentTools.ALL.map { it.name }.toSet()
 
+        assertTrue(allNames.contains(AgentTools.GITHUB_GET_USER.name))
         assertTrue(allNames.contains(AgentTools.GITHUB_LIST_REPOS.name))
         assertTrue(allNames.contains(AgentTools.GITHUB_GET_DEFAULT_BRANCH.name))
         assertTrue(allNames.contains(AgentTools.GITHUB_CREATE_BRANCH_PR.name))
+        assertTrue(allNames.contains(AgentTools.GITHUB_PUSH_FILES.name))
         assertTrue(allNames.contains(AgentTools.GITHUB_MERGE_PR.name))
         assertTrue(allNames.contains(AgentTools.GITHUB_CREATE_RELEASE.name))
         assertTrue(allNames.contains(AgentTools.GITHUB_LIST_WORKFLOW_RUNS.name))
@@ -71,6 +75,7 @@ class AgentToolsTest {
     fun testDeployToolsContainPipelineOperations() {
         val deployNames = AgentTools.DEPLOY.map { it.name }.toSet()
 
+        assertTrue(deployNames.contains(AgentTools.GITHUB_PUSH_FILES.name))
         assertTrue(deployNames.contains(AgentTools.GITHUB_TRIGGER_ACTION.name))
         assertTrue(deployNames.contains(AgentTools.GITHUB_POLL_RUN.name))
         assertTrue(deployNames.contains(AgentTools.GITHUB_LIST_WORKFLOW_RUNS.name))

@@ -480,10 +480,12 @@ class ReActLoop @Inject constructor(
 
     private fun toolCallToApprovalType(toolName: String): ApprovalActionType = when (toolName) {
         "github_create_branch_pr" -> ApprovalActionType.GITHUB_CREATE_PR
+        "github_push_files", "push_files", "github_commit_files" -> ApprovalActionType.GITHUB_PUSH_COMMIT
         "github_trigger_action" -> ApprovalActionType.GITHUB_TRIGGER_ACTION
         "github_create_release" -> ApprovalActionType.GITHUB_CREATE_RELEASE
         "github_merge_pr" -> ApprovalActionType.GITHUB_MERGE_PR
         "cloudflare_publish_worker" -> ApprovalActionType.CLOUDFLARE_DEPLOY_WORKER
+        "cloudflare_deploy_preview" -> ApprovalActionType.CLOUDFLARE_PUBLISH
         "workspace_bash", "bash" -> ApprovalActionType.CUSTOM
         else -> ApprovalActionType.CUSTOM
     }
@@ -541,6 +543,12 @@ class ReActLoop @Inject constructor(
             }
             "github_map_repo" -> {
                 "[GitHub Repo Map: ${content.lines().size} entries (compacted)]"
+            }
+            "github_get_user", "github_user_profile" -> {
+                "[GitHub User Profile: ${content.lines().firstOrNull() ?: ""} (compacted)]"
+            }
+            "github_push_files", "push_files", "github_commit_files" -> {
+                "[GitHub Push: ${content.lines().firstOrNull() ?: "committed"} (compacted)]"
             }
             else -> {
                 if (content.length > 200) {

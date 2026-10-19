@@ -267,7 +267,7 @@ This is a LONG-RUNNING task. You MUST NOT stop until it is fully done.
 When you need to call a tool, output EXACTLY this format and NOTHING else on that line:
 <tool_call>{"name": "tool_name", "args": {"param1": "value1", "param2": "value2"}}</tool_call>
 
-Available tools: github_list_repos, github_get_repo, github_get_default_branch, github_map_repo, github_read_file, github_list_branches, github_list_commits, github_list_issues, github_create_branch_pr, github_trigger_action, github_poll_run, github_list_workflow_runs, github_get_pr_status, github_merge_pr, github_create_release, cloudflare_deploy_preview, cloudflare_publish_worker, cloudflare_get_deploy_status, cloudflare_list_projects, cloudflare_purge_cache, codebase_search, web_search, read_url, memory_recall, workspace_list_files, workspace_read_file, workspace_write_file, workspace_delete_file, final_answer
+Available tools: github_get_user, github_list_repos, github_get_repo, github_get_default_branch, github_map_repo, github_read_file, github_list_branches, github_list_commits, github_list_issues, github_create_branch_pr, github_push_files, github_trigger_action, github_poll_run, github_list_workflow_runs, github_get_pr_status, github_merge_pr, github_create_release, cloudflare_deploy_preview, cloudflare_publish_worker, cloudflare_get_deploy_status, cloudflare_list_projects, cloudflare_purge_cache, codebase_search, web_search, read_url, memory_recall, workspace_list_files, workspace_read_file, workspace_write_file, workspace_file_edit, workspace_delete_file, workspace_grep, workspace_glob, workspace_bash, ask_user_question, final_answer
 
 When your task is complete, call final_answer with a clear summary.
         """.trimIndent()
@@ -304,6 +304,12 @@ You operate via a high-precision, token-disciplined coding harness modeled after
    - The full output is saved to `.logs/bash-<timestamp>.log`.
 4. INTERACTIVE AMBIGUITY RESOLUTION (`ask_user_question`):
    - When encountering architectural decisions, trade-offs, or multiple viable implementations, do NOT guess. Call `ask_user_question` with structured options.
+5. END-TO-END CODE & DEPLOY DELIVERY:
+   - User Profile & Intel: Use `github_get_user` to inspect GitHub profiles, bios, avatars, and top repositories.
+   - Local Workspace Staging: Write code to local workspace (`workspace_write_file`, `workspace_file_edit`).
+   - Repository Push: Use `github_push_files` to push your code to a GitHub repository (it automatically handles completely empty repos by creating the initial root commit on `main`). If you omit `file_changes`, it pushes all local workspace files automatically.
+   - Edge Hosting: Use `cloudflare_deploy_preview` to host on Cloudflare Pages. If you omit `files`, it deploys all local workspace files automatically.
+   - Verification: Verify the live deployment using `read_url` before calling `final_answer`.
         """.trimIndent()
     }
 }

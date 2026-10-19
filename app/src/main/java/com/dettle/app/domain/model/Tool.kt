@@ -84,6 +84,23 @@ object AgentTools {
         safetyLevel = SafetyLevel.REQUIRE
     )
 
+    val GITHUB_PUSH_FILES = Tool(
+        name = "github_push_files",
+        description = "Commit and push files directly to a repository branch (default 'main'). Works seamlessly on both existing repositories and completely empty repositories (automatically initializes main with the root commit). If file_changes is omitted, it automatically commits all files currently in the local workspace.",
+        parameters = ToolParameters(
+            properties = mapOf(
+                "owner" to ToolProperty("string", "GitHub repository owner/org name"),
+                "repo" to ToolProperty("string", "Repository name"),
+                "branch" to ToolProperty("string", "Target branch (defaults to default branch or main)"),
+                "commit_message" to ToolProperty("string", "Commit message describing the changes"),
+                "file_changes" to ToolProperty("string", "Optional JSON array of {path, content} objects. If omitted, all files in local workspace are pushed.")
+            ),
+            required = listOf("owner", "repo", "commit_message")
+        ),
+        requiresApproval = true,
+        safetyLevel = SafetyLevel.REQUIRE
+    )
+
     val GITHUB_TRIGGER_ACTION = Tool(
         name = "github_trigger_action",
         description = "Trigger a GitHub Actions workflow manually via workflow_dispatch event.",
@@ -111,6 +128,18 @@ object AgentTools {
                 "workflow_id" to ToolProperty("string", "Workflow file name, e.g. android-build.yml")
             ),
             required = listOf("owner", "repo", "workflow_id")
+        ),
+        safetyLevel = SafetyLevel.AUTO
+    )
+
+    val GITHUB_GET_USER = Tool(
+        name = "github_get_user",
+        description = "Get detailed profile information and top public repositories for a GitHub user (or the authenticated user if username is omitted). Returns name, bio, avatar URL, follower count, and public repos with descriptions, stars, and languages.",
+        parameters = ToolParameters(
+            properties = mapOf(
+                "username" to ToolProperty("string", "GitHub username to inspect (optional, defaults to connected user)")
+            ),
+            required = emptyList()
         ),
         safetyLevel = SafetyLevel.AUTO
     )
@@ -515,6 +544,7 @@ object AgentTools {
 
     /** All tools available to agents by default */
     val ALL: List<Tool> = listOf(
+        GITHUB_GET_USER,
         GITHUB_LIST_REPOS,
         GITHUB_GET_REPO,
         GITHUB_GET_DEFAULT_BRANCH,
@@ -524,6 +554,7 @@ object AgentTools {
         GITHUB_LIST_COMMITS,
         GITHUB_LIST_ISSUES,
         GITHUB_CREATE_BRANCH_PR,
+        GITHUB_PUSH_FILES,
         GITHUB_TRIGGER_ACTION,
         GITHUB_POLL_RUN,
         GITHUB_LIST_WORKFLOW_RUNS,
@@ -553,6 +584,7 @@ object AgentTools {
 
     /** Read-only tools (safe for Chat mode & READER agent - 100% read access) */
     val READ_ONLY: List<Tool> = listOf(
+        GITHUB_GET_USER,
         GITHUB_LIST_REPOS,
         GITHUB_GET_REPO,
         GITHUB_GET_DEFAULT_BRANCH,
@@ -580,6 +612,7 @@ object AgentTools {
 
     /** Tools for the DEPLOYER agent */
     val DEPLOY: List<Tool> = listOf(
+        GITHUB_PUSH_FILES,
         GITHUB_TRIGGER_ACTION,
         GITHUB_POLL_RUN,
         GITHUB_LIST_WORKFLOW_RUNS,
