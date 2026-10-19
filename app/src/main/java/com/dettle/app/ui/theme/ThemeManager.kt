@@ -92,10 +92,9 @@ enum class AppTheme(
     );
 
     companion object {
-        fun fromId(id: String?): AppTheme = when (id?.lowercase()) {
-            "oat_light", "apple_light" -> OAT_LIGHT
-            "oled_black" -> OLED_BLACK
-            else -> OBSIDIAN
+        fun fromId(id: String?): AppTheme {
+            if (id.isNullOrBlank()) return OBSIDIAN
+            return entries.firstOrNull { it.id.equals(id, ignoreCase = true) } ?: OBSIDIAN
         }
     }
 }

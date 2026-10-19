@@ -9,6 +9,25 @@ val MaliFont = FontFamily.Default
 val PatrickHand = FontFamily.Default
 val DettleFont = FontFamily.Default
 
+// Developer Code Typography
+val CodeMonospace = FontFamily.Monospace
+
+val CodeBlockStyle = TextStyle(
+    fontFamily = CodeMonospace,
+    fontWeight = FontWeight.Normal,
+    fontSize = 13.sp,
+    lineHeight = 18.sp,
+    letterSpacing = 0.sp
+)
+
+val CodeInlineStyle = TextStyle(
+    fontFamily = CodeMonospace,
+    fontWeight = FontWeight.Medium,
+    fontSize = 13.5.sp,
+    lineHeight = 18.sp,
+    letterSpacing = 0.sp
+)
+
 val DettleTypography = Typography(
     displayLarge = TextStyle(
         fontFamily = FontFamily.Default,
