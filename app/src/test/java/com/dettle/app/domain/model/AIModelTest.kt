@@ -10,7 +10,7 @@ class AIModelTest {
     @Test
     fun testWaterfallOrderIsNotEmptyAndContainsTopTierModels() {
         assertTrue(FreeModels.WATERFALL_ORDER.isNotEmpty())
-        assertEquals(FreeModels.GROQ_LLAMA_8B, FreeModels.WATERFALL_ORDER.first())
+        assertEquals(FreeModels.GEMINI_3_8_FLASH, FreeModels.WATERFALL_ORDER.first())
         assertTrue(FreeModels.WATERFALL_ORDER.any { it.modelId == "gemini-3.8-flash" })
         assertTrue(FreeModels.WATERFALL_ORDER.any { it.modelId == "gemini-3.5-flash-lite" })
         assertTrue(FreeModels.WATERFALL_ORDER.any { it.modelId == "gemini-3.1-pro-preview" })
