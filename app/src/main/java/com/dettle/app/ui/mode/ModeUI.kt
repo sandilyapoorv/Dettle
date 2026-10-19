@@ -11,15 +11,19 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.ui.platform.LocalView
+import com.dettle.app.ui.components.Haptics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
@@ -449,11 +453,11 @@ fun ModeCustomizationSheet(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 Spacer(Modifier.height(4.dp))
                 SectionHeader(Icons.Outlined.Speed, "Step Budget", "Max ReAct loop iterations (${maxSteps.toInt()} steps)")
-                Slider(
+                TactileStepperSlider(
                     value = maxSteps,
                     onValueChange = { maxSteps = it },
                     valueRange = 2f..100f,
-                    steps = 49
+                    step = 1f
                 )
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("2 (fast)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -711,6 +715,88 @@ fun SectionHeader(icon: ImageVector, title: String, subtitle: String) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+    }
+}
+
+@Composable
+fun TactileStepperSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float>,
+    step: Float = 1f,
+    modifier: Modifier = Modifier
+) {
+    val view = LocalView.current
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Decrement button
+        IconButton(
+            onClick = {
+                val next = (value - step).coerceIn(valueRange.start, valueRange.endInclusive)
+                if (next != value) {
+                    Haptics.tick(view)
+                    onValueChange(next)
+                }
+            },
+            modifier = Modifier.size(36.dp)
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "−",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        }
+
+        // Smooth Slider
+        Slider(
+            value = value,
+            onValueChange = {
+                onValueChange(it)
+            },
+            valueRange = valueRange,
+            modifier = Modifier.weight(1f)
+        )
+
+        // Increment button
+        IconButton(
+            onClick = {
+                val next = (value + step).coerceIn(valueRange.start, valueRange.endInclusive)
+                if (next != value) {
+                    Haptics.tick(view)
+                    onValueChange(next)
+                }
+            },
+            modifier = Modifier.size(36.dp)
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Filled.Add,
+                        contentDescription = "Increase",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
         }
     }
 }

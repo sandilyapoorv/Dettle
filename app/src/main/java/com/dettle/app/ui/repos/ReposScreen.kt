@@ -29,11 +29,24 @@ import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.InsertDriveFile
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.dettle.app.ui.components.Haptics
+import com.dettle.app.ui.theme.CodeMonospace
+import com.dettle.app.ui.theme.DettleGreen
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -565,6 +578,10 @@ fun RepoFileRow(file: RepoFile, onClick: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FileViewerScreen(file: RepoFileView, onClose: () -> Unit) {
+    val clipboardManager = LocalClipboardManager.current
+    val view = LocalView.current
+    var copied by remember { mutableStateOf(false) }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -586,15 +603,31 @@ fun FileViewerScreen(file: RepoFileView, onClose: () -> Unit) {
                 },
                 actions = {
                     Surface(
-                        shape = MaterialTheme.shapes.extraSmall,
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        modifier = Modifier.padding(end = 12.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
+                        modifier = Modifier.padding(end = 4.dp)
                     ) {
                         Text(
                             "${file.content.lines().size} lines",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            style = MaterialTheme.typography.labelSmall.copy(fontFamily = CodeMonospace),
+                            color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
+
+                    IconButton(
+                        onClick = {
+                            Haptics.confirm(view)
+                            clipboardManager.setText(AnnotatedString(file.content))
+                            copied = true
+                        }
+                    ) {
+                        Icon(
+                            imageVector = if (copied) Icons.Outlined.Check else Icons.Outlined.ContentCopy,
+                            contentDescription = "Copy file content",
+                            tint = if (copied) DettleGreen else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
@@ -605,28 +638,44 @@ fun FileViewerScreen(file: RepoFileView, onClose: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp),
-            shape = MaterialTheme.shapes.medium,
-            color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            shape = RoundedCornerShape(12.dp),
+            color = Color(0xFF0D1117),
+            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
         ) {
             val lines = remember(file.content) { file.content.lines() }
-            LazyColumn(
-                modifier = Modifier.padding(12.dp)
-            ) {
-                items(count = lines.size, key = { it }) { idx ->
-                    Row(modifier = Modifier.padding(vertical = 1.dp)) {
-                        Text(
-                            text = "%4d".format(idx + 1),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                            modifier = Modifier.width(40.dp)
-                        )
-                        Text(
-                            text = lines[idx],
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+            val horizontalScrollState = rememberScrollState()
+
+            Box(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .horizontalScroll(horizontalScrollState)
+                        .padding(12.dp)
+                ) {
+                    items(count = lines.size, key = { it }) { idx ->
+                        Row(modifier = Modifier.padding(vertical = 1.dp)) {
+                            Text(
+                                text = "%4d".format(idx + 1),
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontFamily = CodeMonospace,
+                                    fontSize = 12.sp
+                                ),
+                                color = Color(0xFF6E7681),
+                                modifier = Modifier.width(42.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = lines[idx],
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontFamily = CodeMonospace,
+                                    fontSize = 12.sp,
+                                    lineHeight = 18.sp
+                                ),
+                                color = Color(0xFFE6EDF3),
+                                softWrap = false
+                            )
+                        }
                     }
                 }
             }
