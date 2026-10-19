@@ -11,7 +11,6 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.dettle.app.MainActivity
 import com.dettle.app.data.settings.ApiKeyStore
-import com.dettle.app.data.webview.WebViewPool
 import com.dettle.app.orchestrator.overnight.OvernightLoop
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -39,8 +38,7 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class AgentForegroundService : Service() {
 
-    @Inject lateinit var webViewPool: WebViewPool
-    @Inject lateinit var keyStore: ApiKeyStore
+        @Inject lateinit var keyStore: ApiKeyStore
     @Inject lateinit var overnightLoop: OvernightLoop
     @Inject lateinit var learningEngine: LearningEngine
     @Inject lateinit var apiHeartbeat: ApiHeartbeat
@@ -52,10 +50,6 @@ class AgentForegroundService : Service() {
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildNotification("Dettle Agent is active"))
 
-        // Initialize WebView pool — loads all provider sessions in the background
-        val gistUrl = keyStore.selectorRegistryGistUrl
-        webViewPool.initialize(gistUrl)
-        
         // Start background daemon processes
         learningEngine.startProcessing(serviceScope)
         apiHeartbeat.start(serviceScope)
@@ -87,8 +81,7 @@ class AgentForegroundService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         ServiceBridge.tryEmit(DaemonEvent.ServiceStopped)
-        webViewPool.destroy()
-        overnightLoop.stop()
+                overnightLoop.stop()
         apiHeartbeat.stop()
         serviceScope.cancel()
     }

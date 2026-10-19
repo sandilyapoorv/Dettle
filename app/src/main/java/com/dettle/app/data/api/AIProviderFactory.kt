@@ -88,7 +88,7 @@ class AIProviderFactory @Inject constructor(
                 )
             )
 
-            else -> null  // WebView providers handled separately
+            else -> null
         }
     }
 

@@ -9,8 +9,9 @@ import com.dettle.app.domain.model.AggregateAccountMetrics
 import com.dettle.app.domain.model.GitHubAccount
 import com.dettle.app.domain.model.ProviderAccount
 import com.dettle.app.domain.model.ProviderMetrics
-import com.dettle.app.domain.model.WebViewAccount
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import org.json.JSONArray
 import org.json.JSONObject
 import javax.inject.Inject
@@ -142,7 +143,7 @@ class ApiKeyStore @Inject constructor(
         val totalRequests = accounts.sumOf { it.requestsUsed }
         val totalTokens = accounts.sumOf { it.tokensUsed }
 
-        val breakdown = AIProviderType.entries.filter { !it.isWebView }.associateWith { provider ->
+        val breakdown = AIProviderType.entries.associateWith { provider ->
             val providerAccs = accounts.filter { it.provider == provider }
             ProviderMetrics(
                 provider = provider,
@@ -201,7 +202,7 @@ class ApiKeyStore @Inject constructor(
     fun hasAnyActiveKey(): Boolean {
         val accounts = getAllProviderAccounts()
         if (accounts.any { it.isActive && it.apiKey.isNotBlank() }) return true
-        return AIProviderType.entries.any { !it.isWebView && hasKey(it) }
+        return AIProviderType.entries.any { hasKey(it) }
     }
 
     private fun keyFor(provider: AIProviderType) = "api_key_${provider.name}"
@@ -339,130 +340,11 @@ class ApiKeyStore @Inject constructor(
         get() = prefs.getString("drive_folder_id", null)
         set(value) = prefs.edit().putString("drive_folder_id", value).apply()
 
-    // ─── Remote Selector Registry ─────────────────────────────────────────
-
-    var selectorRegistryGistUrl: String?
-        get() = prefs.getString("selector_gist_url", DEFAULT_SELECTOR_URL)
-        set(value) = prefs.edit().putString("selector_gist_url", value).apply()
 
     // ─── Helper: which providers have keys configured ─────────────────────
 
     fun getConfiguredApiProviders(): List<AIProviderType> =
-        AIProviderType.entries.filter { !it.isWebView && hasKey(it) }
-
-    // ─── Multi-Account Subscription / WebView Provider Storage ─────────────
-
-    fun getAllWebViewAccounts(): List<WebViewAccount> {
-        val json = prefs.getString("webview_accounts_json", null)
-        if (json.isNullOrBlank()) {
-            // Seed defaults on initial launch
-            val defaults = listOf(
-                WebViewAccount(
-                    providerType = AIProviderType.CHATGPT_WEB,
-                    label = "ChatGPT Account 1",
-                    loginUrl = AIProviderType.CHATGPT_WEB.loginUrl,
-                    baseUrl = AIProviderType.CHATGPT_WEB.baseUrl
-                ),
-                WebViewAccount(
-                    providerType = AIProviderType.CLAUDE_WEB,
-                    label = "Claude Account 1",
-                    loginUrl = AIProviderType.CLAUDE_WEB.loginUrl,
-                    baseUrl = AIProviderType.CLAUDE_WEB.baseUrl
-                ),
-                WebViewAccount(
-                    providerType = AIProviderType.DEEPSEEK_WEB,
-                    label = "DeepSeek Account 1",
-                    loginUrl = AIProviderType.DEEPSEEK_WEB.loginUrl,
-                    baseUrl = AIProviderType.DEEPSEEK_WEB.baseUrl
-                ),
-                WebViewAccount(
-                    providerType = AIProviderType.GROK_WEB,
-                    label = "Grok Account 1",
-                    loginUrl = AIProviderType.GROK_WEB.loginUrl,
-                    baseUrl = AIProviderType.GROK_WEB.baseUrl
-                )
-            )
-            saveWebViewAccounts(defaults)
-            return defaults
-        }
-
-        return try {
-            val array = JSONArray(json)
-            val list = mutableListOf<WebViewAccount>()
-            for (i in 0 until array.length()) {
-                val obj = array.getJSONObject(i)
-                val providerStr = obj.getString("providerType")
-                val provider = runCatching { AIProviderType.valueOf(providerStr) }.getOrNull() ?: continue
-                list.add(
-                    WebViewAccount(
-                        id = obj.getString("id"),
-                        providerType = provider,
-                        label = obj.getString("label"),
-                        loginUrl = obj.optString("loginUrl", provider.loginUrl),
-                        baseUrl = obj.optString("baseUrl", provider.baseUrl),
-                        isEnabled = obj.optBoolean("isEnabled", true),
-                        requestsUsed = obj.optLong("requestsUsed", 0L),
-                        tokensUsed = obj.optLong("tokensUsed", 0L),
-                        isLoggedIn = obj.optBoolean("isLoggedIn", false)
-                    )
-                )
-            }
-            list
-        } catch (e: Exception) {
-            emptyList()
-        }
-    }
-
-    fun saveWebViewAccounts(accounts: List<WebViewAccount>) {
-        val array = JSONArray()
-        for (acc in accounts) {
-            val obj = JSONObject().apply {
-                put("id", acc.id)
-                put("providerType", acc.providerType.name)
-                put("label", acc.label)
-                put("loginUrl", acc.loginUrl)
-                put("baseUrl", acc.baseUrl)
-                put("isEnabled", acc.isEnabled)
-                put("requestsUsed", acc.requestsUsed)
-                put("tokensUsed", acc.tokensUsed)
-                put("isLoggedIn", acc.isLoggedIn)
-            }
-            array.put(obj)
-        }
-        prefs.edit().putString("webview_accounts_json", array.toString()).apply()
-    }
-
-    fun addWebViewAccount(account: WebViewAccount) {
-        val accounts = getAllWebViewAccounts().toMutableList()
-        accounts.add(account)
-        saveWebViewAccounts(accounts)
-    }
-
-    fun updateWebViewAccount(account: WebViewAccount) {
-        val accounts = getAllWebViewAccounts().toMutableList()
-        val index = accounts.indexOfFirst { it.id == account.id }
-        if (index >= 0) {
-            accounts[index] = account
-            saveWebViewAccounts(accounts)
-        }
-    }
-
-    fun deleteWebViewAccount(id: String) {
-        val accounts = getAllWebViewAccounts().filter { it.id != id }
-        saveWebViewAccounts(accounts)
-    }
-
-    fun getWebViewAccount(id: String): WebViewAccount? {
-        return getAllWebViewAccounts().firstOrNull { it.id == id }
-    }
-
-    // ─── WebView provider enable/disable ──────────────────────────────────
-
-    fun isWebViewProviderEnabled(providerType: AIProviderType): Boolean =
-        prefs.getBoolean("webview_enabled_${providerType.name}", true)
-
-    fun setWebViewProviderEnabled(providerType: AIProviderType, enabled: Boolean) =
-        prefs.edit().putBoolean("webview_enabled_${providerType.name}", enabled).apply()
+        AIProviderType.entries.filter { hasKey(it) }
 
     // ─── Overnight mode settings ──────────────────────────────────────────
 
@@ -498,10 +380,10 @@ class ApiKeyStore @Inject constructor(
 
     // ─── Unleashed Engine / Uncensored Mode ─────────────────────────────────
 
-    private val _isUnleashedFlow = kotlinx.coroutines.flow.MutableStateFlow(
+    private val _isUnleashedFlow = MutableStateFlow(
         prefs.getBoolean("is_unleashed_enabled", false)
     )
-    val isUnleashedFlow: kotlinx.coroutines.flow.StateFlow<Boolean> = _isUnleashedFlow
+    val isUnleashedFlow: StateFlow<Boolean> = _isUnleashedFlow
 
     var isUnleashed: Boolean
         get() = prefs.getBoolean("is_unleashed_enabled", false)
@@ -518,7 +400,6 @@ class ApiKeyStore @Inject constructor(
 
     /**
      * Exports all decrypted key-value pairs stored in EncryptedSharedPreferences.
-     * Captures every single token, account, custom setting, and credential.
      */
     fun getAllSecureEntries(): Map<String, *> {
         return try {
@@ -543,10 +424,5 @@ class ApiKeyStore @Inject constructor(
             }
         }
         editor.apply()
-    }
-
-    companion object {
-        const val DEFAULT_SELECTOR_URL =
-            "https://gist.githubusercontent.com/YOUR_GITHUB_USERNAME/GIST_ID/raw/dom_selectors.json"
     }
 }

@@ -2,10 +2,6 @@ package com.dettle.app.orchestrator.config
 
 import android.content.ComponentCallbacks2
 import android.util.Log
-import com.dettle.app.data.webview.WebViewPool
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -19,9 +15,7 @@ private const val TAG = "ResourceManager"
  * heap efficiency, avoids memory leaks, and leverages full device hardware capabilities.
  */
 @Singleton
-class ResourceManager @Inject constructor(
-    private val webViewPool: WebViewPool
-) {
+class ResourceManager @Inject constructor() {
     private var isForeground = false
 
     /**
@@ -30,10 +24,6 @@ class ResourceManager @Inject constructor(
     fun onAppForegrounded() {
         Log.d(TAG, "App Foregrounded: Optimizing resources for interactive performance.")
         isForeground = true
-
-        CoroutineScope(Dispatchers.Main).launch {
-            webViewPool.initialize()
-        }
     }
 
     /**

@@ -6,10 +6,8 @@ package com.dettle.app.domain.model
 enum class AIProviderType(
     val displayName: String,
     val baseUrl: String,
-    val isWebView: Boolean = false,
     val isFree: Boolean = true,
-    val loginUrl: String = baseUrl
-) {
+    ) {
     // ── Track A: Official API Providers ──────────────────────────────────
     GROQ("Groq", "https://api.groq.com/openai/v1"),
     GEMINI("Google AI Studio", "https://generativelanguage.googleapis.com/v1beta"),
@@ -26,15 +24,7 @@ enum class AIProviderType(
     CEREBRAS("Cerebras", "https://api.cerebras.ai/v1", isFree = false),
     XAI("xAI (Grok)", "https://api.x.ai/v1", isFree = false),
 
-    // ── Track B: WebView bridge (user's own subscriptions) ────────────────
-    CHATGPT_WEB("ChatGPT", "https://chatgpt.com", isWebView = true, loginUrl = "https://chatgpt.com/auth/login"),
-    CLAUDE_WEB("Claude", "https://claude.ai", isWebView = true, loginUrl = "https://claude.ai/login"),
-    DEEPSEEK_WEB("DeepSeek", "https://chat.deepseek.com", isWebView = true, loginUrl = "https://chat.deepseek.com/sign_in"),
-    GROK_WEB("Grok", "https://grok.com", isWebView = true, loginUrl = "https://grok.com"),
-    GEMINI_WEB("Gemini Web", "https://gemini.google.com", isWebView = true, loginUrl = "https://gemini.google.com"),
-    KIMI_WEB("Kimi", "https://kimi.ai", isWebView = true, loginUrl = "https://kimi.ai"),
-    MISTRAL_WEB("Mistral Chat", "https://chat.mistral.ai", isWebView = true, loginUrl = "https://chat.mistral.ai/auth/login"),
-    QWEN_WEB("Qwen", "https://chat.qwenlm.ai", isWebView = true, loginUrl = "https://chat.qwenlm.ai");
+    ;
 
     companion object {
         fun fromId(id: String) = entries.firstOrNull { it.name.equals(id, ignoreCase = true) }

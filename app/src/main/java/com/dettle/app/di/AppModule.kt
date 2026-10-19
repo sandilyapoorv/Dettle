@@ -87,23 +87,8 @@ object AppModule {
     ): com.dettle.app.data.drive.GoogleDriveConnector =
         com.dettle.app.data.drive.GoogleDriveConnector(context, keyStore)
 
-    @Provides
-    @Singleton
-    fun provideSelectorRegistry(
-        client: OkHttpClient,
-        json: Json
-    ): com.dettle.app.data.webview.SelectorRegistry =
-        com.dettle.app.data.webview.SelectorRegistry(client, json)
-
-    @Provides
-    @Singleton
-    fun provideWebViewPool(
-        @ApplicationContext context: Context,
-        selectorRegistry: com.dettle.app.data.webview.SelectorRegistry,
-        keyStore: ApiKeyStore
-    ): com.dettle.app.data.webview.WebViewPool =
-        com.dettle.app.data.webview.WebViewPool(context, selectorRegistry, keyStore)
-
+    
+    
     // ─── Agent Config System ───────────────────────────────────────────────────
 
     /**

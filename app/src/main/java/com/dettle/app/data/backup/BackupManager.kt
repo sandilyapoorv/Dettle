@@ -27,7 +27,6 @@ import com.dettle.app.data.settings.ApiKeyStore
 import com.dettle.app.domain.model.AIProviderType
 import com.dettle.app.domain.model.GitHubAccount
 import com.dettle.app.domain.model.ProviderAccount
-import com.dettle.app.domain.model.WebViewAccount
 import com.dettle.app.orchestrator.mode.GoalEntity
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -111,7 +110,7 @@ class BackupManager @Inject constructor(
 
     suspend fun getLiveSummary(): BackupSummary = withContext(Dispatchers.IO) {
         val apis = apiKeyStore.getAllProviderAccounts().size + apiKeyStore.getAllGitHubAccounts().size
-        val subscriptions = apiKeyStore.getAllWebViewAccounts().size
+        val subscriptions = 0
         val projects = projectDao.getAllProjects().size
         val chats = conversationDao.getAllConversations().size
         val logs = taskLogDao.getAllLogs().size
@@ -203,24 +202,6 @@ class BackupManager @Inject constructor(
             root.put("apis", apisObj)
         }
 
-        // 2. Subscriptions (ChatGPT, Claude, Grok, DeepSeek, etc.)
-        if (options.includeSubscriptions) {
-            val subArr = JSONArray()
-            apiKeyStore.getAllWebViewAccounts().forEach { sub ->
-                subArr.put(JSONObject().apply {
-                    put("id", sub.id)
-                    put("providerType", sub.providerType.name)
-                    put("label", sub.label)
-                    put("loginUrl", sub.loginUrl)
-                    put("baseUrl", sub.baseUrl)
-                    put("isEnabled", sub.isEnabled)
-                    put("requestsUsed", sub.requestsUsed)
-                    put("tokensUsed", sub.tokensUsed)
-                    put("isLoggedIn", sub.isLoggedIn)
-                })
-            }
-            root.put("subscriptions", subArr)
-        }
 
         // 4. Cognitive Memories, Facts, Knowledge Graph, & User Profile
         if (options.includeMemories) {
@@ -428,8 +409,7 @@ class BackupManager @Inject constructor(
             val settingsObj = JSONObject().apply {
                 put("github_owner", apiKeyStore.githubOwner ?: "")
                 put("github_repo", apiKeyStore.githubRepo ?: "")
-                put("selector_gist_url", apiKeyStore.selectorRegistryGistUrl ?: "")
-                put("is_unleashed", apiKeyStore.isUnleashed)
+                                put("is_unleashed", apiKeyStore.isUnleashed)
                 put("voice_typing_engine", apiKeyStore.voiceTypingEngine)
                 put("openwhispr_server_url", apiKeyStore.openWhisprServerUrl)
                 put("overnight_max_hours", apiKeyStore.overnightMaxHours)
@@ -556,35 +536,11 @@ class BackupManager @Inject constructor(
                 }
             }
 
-            // 2. Subscriptions
+            // 2. Subscriptions (WebView accounts eradicated)
             if (options.includeSubscriptions && root.has("subscriptions")) {
-                runCatching {
-                    val subArr = root.getJSONArray("subscriptions")
-                    val existingSubs = apiKeyStore.getAllWebViewAccounts().toMutableList()
-                    for (i in 0 until subArr.length()) {
-                        val o = subArr.getJSONObject(i)
-                        val providerType = runCatching { AIProviderType.valueOf(o.getString("providerType")) }.getOrNull() ?: continue
-                        val sub = WebViewAccount(
-                            id = o.getString("id"),
-                            providerType = providerType,
-                            label = o.getString("label"),
-                            loginUrl = o.getString("loginUrl"),
-                            baseUrl = o.getString("baseUrl"),
-                            isEnabled = o.optBoolean("isEnabled", true),
-                            requestsUsed = o.optLong("requestsUsed", 0L),
-                            tokensUsed = o.optLong("tokensUsed", 0L),
-                            isLoggedIn = o.optBoolean("isLoggedIn", false)
-                        )
-                        val idx = existingSubs.indexOfFirst { it.id == sub.id }
-                        if (idx >= 0) existingSubs[idx] = sub else existingSubs.add(sub)
-                        subsCount++
-                    }
-                    apiKeyStore.saveWebViewAccounts(existingSubs)
-                }
+                // No-op: legacy webview subscriptions purged
             }
 
-
-            // 4. Cognitive Memories, Knowledge Graph, & Profile
             if (options.includeMemories && root.has("memories")) {
                 runCatching {
                     val memObj = root.getJSONObject("memories")
@@ -882,8 +838,7 @@ class BackupManager @Inject constructor(
                     val settings = root.getJSONObject("settings")
                     if (settings.has("github_owner")) apiKeyStore.githubOwner = settings.getString("github_owner")
                     if (settings.has("github_repo")) apiKeyStore.githubRepo = settings.getString("github_repo")
-                    if (settings.has("selector_gist_url")) apiKeyStore.selectorRegistryGistUrl = settings.getString("selector_gist_url")
-                    if (settings.has("is_unleashed")) apiKeyStore.isUnleashed = settings.getBoolean("is_unleashed")
+                                        if (settings.has("is_unleashed")) apiKeyStore.isUnleashed = settings.getBoolean("is_unleashed")
                     if (settings.has("voice_typing_engine")) apiKeyStore.voiceTypingEngine = settings.getString("voice_typing_engine")
                     if (settings.has("openwhispr_server_url")) apiKeyStore.openWhisprServerUrl = settings.getString("openwhispr_server_url")
                     if (settings.has("overnight_max_hours")) apiKeyStore.overnightMaxHours = settings.getLong("overnight_max_hours")
