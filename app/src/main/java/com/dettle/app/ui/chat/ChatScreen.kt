@@ -203,6 +203,7 @@ import java.util.Locale
 import com.dettle.app.ui.theme.DettleGreen
 import com.dettle.app.ui.theme.DettleOrange
 import com.dettle.app.ui.theme.DettleRed
+import com.dettle.app.ui.components.MarkdownText
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
@@ -1006,23 +1007,18 @@ fun TextMessageBubble(message: ChatMessage) {
                     if (isUser) UserBubbleBorder else AiBubbleBorder
                 )
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.Bottom
+                Box(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
                 ) {
-                    Text(
-                        text = message.content,
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontSize = 15.sp,
-                            lineHeight = 22.sp
-                        ),
+                    MarkdownText(
+                        content = message.content,
                         color = if (isUser) Color(0xFFF4F4F5) else MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f, fill = false)
+                        isStreaming = message.isStreaming,
+                        streamingCursor = {
+                            Spacer(Modifier.width(4.dp))
+                            StreamingCursor()
+                        }
                     )
-                    if (message.isStreaming) {
-                        Spacer(Modifier.width(4.dp))
-                        StreamingCursor()
-                    }
                 }
             }
 
