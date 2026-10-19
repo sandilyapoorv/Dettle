@@ -11,6 +11,9 @@ import kotlinx.coroutines.flow.flowOn
 import okhttp3.Response
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -55,15 +58,111 @@ class AnthropicProvider(
         try {
             val userAssistantMessages = messages.filter { it.role != "system" }.map { msg ->
                 buildJsonObject {
-                    put("role", JsonPrimitive(if (msg.role == "assistant") "assistant" else "user"))
-                    put("content", JsonPrimitive(msg.content))
+                    when (msg.role) {
+                        "assistant" -> {
+                            put("role", JsonPrimitive("assistant"))
+                            if (!msg.tool_calls.isNullOrBlank()) {
+                                put("content", buildJsonArray {
+                                    if (msg.content.isNotBlank()) {
+                                        add(buildJsonObject {
+                                            put("type", JsonPrimitive("text"))
+                                            put("text", JsonPrimitive(msg.content))
+                                        })
+                                    }
+                                    val parsedTools = runCatching {
+                                        val el = json.parseToJsonElement(msg.tool_calls)
+                                        if (el is kotlinx.serialization.json.JsonArray) el else kotlinx.serialization.json.JsonArray(listOf(el))
+                                    }.getOrNull() ?: kotlinx.serialization.json.JsonArray(emptyList())
+
+                                    parsedTools.forEach { toolItem ->
+                                        val obj = toolItem.jsonObject
+                                        val id = (obj["id"] as? JsonPrimitive)?.content ?: msg.tool_call_id ?: "toolu_1"
+                                        val name = (obj["name"] ?: (obj["function"] as? kotlinx.serialization.json.JsonObject)?.get("name"))?.let { (it as? JsonPrimitive)?.content } ?: msg.name ?: ""
+                                        val argsEl = (obj["arguments"] ?: (obj["function"] as? kotlinx.serialization.json.JsonObject)?.get("arguments") ?: obj["args"])
+                                        val inputObj = when (argsEl) {
+                                            is kotlinx.serialization.json.JsonObject -> argsEl
+                                            is JsonPrimitive -> runCatching { json.parseToJsonElement(argsEl.content) as? kotlinx.serialization.json.JsonObject }.getOrNull() ?: kotlinx.serialization.json.JsonObject(emptyMap())
+                                            else -> kotlinx.serialization.json.JsonObject(emptyMap())
+                                        }
+                                        add(buildJsonObject {
+                                            put("type", JsonPrimitive("tool_use"))
+                                            put("id", JsonPrimitive(id))
+                                            put("name", JsonPrimitive(name))
+                                            put("input", inputObj)
+                                        })
+                                    }
+                                })
+                            } else {
+                                put("content", JsonPrimitive(msg.content))
+                            }
+                        }
+                        "tool" -> {
+                            put("role", JsonPrimitive("user"))
+                            put("content", buildJsonArray {
+                                add(buildJsonObject {
+                                    put("type", JsonPrimitive("tool_result"))
+                                    put("tool_use_id", JsonPrimitive(msg.tool_call_id ?: "toolu_1"))
+                                    put("content", JsonPrimitive(msg.content))
+                                })
+                            })
+                        }
+                        else -> {
+                            put("role", JsonPrimitive("user"))
+                            put("content", JsonPrimitive(msg.content))
+                        }
+                    }
                 }
+            }
+
+            val coalescedMessages = mutableListOf<JsonObject>()
+            userAssistantMessages.forEach { msgObj ->
+                val role = msgObj["role"]?.jsonPrimitive?.content ?: "user"
+                val last = coalescedMessages.lastOrNull()
+                val lastRole = last?.get("role")?.jsonPrimitive?.content
+                if (last != null && lastRole == role) {
+                    val lastContent = last["content"]
+                    val newContent = msgObj["content"]
+                    val mergedContent = when {
+                        lastContent is kotlinx.serialization.json.JsonArray && newContent is kotlinx.serialization.json.JsonArray -> {
+                            kotlinx.serialization.json.JsonArray(lastContent + newContent)
+                        }
+                        lastContent is kotlinx.serialization.json.JsonArray && newContent is JsonPrimitive -> {
+                            kotlinx.serialization.json.JsonArray(lastContent + buildJsonObject {
+                                put("type", JsonPrimitive("text"))
+                                put("text", newContent)
+                            })
+                        }
+                        lastContent is JsonPrimitive && newContent is kotlinx.serialization.json.JsonArray -> {
+                            kotlinx.serialization.json.JsonArray(listOf(buildJsonObject {
+                                put("type", JsonPrimitive("text"))
+                                put("text", lastContent)
+                            }) + newContent)
+                        }
+                        lastContent is JsonPrimitive && newContent is JsonPrimitive -> {
+                            JsonPrimitive("${lastContent.content}\n\n${newContent.content}")
+                        }
+                        else -> newContent ?: lastContent
+                    }
+                    coalescedMessages[coalescedMessages.lastIndex] = buildJsonObject {
+                        put("role", JsonPrimitive(role))
+                        if (mergedContent != null) put("content", mergedContent)
+                    }
+                } else {
+                    coalescedMessages.add(msgObj)
+                }
+            }
+
+            if (coalescedMessages.firstOrNull()?.get("role")?.jsonPrimitive?.content == "assistant") {
+                coalescedMessages.add(0, buildJsonObject {
+                    put("role", JsonPrimitive("user"))
+                    put("content", JsonPrimitive("Proceed."))
+                })
             }
 
             val effectiveMaxTokens = maxTokens.coerceAtMost(model.maxOutputTokens)
             val requestBody = buildJsonObject {
                 put("model", JsonPrimitive(model.modelId))
-                put("messages", json.parseToJsonElement(json.encodeToString(userAssistantMessages)))
+                put("messages", json.parseToJsonElement(json.encodeToString(coalescedMessages)))
                 put("max_tokens", JsonPrimitive(effectiveMaxTokens))
                 put("stream", JsonPrimitive(true))
 

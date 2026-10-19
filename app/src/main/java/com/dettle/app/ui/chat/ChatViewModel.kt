@@ -36,6 +36,7 @@ import com.dettle.app.data.settings.ApiKeyStore
 import com.dettle.app.data.db.dao.ConversationDao
 import com.dettle.app.data.db.entity.ConversationEntity
 import com.dettle.app.data.db.entity.ConversationMessageEntity
+import com.dettle.app.orchestrator.ToolExecutor
 import com.dettle.app.orchestrator.mode.EnvironmentMode
 import com.dettle.app.orchestrator.mode.SlashCommand
 import com.dettle.app.orchestrator.swarm.SwarmOrchestrator
@@ -61,6 +62,7 @@ enum class SimpleChatMode(val displayName: String, val emoji: String) {
 class ChatViewModel @Inject constructor(
     private val agentExecutionManager: com.dettle.app.orchestrator.execution.AgentExecutionManager,
     private val reActLoop: ReActLoop,
+    private val toolExecutor: ToolExecutor,
     private val modeRouter: ModeRouter,
     private val modeRepository: ModeRepository,
     private val goalRepository: GoalRepository,
@@ -784,21 +786,87 @@ class ChatViewModel @Inject constructor(
     // ── Approval ────────────────────────────────────────────────────────────
 
     fun approveAction() {
-        val (approval, _) = pendingApproval ?: return
+        val (approval, toolCall) = pendingApproval ?: return
         approval.status = ApprovalStatus.APPROVED
         updateApprovalStatus(approval.id, ApprovalStatus.APPROVED)
         pendingApproval = null
-        addMessage(ChatMessage(role = MessageRole.SYSTEM, type = MessageType.SYSTEM, content = "Action approved. Executing..."))
+        addMessage(ChatMessage(role = MessageRole.SYSTEM, type = MessageType.SYSTEM, content = "Action approved. Executing `${toolCall.name}`..."))
         _uiState.update { it.copy(isAgentRunning = true, inputEnabled = false) }
+
+        val convId = activeConversationId ?: return
+        viewModelScope.launch {
+            try {
+                val toolResult = toolExecutor.execute(toolCall)
+                addMessage(ChatMessage(
+                    role = MessageRole.TOOL, type = MessageType.TOOL_RESULT,
+                    content = toolResult.content, toolResult = toolResult
+                ))
+                conversationHistory.add(ApiMessage(
+                    role = "tool", content = toolResult.content,
+                    tool_call_id = toolResult.toolCallId, name = toolResult.toolName
+                ))
+                conversationDao.insertMessage(
+                    ConversationMessageEntity(
+                        conversationId = convId,
+                        role = "tool",
+                        content = toolResult.content,
+                        type = MessageType.TOOL_RESULT.name,
+                        toolName = toolResult.toolName,
+                        toolCallId = toolResult.toolCallId
+                    )
+                )
+                conversationDao.incrementMessageCount(convId)
+
+                val isUnleashedMode = _uiState.value.isUnleashed
+                val taskContext = TaskContext(isUncensored = isUnleashedMode)
+                val effectiveMode = resolveMode("")
+                agentExecutionManager.dispatchMessage(
+                    conversationId = convId,
+                    userMessage = "Tool `${toolCall.name}` was approved and executed. Result:\n${toolResult.content}",
+                    conversationHistory = conversationHistory.toList(),
+                    taskContext = taskContext,
+                    effectiveMode = effectiveMode,
+                    isUncensored = isUnleashedMode,
+                    activeChatMode = _uiState.value.activeChatMode,
+                    selectedModel = _uiState.value.selectedModel,
+                    startTimeMs = System.currentTimeMillis()
+                )
+            } catch (t: Throwable) {
+                addMessage(ChatMessage(role = MessageRole.SYSTEM, type = MessageType.ERROR, content = "Tool execution failed: ${t.localizedMessage ?: "Unknown error"}"))
+                _uiState.update { it.copy(isAgentRunning = false, inputEnabled = true) }
+            }
+        }
     }
 
     fun rejectAction() {
-        val (approval, _) = pendingApproval ?: return
+        val (approval, toolCall) = pendingApproval ?: return
         approval.status = ApprovalStatus.REJECTED
         updateApprovalStatus(approval.id, ApprovalStatus.REJECTED)
         pendingApproval = null
-        addMessage(ChatMessage(role = MessageRole.SYSTEM, type = MessageType.SYSTEM, content = "Action rejected."))
-        _uiState.update { it.copy(isAgentRunning = false, inputEnabled = true) }
+        addMessage(ChatMessage(role = MessageRole.SYSTEM, type = MessageType.SYSTEM, content = "Action `${toolCall.name}` rejected by user."))
+        _uiState.update { it.copy(isAgentRunning = true, inputEnabled = false) }
+
+        val convId = activeConversationId ?: return
+        viewModelScope.launch {
+            conversationHistory.add(ApiMessage(
+                role = "tool", content = "User rejected the action `${toolCall.name}`. Do not attempt this action again without asking or proposing an alternative.",
+                tool_call_id = toolCall.id, name = toolCall.name
+            ))
+            val isUnleashedMode = _uiState.value.isUnleashed
+            val taskContext = TaskContext(isUncensored = isUnleashedMode)
+            val effectiveMode = resolveMode("")
+            agentExecutionManager.dispatchMessage(
+                conversationId = convId,
+                userMessage = "Action `${toolCall.name}` was rejected by the user. Please proceed accordingly.",
+                conversationHistory = conversationHistory.toList(),
+                taskContext = taskContext,
+                effectiveMode = effectiveMode,
+                isUncensored = isUnleashedMode,
+                activeChatMode = _uiState.value.activeChatMode,
+                selectedModel = _uiState.value.selectedModel,
+                startTimeMs = System.currentTimeMillis()
+            )
+        }
     }
 
     fun clearChat() {

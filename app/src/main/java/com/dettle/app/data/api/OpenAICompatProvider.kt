@@ -194,9 +194,24 @@ class OpenAICompatProvider(
         val messagesJson = messages.map { msg ->
             buildJsonObject {
                 put("role", JsonPrimitive(msg.role))
-                put("content", JsonPrimitive(msg.content))
-                if (msg.tool_call_id != null) put("tool_call_id", JsonPrimitive(msg.tool_call_id))
-                if (msg.name != null) put("name", JsonPrimitive(msg.name))
+                if (msg.role == "assistant" && !msg.tool_calls.isNullOrBlank()) {
+                    if (msg.content.isNotBlank()) {
+                        put("content", JsonPrimitive(msg.content))
+                    } else {
+                        put("content", JsonPrimitive(null as String?))
+                    }
+                    val toolsElement = runCatching {
+                        val parsed = json.parseToJsonElement(msg.tool_calls)
+                        if (parsed is kotlinx.serialization.json.JsonArray) parsed else kotlinx.serialization.json.JsonArray(listOf(parsed))
+                    }.getOrNull()
+                    if (toolsElement != null) {
+                        put("tool_calls", toolsElement)
+                    }
+                } else {
+                    put("content", JsonPrimitive(msg.content))
+                    if (msg.tool_call_id != null) put("tool_call_id", JsonPrimitive(msg.tool_call_id))
+                    if (msg.name != null) put("name", JsonPrimitive(msg.name))
+                }
             }
         }
 

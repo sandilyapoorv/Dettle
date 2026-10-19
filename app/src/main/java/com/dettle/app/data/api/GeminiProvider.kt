@@ -10,11 +10,15 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import okhttp3.Response
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -56,15 +60,87 @@ class GeminiProvider(
             // Build Gemini-format request
             val contents = messages.filter { it.role != "system" }.map { msg ->
                 buildJsonObject {
-                    put("role", JsonPrimitive(if (msg.role == "assistant") "model" else "user"))
-                    put("parts", buildJsonArray {
-                        add(buildJsonObject { put("text", JsonPrimitive(msg.content)) })
-                    })
+                    when (msg.role) {
+                        "assistant" -> {
+                            put("role", JsonPrimitive("model"))
+                            put("parts", buildJsonArray {
+                                if (msg.content.isNotBlank()) {
+                                    add(buildJsonObject { put("text", JsonPrimitive(msg.content)) })
+                                }
+                                if (!msg.tool_calls.isNullOrBlank()) {
+                                    val parsedTools = runCatching {
+                                        val el = json.parseToJsonElement(msg.tool_calls)
+                                        if (el is kotlinx.serialization.json.JsonArray) el else kotlinx.serialization.json.JsonArray(listOf(el))
+                                    }.getOrNull() ?: kotlinx.serialization.json.JsonArray(emptyList())
+
+                                    parsedTools.forEach { toolItem ->
+                                        val obj = toolItem.jsonObject
+                                        val name = (obj["name"] ?: (obj["function"] as? kotlinx.serialization.json.JsonObject)?.get("name"))?.let { (it as? JsonPrimitive)?.content } ?: msg.name ?: ""
+                                        val argsEl = (obj["args"] ?: obj["arguments"] ?: (obj["function"] as? kotlinx.serialization.json.JsonObject)?.get("arguments"))
+                                        val argsObj = when (argsEl) {
+                                            is kotlinx.serialization.json.JsonObject -> argsEl
+                                            is JsonPrimitive -> runCatching { json.parseToJsonElement(argsEl.content) as? kotlinx.serialization.json.JsonObject }.getOrNull() ?: kotlinx.serialization.json.JsonObject(emptyMap())
+                                            else -> kotlinx.serialization.json.JsonObject(emptyMap())
+                                        }
+                                        add(buildJsonObject {
+                                            put("functionCall", buildJsonObject {
+                                                put("name", JsonPrimitive(name))
+                                                put("args", argsObj)
+                                            })
+                                        })
+                                    }
+                                }
+                            })
+                        }
+                        "tool" -> {
+                            put("role", JsonPrimitive("user"))
+                            put("parts", buildJsonArray {
+                                add(buildJsonObject {
+                                    put("functionResponse", buildJsonObject {
+                                        put("name", JsonPrimitive(msg.name ?: "tool"))
+                                        put("response", buildJsonObject {
+                                            put("result", JsonPrimitive(msg.content))
+                                        })
+                                    })
+                                })
+                            })
+                        }
+                        else -> {
+                            put("role", JsonPrimitive("user"))
+                            put("parts", buildJsonArray {
+                                add(buildJsonObject { put("text", JsonPrimitive(msg.content)) })
+                            })
+                        }
+                    }
                 }
             }
 
+            val coalescedContents = mutableListOf<JsonObject>()
+            contents.forEach { item ->
+                val role = item["role"]?.jsonPrimitive?.content ?: "user"
+                val last = coalescedContents.lastOrNull()
+                val lastRole = last?.get("role")?.jsonPrimitive?.content
+                if (last != null && lastRole == role) {
+                    val prevParts = last["parts"]?.jsonArray ?: JsonArray(emptyList())
+                    val newParts = item["parts"]?.jsonArray ?: JsonArray(emptyList())
+                    coalescedContents[coalescedContents.lastIndex] = buildJsonObject {
+                        put("role", JsonPrimitive(role))
+                        put("parts", JsonArray(prevParts + newParts))
+                    }
+                } else {
+                    coalescedContents.add(item)
+                }
+            }
+
+            if (coalescedContents.firstOrNull()?.get("role")?.jsonPrimitive?.content == "model") {
+                coalescedContents.add(0, buildJsonObject {
+                    put("role", JsonPrimitive("user"))
+                    put("parts", buildJsonArray { add(buildJsonObject { put("text", JsonPrimitive("Hello")) }) })
+                })
+            }
+
             val requestBody = buildJsonObject {
-                put("contents", buildJsonArray { contents.forEach { add(it) } })
+                put("contents", buildJsonArray { coalescedContents.forEach { add(it) } })
                 put("safetySettings", buildJsonArray {
                     val blockNone = JsonPrimitive("BLOCK_NONE")
                     add(buildJsonObject { put("category", JsonPrimitive("HARM_CATEGORY_HARASSMENT")); put("threshold", blockNone) })
@@ -107,8 +183,19 @@ class GeminiProvider(
                                             put("properties", buildJsonObject {
                                                 tool.parameters.properties.forEach { (propName, propDef) ->
                                                     put(propName, buildJsonObject {
-                                                        put("type", JsonPrimitive(propDef.type.uppercase()))
+                                                        val typeUpper = when (propDef.type.lowercase()) {
+                                                            "int", "integer" -> "INTEGER"
+                                                            "number", "float", "double" -> "NUMBER"
+                                                            "bool", "boolean" -> "BOOLEAN"
+                                                            "array", "list" -> "ARRAY"
+                                                            "object" -> "OBJECT"
+                                                            else -> "STRING"
+                                                        }
+                                                        put("type", JsonPrimitive(typeUpper))
                                                         put("description", JsonPrimitive(propDef.description))
+                                                        if (typeUpper == "ARRAY") {
+                                                            put("items", buildJsonObject { put("type", JsonPrimitive("STRING")) })
+                                                        }
                                                         if (!propDef.enum.isNullOrEmpty()) {
                                                             put("enum", buildJsonArray {
                                                                 propDef.enum.forEach { add(JsonPrimitive(it)) }

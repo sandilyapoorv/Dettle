@@ -189,16 +189,16 @@ class ToolExecutor @Inject constructor(
                         is kotlinx.serialization.json.JsonArray -> {
                             element.mapNotNull { el ->
                                 val obj = el as? kotlinx.serialization.json.JsonObject ?: return@mapNotNull null
-                                val path = ((obj["path"] ?: obj["file_path"] ?: obj["filename"] ?: obj["file"]) as? kotlinx.serialization.json.JsonPrimitive)?.content?.trim()
-                                val content = ((obj["content"] ?: obj["code"] ?: obj["text"]) as? kotlinx.serialization.json.JsonPrimitive)?.content
+                                val path = ((obj["path"] ?: obj["file_path"] ?: obj["filename"] ?: obj["file"] ?: obj["file_name"]) as? kotlinx.serialization.json.JsonPrimitive)?.content?.trim()
+                                val content = ((obj["content"] ?: obj["code"] ?: obj["text"] ?: obj["body"] ?: obj["source"]) as? kotlinx.serialization.json.JsonPrimitive)?.content
                                 if (!path.isNullOrBlank() && content != null) {
                                     com.dettle.app.data.github.FileChange(path = path, content = content)
                                 } else null
                             }
                         }
                         is kotlinx.serialization.json.JsonObject -> {
-                            val path = ((element["path"] ?: element["file_path"] ?: element["filename"] ?: element["file"]) as? kotlinx.serialization.json.JsonPrimitive)?.content?.trim()
-                            val content = ((element["content"] ?: element["code"] ?: element["text"]) as? kotlinx.serialization.json.JsonPrimitive)?.content
+                            val path = ((element["path"] ?: element["file_path"] ?: element["filename"] ?: element["file"] ?: element["file_name"]) as? kotlinx.serialization.json.JsonPrimitive)?.content?.trim()
+                            val content = ((element["content"] ?: element["code"] ?: element["text"] ?: element["body"] ?: element["source"]) as? kotlinx.serialization.json.JsonPrimitive)?.content
                             if (!path.isNullOrBlank() && content != null) {
                                 listOf(com.dettle.app.data.github.FileChange(path = path, content = content))
                             } else emptyList()
@@ -295,10 +295,10 @@ class ToolExecutor @Inject constructor(
             "github_create_release" -> {
                 val owner = args["owner"] ?: activeProj?.owner ?: return errResult(toolCall, "Missing owner and no active project anchored")
                 val repo = args["repo"] ?: activeProj?.repo ?: return errResult(toolCall, "Missing repo and no active project anchored")
-                val tagName = args["tag_name"] ?: return errResult(toolCall, "Missing tag_name")
-                val name = args["name"] ?: tagName
-                val body = args["body"] ?: "Release $tagName created by Dettle AI Agent"
-                val targetBranch = resolveBranch(owner, repo, args["target_branch"])
+                val tagName = args["tag_name"] ?: args["tag"] ?: args["version"] ?: return errResult(toolCall, "Missing tag_name")
+                val name = args["name"] ?: args["title"] ?: args["release_name"] ?: tagName
+                val body = args["body"] ?: args["description"] ?: "Release $tagName created by Dettle AI Agent"
+                val targetBranch = resolveBranch(owner, repo, args["target_branch"] ?: args["branch"])
                 val draft = args["draft"]?.toBooleanStrictOrNull() ?: false
                 val prerelease = args["prerelease"]?.toBooleanStrictOrNull() ?: false
 
@@ -322,8 +322,8 @@ class ToolExecutor @Inject constructor(
             "github_trigger_action" -> {
                 val owner = args["owner"] ?: activeProj?.owner ?: return errResult(toolCall, "Missing owner and no active project anchored")
                 val repo = args["repo"] ?: activeProj?.repo ?: return errResult(toolCall, "Missing repo and no active project anchored")
-                val workflowId = args["workflow_id"] ?: return errResult(toolCall, "Missing workflow_id")
-                val ref = resolveBranch(owner, repo, args["ref"])
+                val workflowId = args["workflow_id"] ?: args["workflow"] ?: args["action"] ?: return errResult(toolCall, "Missing workflow_id")
+                val ref = resolveBranch(owner, repo, args["ref"] ?: args["branch"])
                 val inputsJson = args["inputs"] ?: "{}"
                 val inputs = try {
                     val el = json.parseToJsonElement(inputsJson)
@@ -340,7 +340,7 @@ class ToolExecutor @Inject constructor(
             "github_poll_run" -> {
                 val owner = args["owner"] ?: activeProj?.owner ?: return errResult(toolCall, "Missing owner and no active project anchored")
                 val repo = args["repo"] ?: activeProj?.repo ?: return errResult(toolCall, "Missing repo and no active project anchored")
-                val workflowId = args["workflow_id"] ?: return errResult(toolCall, "Missing workflow_id")
+                val workflowId = args["workflow_id"] ?: args["workflow"] ?: args["action"] ?: return errResult(toolCall, "Missing workflow_id")
                 val runs = githubClient.getWorkflowRuns(owner, repo, workflowId)
                     .getOrElse { return errResult(toolCall, it.message ?: "Failed to fetch workflow runs") }
                 if (runs.isEmpty()) {
@@ -384,14 +384,29 @@ class ToolExecutor @Inject constructor(
 
             "cloudflare_deploy_preview" -> {
                 val projectName = args["project_name"]?.ifBlank { null }
+                    ?: args["project"]?.ifBlank { null }
+                    ?: args["name"]?.ifBlank { null }
                     ?: activeProj?.cloudflareProjectName
                     ?: "dettle-site"
                 val files = if (!args["files"].isNullOrBlank()) {
                     try {
                         val el = json.parseToJsonElement(args["files"]!!)
-                        (el as? kotlinx.serialization.json.JsonObject)?.entries?.associate {
-                            it.key to ((it.value as? kotlinx.serialization.json.JsonPrimitive)?.content ?: it.value.toString())
-                        } ?: workspaceManager.readAllFiles()
+                        when (el) {
+                            is kotlinx.serialization.json.JsonObject -> {
+                                el.entries.associate {
+                                    it.key to ((it.value as? kotlinx.serialization.json.JsonPrimitive)?.content ?: it.value.toString())
+                                }
+                            }
+                            is kotlinx.serialization.json.JsonArray -> {
+                                el.mapNotNull { item ->
+                                    val obj = item as? kotlinx.serialization.json.JsonObject ?: return@mapNotNull null
+                                    val path = ((obj["path"] ?: obj["filename"] ?: obj["file_path"] ?: obj["file"]) as? kotlinx.serialization.json.JsonPrimitive)?.content?.trim()
+                                    val content = ((obj["content"] ?: obj["code"] ?: obj["text"] ?: obj["body"]) as? kotlinx.serialization.json.JsonPrimitive)?.content
+                                    if (!path.isNullOrBlank() && content != null) path to content else null
+                                }.toMap().ifEmpty { workspaceManager.readAllFiles() }
+                            }
+                            else -> workspaceManager.readAllFiles()
+                        }
                     } catch (_: Exception) {
                         workspaceManager.readAllFiles()
                     }
@@ -412,7 +427,7 @@ class ToolExecutor @Inject constructor(
             }
 
             "cloudflare_publish_worker" -> {
-                val workerName = args["worker_name"] ?: args["script_name"]
+                val workerName = args["worker_name"] ?: args["script_name"] ?: args["name"]
                     ?: "${activeProj?.cloudflareProjectName ?: "dettle"}-worker"
                 val scriptBody = args["script_content"] ?: args["script"] ?: args["code"]
                     ?: runCatching { workspaceManager.readFile("worker.js") }.getOrNull()

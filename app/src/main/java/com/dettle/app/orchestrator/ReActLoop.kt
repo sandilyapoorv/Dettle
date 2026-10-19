@@ -34,8 +34,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -273,19 +275,39 @@ class ReActLoop @Inject constructor(
                 ""
             ).trim()
 
-            // Add assistant response to history
-            if (assistantTextForHistory.isNotBlank()) {
-                history.add(ApiMessage(role = "assistant", content = assistantTextForHistory))
-            } else if (assistantText.isNotBlank()) {
-                // If stripping left nothing (rare: full response was tool call), keep raw for history
-                history.add(ApiMessage(role = "assistant", content = assistantText))
-            }
-
             // ── Parse tool call ────────────────────────────────────────────
             // Provider returned a structured tool call
             val toolCall = detectedToolCallJson?.let { parseToolCall(it) }
                 // OR: AI embedded a tool call in text (WebView providers / Ollama)
                 ?: extractTextToolCall(assistantText)
+                // OR: AI emitted tool call in markdown code block or raw JSON
+                ?: extractRawOrMarkdownToolCall(assistantText, effectiveTools)
+
+            // Add assistant response to history
+            if (toolCall != null) {
+                val rawToolCallJson = detectedToolCallJson ?: buildJsonObject {
+                    put("id", kotlinx.serialization.json.JsonPrimitive(toolCall.id))
+                    put("type", kotlinx.serialization.json.JsonPrimitive("function"))
+                    put("name", kotlinx.serialization.json.JsonPrimitive(toolCall.name))
+                    put("arguments", buildJsonObject {
+                        toolCall.arguments.forEach { (k, v) -> put(k, kotlinx.serialization.json.JsonPrimitive(v)) }
+                    })
+                }.toString()
+                val assistantContent = if (assistantTextForHistory.isNotBlank()) assistantTextForHistory else "Calling tool: ${toolCall.name}"
+                history.add(ApiMessage(
+                    role = "assistant",
+                    content = assistantContent,
+                    tool_call_id = toolCall.id,
+                    name = toolCall.name,
+                    tool_calls = rawToolCallJson
+                ))
+            } else {
+                if (assistantTextForHistory.isNotBlank()) {
+                    history.add(ApiMessage(role = "assistant", content = assistantTextForHistory))
+                } else if (assistantText.isNotBlank()) {
+                    history.add(ApiMessage(role = "assistant", content = assistantText))
+                }
+            }
 
             if (toolCall == null) {
                 // No tool call → AI is done
@@ -330,7 +352,8 @@ class ReActLoop @Inject constructor(
 
             // ── Check safety / approval required ──────────────────────────
             val toolDef = effectiveTools.find { it.name == toolCall.name }
-            if (toolDef?.requiresApproval == true) {
+            val requiresApproval = !isUncensored && (toolDef?.requiresApproval == true)
+            if (requiresApproval) {
                 val approval = ApprovalRequest(
                     title = "Agent wants to: ${toolCall.name}",
                     description = buildApprovalDescription(toolCall),
@@ -425,79 +448,14 @@ class ReActLoop @Inject constructor(
     }.flowOn(Dispatchers.IO)
     }
 
-    /** Parse a structured JSON tool call from OpenAI-compatible or Gemini providers */
-    private fun parseToolCall(rawJson: String): ToolCall? {
-        return try {
-            val element = json.parseToJsonElement(rawJson)
-            val first = if (element is kotlinx.serialization.json.JsonArray) {
-                element.firstOrNull()?.jsonObject ?: return null
-            } else {
-                element.jsonObject
-            }
+    /** Parse a structured JSON tool call from OpenAI-compatible, Gemini, or Claude providers */
+    internal fun parseToolCall(rawJson: String): ToolCall? = ToolCallParser.parse(rawJson, json)
 
-            val functionObj = first["function"]?.jsonObject
-            val name = functionObj?.get("name")?.jsonPrimitive?.content
-                ?: first["name"]?.jsonPrimitive?.content
-                ?: return null
+    /** Extract XML-format tool call embedded in plain text (for WebView providers or Ollama fallback) */
+    internal fun extractTextToolCall(text: String): ToolCall? = ToolCallParser.extractFromText(text, json)
 
-            val args: Map<String, String> = when {
-                functionObj?.containsKey("arguments") == true -> {
-                    val argsElement = functionObj["arguments"]
-                    if (argsElement is kotlinx.serialization.json.JsonPrimitive) {
-                        runCatching {
-                            json.parseToJsonElement(argsElement.content).jsonObject.entries.associate { it.key to it.value.jsonPrimitive.content }
-                        }.getOrDefault(emptyMap())
-                    } else if (argsElement is kotlinx.serialization.json.JsonObject) {
-                        argsElement.entries.associate { it.key to it.value.jsonPrimitive.content }
-                    } else emptyMap()
-                }
-                first.containsKey("args") -> {
-                    val argsElement = first["args"]
-                    if (argsElement is kotlinx.serialization.json.JsonObject) {
-                        argsElement.entries.associate { it.key to it.value.jsonPrimitive.content }
-                    } else if (argsElement is kotlinx.serialization.json.JsonPrimitive) {
-                        runCatching {
-                            json.parseToJsonElement(argsElement.content).jsonObject.entries.associate { it.key to it.value.jsonPrimitive.content }
-                        }.getOrDefault(emptyMap())
-                    } else emptyMap()
-                }
-                first.containsKey("arguments") -> {
-                    val argsElement = first["arguments"]
-                    if (argsElement is kotlinx.serialization.json.JsonObject) {
-                        argsElement.entries.associate { it.key to it.value.jsonPrimitive.content }
-                    } else if (argsElement is kotlinx.serialization.json.JsonPrimitive) {
-                        runCatching {
-                            json.parseToJsonElement(argsElement.content).jsonObject.entries.associate { it.key to it.value.jsonPrimitive.content }
-                        }.getOrDefault(emptyMap())
-                    } else emptyMap()
-                }
-                else -> emptyMap()
-            }
-
-            ToolCall(name = name, arguments = args)
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to parse structured tool call: $e\nJSON input: $rawJson")
-            null
-        }
-    }
-
-    /** Extract XML-format tool call embedded in plain text (for WebView providers) */
-    private fun extractTextToolCall(text: String): ToolCall? {
-        val regex = """<tool_call>\s*(\{.*?\})\s*</tool_call>""".toRegex(RegexOption.DOT_MATCHES_ALL)
-        val match = regex.find(text) ?: return null
-        return try {
-            val obj = json.parseToJsonElement(match.groupValues[1]) as? kotlinx.serialization.json.JsonObject ?: return null
-            val name = (obj["name"] as? kotlinx.serialization.json.JsonPrimitive)?.content ?: return null
-            val argsObj = obj["args"] as? kotlinx.serialization.json.JsonObject
-            val args = argsObj?.entries?.associate { (k, v) ->
-                k to ((v as? kotlinx.serialization.json.JsonPrimitive)?.content ?: v.toString())
-            } ?: emptyMap()
-            ToolCall(name = name, arguments = args)
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to parse text tool call: $e")
-            null
-        }
-    }
+    /** Extract tool call from raw JSON object or markdown code block in text when tags are omitted */
+    internal fun extractRawOrMarkdownToolCall(text: String, tools: List<Tool>): ToolCall? = ToolCallParser.extractRawOrMarkdown(text, tools, json)
 
     private fun buildApprovalDescription(toolCall: ToolCall): String = buildString {
         appendLine("**Tool**: `${toolCall.name}`")

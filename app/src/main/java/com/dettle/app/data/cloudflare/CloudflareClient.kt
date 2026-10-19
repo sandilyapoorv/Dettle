@@ -109,7 +109,20 @@ class CloudflareClient @Inject constructor(
             ).build()
             val createResponse = client.newCall(createRequest).execute()
             val createBody = createResponse.body?.string().orEmpty()
-            val createParsed = json.decodeFromString<CfResponse<PagesDeploymentResult>>(createBody)
+            var createParsed = json.decodeFromString<CfResponse<PagesDeploymentResult>>(createBody)
+
+            if (!createParsed.success || createParsed.result == null) {
+                // If project not found, create project first and retry
+                val notFound = createParsed.errors.any { it.code == 8000007 || it.message.contains("not found", ignoreCase = true) }
+                if (notFound) {
+                    val createProjResult = createPagesProject(projectName)
+                    if (createProjResult.isSuccess) {
+                        val retryResponse = client.newCall(createRequest).execute()
+                        val retryBody = retryResponse.body?.string().orEmpty()
+                        createParsed = json.decodeFromString<CfResponse<PagesDeploymentResult>>(retryBody)
+                    }
+                }
+            }
 
             if (!createParsed.success || createParsed.result == null) {
                 return@withContext Result.failure(Exception("Failed to create deployment: ${createParsed.errors.joinToString { it.message }}"))

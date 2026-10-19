@@ -86,7 +86,8 @@ data class ApiMessage(
     val role: String,  // "user", "assistant", "system", "tool"
     val content: String,
     val tool_call_id: String? = null,
-    val name: String? = null
+    val name: String? = null,
+    val tool_calls: String? = null
 )
 
 fun ChatMessage.toApiMessage(): ApiMessage = ApiMessage(
