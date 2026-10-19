@@ -65,6 +65,9 @@ import com.dettle.app.orchestrator.AgentStatus
 import com.dettle.app.ui.theme.DettleGreen
 import com.dettle.app.ui.theme.DettleOrange
 
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.IconButton
+
 fun getAgentRoleIcon(role: AgentRole): ImageVector = when (role) {
     AgentRole.ORCHESTRATOR -> Icons.Outlined.Psychology
     AgentRole.READER -> Icons.Outlined.AutoStories
@@ -76,7 +79,8 @@ fun getAgentRoleIcon(role: AgentRole): ImageVector = when (role) {
 
 @Composable
 fun AgentsScreen(
-    viewModel: AgentsViewModel = hiltViewModel()
+    viewModel: AgentsViewModel = hiltViewModel(),
+    onBack: (() -> Unit)? = null
 ) {
     val state by viewModel.uiState.collectAsState()
 
@@ -93,6 +97,18 @@ fun AgentsScreen(
             // Header
             item {
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (onBack != null) {
+                        IconButton(
+                            onClick = onBack,
+                            modifier = Modifier.size(40.dp).padding(end = 6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+                    }
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
                             "Agent Fleet",

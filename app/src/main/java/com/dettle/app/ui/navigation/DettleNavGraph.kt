@@ -8,6 +8,7 @@ import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.FolderCopy
+import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -22,6 +23,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.dettle.app.ui.agents.AgentsScreen
 import com.dettle.app.ui.chat.ChatScreen
 import com.dettle.app.ui.chat.ChatViewModel
 import com.dettle.app.ui.deployments.DeploymentsScreen
@@ -33,6 +35,7 @@ import com.dettle.app.ui.settings.SettingsScreen
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Onboarding : Screen("onboarding", "Onboarding", Icons.Outlined.AutoAwesome)
     object Chat : Screen("chat", "Chat", Icons.Outlined.ChatBubbleOutline)
+    object Agents : Screen("agents", "Fleet", Icons.Outlined.Psychology)
     object Repos : Screen("repos", "Repos", Icons.Outlined.FolderCopy)
     object Deployments : Screen("deployments", "Deploy", Icons.Outlined.CloudUpload)
     object Overnight : Screen("overnight", "Overnight", Icons.Outlined.Bedtime)
@@ -101,7 +104,15 @@ fun DettleNavGraph(
                 viewModel = chatViewModel,
                 onNavigateToSettings = {
                     navController.navigate(Screen.Settings.route)
+                },
+                onNavigateToAgents = {
+                    navController.navigate(Screen.Agents.route)
                 }
+            )
+        }
+        composable(Screen.Agents.route) {
+            AgentsScreen(
+                onBack = { navController.popBackStack() }
             )
         }
         composable(Screen.Settings.route) {
