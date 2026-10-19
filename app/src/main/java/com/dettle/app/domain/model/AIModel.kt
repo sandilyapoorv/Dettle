@@ -723,16 +723,16 @@ object FreeModels {
 
     /** Default waterfall order — most generous/fastest first */
     val WATERFALL_ORDER: List<AIModel> = listOf(
-        GROQ_LLAMA_8B,                  // Primary: fast routing (< 400ms)
-        GeminiModels.GEMINI_3_8_FLASH,  // Heavy lifting (1M context)
+        GeminiModels.GEMINI_3_8_FLASH,      // Primary heavy lifting (1M context)
         GeminiModels.GEMINI_3_5_FLASH_LITE, // High throughput agent turns
-        GeminiModels.GEMINI_3_1_PRO,    // Deep reasoning & architecture
+        GeminiModels.GEMINI_3_1_PRO,        // Deep reasoning & architecture
+        GROQ_LLAMA_8B,                      // Fast routing (< 400ms)
         GroqModels.LLAMA_3_3_70B_VERSATILE, // Fast reasoning
-        SAMBANOVA_LLAMA_70B,            // Large context reads
-        OPENROUTER_LLAMA,               // Fallback 1
-        OPENROUTER_QWEN,                // Fallback 2
-        GITHUB_GPT4O,                   // Best quality
-        GITHUB_DEEPSEEK_R1              // Best reasoning
+        SAMBANOVA_LLAMA_70B,                // Large context reads
+        OPENROUTER_LLAMA,                   // Fallback 1
+        OPENROUTER_QWEN,                    // Fallback 2
+        GITHUB_GPT4O,                       // Best quality
+        GITHUB_DEEPSEEK_R1                  // Best reasoning
     )
 }
 
@@ -743,9 +743,9 @@ object FreeModels {
 object ModelSets {
     /** Intent classification, inner loop decisions, fast turns */
     val FAST: List<AIModel> = listOf(
-        FreeModels.GROQ_LLAMA_8B,
         GeminiModels.GEMINI_3_5_FLASH_LITE,
         GeminiModels.GEMINI_3_8_FLASH,
+        FreeModels.GROQ_LLAMA_8B,
         FreeModels.OPENROUTER_LLAMA,
         FreeModels.GROQ_LLAMA_70B
     )

@@ -76,8 +76,9 @@ object AppModule {
     @Singleton
     fun provideKeyPoolManager(
         factory: AIProviderFactory,
+        keyStore: ApiKeyStore,
         agentLogger: com.dettle.app.orchestrator.telemetry.AgentLogger
-    ): KeyPoolManager = KeyPoolManager(factory, agentLogger)
+    ): KeyPoolManager = KeyPoolManager(factory, keyStore, agentLogger)
 
     @Provides
     @Singleton

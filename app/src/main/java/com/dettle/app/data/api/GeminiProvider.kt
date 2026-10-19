@@ -229,24 +229,18 @@ class GeminiProvider(
 
             val cleanApiKey = apiKey.trim().replace("\r", "").replace("\n", "")
 
-            // Map known retired models directly to avoid unnecessary 404 roundtrips
-            val primaryModel = when (model.modelId) {
-                "gemini-2.0-flash", "gemini-2.0-flash-exp", "gemini-1.5-flash" -> "gemini-3.8-flash"
-                "gemini-2.0-flash-thinking-exp" -> "gemini-3.1-pro-preview"
-                else -> model.modelId
-            }
+            val primaryModel = model.modelId
 
             // Build candidate model list with prioritized fallback on 404
             val candidateModels = mutableListOf(
                 primaryModel,
+                "gemini-2.0-flash",
+                "gemini-1.5-flash",
+                "gemini-1.5-pro",
+                "gemini-2.5-flash",
                 "gemini-3.8-flash",
                 "gemini-3.5-flash-lite",
-                "gemini-3.1-pro-preview",
-                "gemini-3-flash-preview",
-                "gemini-2.5-flash",
-                "gemini-2.5-pro",
-                "gemini-1.5-flash",
-                "gemini-1.5-pro"
+                "gemini-3.1-pro-preview"
             ).distinct().toMutableList()
 
             var callResponse: Response? = null

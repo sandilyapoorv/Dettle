@@ -69,6 +69,7 @@ class ReActLoop @Inject constructor(
     private val projectContextManager: com.dettle.app.orchestrator.project.ProjectContextManager,
     private val workspaceManager: com.dettle.app.data.workspace.LocalWorkspaceManager,
     private val repoMapper: RepoMapper,
+    private val apiKeyStore: com.dettle.app.data.settings.ApiKeyStore,
     private val json: Json
 ) {
     fun run(
@@ -186,10 +187,12 @@ class ReActLoop @Inject constructor(
 
             val resolvedPreferredModel: com.dettle.app.domain.model.AIModel? = preferredModel ?: selectedModelId?.let { id ->
                 if (id != "Dettle AI" && id.isNotBlank()) {
-                    ALL_KNOWN_MODELS[id] ?: ALL_KNOWN_MODELS.values.firstOrNull { it.displayName.equals(id, ignoreCase = true) }
+                    val m = ALL_KNOWN_MODELS[id] ?: ALL_KNOWN_MODELS.values.firstOrNull { it.displayName.equals(id, ignoreCase = true) }
+                    if (m != null && apiKeyStore.hasKey(m.provider)) m else null
                 } else null
             } ?: mode?.effectiveConfig?.modelWaterfall?.firstNotNullOfOrNull { id ->
-                ALL_KNOWN_MODELS[id] ?: ALL_KNOWN_MODELS.values.firstOrNull { it.displayName.equals(id, ignoreCase = true) }
+                val m = ALL_KNOWN_MODELS[id] ?: ALL_KNOWN_MODELS.values.firstOrNull { it.displayName.equals(id, ignoreCase = true) }
+                if (m != null && apiKeyStore.hasKey(m.provider)) m else null
             }
 
             // Stream from AI provider

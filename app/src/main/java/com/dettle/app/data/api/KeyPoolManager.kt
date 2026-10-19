@@ -48,6 +48,7 @@ data class ProviderState(
 @Singleton
 class KeyPoolManager @Inject constructor(
     private val providerFactory: AIProviderFactory,
+    private val keyStore: com.dettle.app.data.settings.ApiKeyStore,
     private val agentLogger: com.dettle.app.orchestrator.telemetry.AgentLogger
 ) {
     private val states = FreeModels.WATERFALL_ORDER
@@ -70,17 +71,25 @@ class KeyPoolManager @Inject constructor(
 
         resetDailyCountsIfNeeded()
 
-        // Build ordered list: preferred model first, then waterfall
+        val configuredProviders = keyStore.getConfiguredApiProviders().toSet()
+        if (configuredProviders.isEmpty()) {
+            emit(StreamChunk.Error("No active AI providers configured. Please add an API key (e.g. Gemini) in Settings."))
+            return@flow
+        }
+
+        // Only include models whose providers are actively configured in ApiKeyStore
+        val availableStates = states.filter { configuredProviders.contains(it.model.provider) }
+
+        // Build ordered list: preferred model first, then waterfall (strictly within configured providers)
         val ordered = buildList {
-            if (preferModel != null) {
-                var prefState = states.find { it.model.modelId == preferModel.modelId }
+            if (preferModel != null && configuredProviders.contains(preferModel.provider)) {
+                var prefState = availableStates.find { it.model.modelId == preferModel.modelId }
                 if (prefState == null) {
                     prefState = ProviderState(preferModel)
-                    states.add(prefState)
                 }
                 add(prefState)
             }
-            addAll(states.filter { it.model.modelId != preferModel?.modelId })
+            addAll(availableStates.filter { it.model.modelId != preferModel?.modelId })
         }
 
         var lastError: String? = null
